@@ -1,0 +1,176 @@
+# Data Model Proposal
+
+All IDs use `uuid`. Event tables are append-only unless noted.
+
+## users
+- `id uuid pk`
+- `email text unique not null`
+- `display_name text`
+- `created_at timestamptz not null default now()`
+- `updated_at timestamptz not null default now()`
+
+Indexes: `unique(email)`
+
+## teams
+- `id uuid pk`
+- `name text not null`
+- `owner_user_id uuid not null references users(id)`
+- `created_at timestamptz not null default now()`
+
+Indexes: `(owner_user_id)`
+
+## studies
+- `id uuid pk`
+- `team_id uuid not null references teams(id)`
+- `created_by_user_id uuid not null references users(id)`
+- `name text not null`
+- `objective text`
+- `status text not null default 'draft'`
+- `created_at timestamptz not null default now()`
+- `updated_at timestamptz not null default now()`
+
+Indexes: `(team_id, created_at desc)`, `(status)`
+
+## study_pages
+- `id uuid pk`
+- `study_id uuid not null references studies(id)`
+- `page_url text`
+- `built_in_page_key text`
+- `task_prompt text not null`
+- `task_success_criteria text`
+- `sort_order int not null default 0`
+- `created_at timestamptz not null default now()`
+
+Indexes: `(study_id, sort_order)`
+
+## regions_of_interest
+- `id uuid pk`
+- `study_page_id uuid not null references study_pages(id)`
+- `name text not null`
+- `shape_type text not null` -- rect/polygon
+- `geometry jsonb not null` -- normalized coordinates
+- `is_primary_target boolean not null default false`
+- `created_at timestamptz not null default now()`
+
+Indexes: `(study_page_id)`, `gin(geometry)`
+
+## tester_sessions
+- `id uuid pk`
+- `study_id uuid not null references studies(id)`
+- `study_page_id uuid not null references study_pages(id)`
+- `session_token text unique not null`
+- `started_at timestamptz`
+- `ended_at timestamptz`
+- `task_completed boolean`
+- `device_type text`
+- `browser text`
+- `viewport_width int`
+- `viewport_height int`
+- `created_at timestamptz not null default now()`
+
+Indexes: `(study_id, created_at desc)`, `(study_page_id)`, `unique(session_token)`
+
+## calibration_points
+- `id bigserial pk`
+- `tester_session_id uuid not null references tester_sessions(id)`
+- `point_order int not null`
+- `target_x_norm double precision not null`
+- `target_y_norm double precision not null`
+- `predicted_x_norm double precision`
+- `predicted_y_norm double precision`
+- `error_px double precision`
+- `confidence double precision`
+- `captured_at timestamptz not null`
+
+Indexes: `(tester_session_id, point_order)`, `(tester_session_id, captured_at)`
+
+## gaze_events
+- `id bigserial pk`
+- `tester_session_id uuid not null references tester_sessions(id)`
+- `captured_at timestamptz not null`
+- `x_norm double precision not null`
+- `y_norm double precision not null`
+- `x_px double precision`
+- `y_px double precision`
+- `scroll_x_px double precision`
+- `scroll_y_px double precision`
+- `confidence double precision`
+- `sample_source text not null default 'webgazer'`
+- `ingested_at timestamptz not null default now()`
+
+Indexes: `(tester_session_id, captured_at)`, `(tester_session_id, ingested_at)`
+
+Volume note: highest-volume table; plan partitioning by time/session at scale.
+
+## click_events
+- `id bigserial pk`
+- `tester_session_id uuid not null references tester_sessions(id)`
+- `captured_at timestamptz not null`
+- `x_norm double precision`
+- `y_norm double precision`
+- `x_px double precision`
+- `y_px double precision`
+- `button text`
+- `target_hint text`
+- `ingested_at timestamptz not null default now()`
+
+Indexes: `(tester_session_id, captured_at)`
+
+## scroll_events
+- `id bigserial pk`
+- `tester_session_id uuid not null references tester_sessions(id)`
+- `captured_at timestamptz not null`
+- `scroll_x_px double precision not null`
+- `scroll_y_px double precision not null`
+- `delta_x double precision`
+- `delta_y double precision`
+- `ingested_at timestamptz not null default now()`
+
+Indexes: `(tester_session_id, captured_at)`
+
+## task_events
+- `id bigserial pk`
+- `tester_session_id uuid not null references tester_sessions(id)`
+- `captured_at timestamptz not null`
+- `event_type text not null` -- task_started/task_completed/task_abandoned
+- `event_value text`
+- `ingested_at timestamptz not null default now()`
+
+Indexes: `(tester_session_id, captured_at)`, `(event_type)`
+
+## session_quality_metrics
+- `tester_session_id uuid pk references tester_sessions(id)`
+- `calibration_error_mean_px double precision`
+- `calibration_error_p95_px double precision`
+- `low_confidence_sample_rate double precision`
+- `valid_gaze_sample_rate double precision`
+- `tracking_gap_rate double precision`
+- `quality_score double precision`
+- `quality_band text`
+- `computed_at timestamptz not null default now()`
+
+Indexes: `(quality_band)`, `(computed_at)`
+
+## session_reports
+- `tester_session_id uuid pk references tester_sessions(id)`
+- `report_version int not null default 1`
+- `task_completion_time_ms bigint`
+- `time_to_first_fixation_ms bigint`
+- `fixation_count int`
+- `attention_entropy double precision`
+- `gaze_dispersion double precision`
+- `metrics_json jsonb not null`
+- `heatmap_json jsonb not null`
+- `replay_json jsonb not null`
+- `generated_at timestamptz not null default now()`
+
+Indexes: `(generated_at)`, `gin(metrics_json)`
+
+## Relationship summary
+- `users 1->many teams`
+- `teams 1->many studies`
+- `studies 1->many study_pages`
+- `study_pages 1->many regions_of_interest`
+- `studies/study_pages 1->many tester_sessions`
+- `tester_sessions 1->many calibration_points/gaze_events/click_events/scroll_events/task_events`
+- `tester_sessions 1->1 session_quality_metrics/session_reports`
