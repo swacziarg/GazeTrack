@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gazeops.dev/contracts/events.schema.json",
+  "title": "SessionEventsBatch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session_id", "events"],
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/event" }
+    }
+  },
+  "$defs": {
+    "event": {
+      "oneOf": [
+        { "$ref": "#/$defs/gaze_event" },
+        { "$ref": "#/$defs/click_event" },
+        { "$ref": "#/$defs/scroll_event" },
+        { "$ref": "#/$defs/task_event" }
+      ]
+    },
+    "base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_type", "session_id", "timestamp"],
+      "properties": {
+        "event_type": { "type": "string" },
+        "session_id": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "gaze_event": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "session_id", "timestamp", "x", "y", "viewport_width", "viewport_height", "confidence"],
+          "properties": {
+            "event_type": { "const": "gaze" },
+            "session_id": { "type": "string", "minLength": 1 },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "x": { "type": "number", "minimum": 0 },
+            "y": { "type": "number", "minimum": 0 },
+            "viewport_width": { "type": "integer", "minimum": 1 },
+            "viewport_height": { "type": "integer", "minimum": 1 },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "scroll_x": { "type": "number" },
+            "scroll_y": { "type": "number" }
+          }
+        }
+      ]
+    },
+    "click_event": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "session_id", "timestamp", "x", "y", "button"],
+          "properties": {
+            "event_type": { "const": "click" },
+            "session_id": { "type": "string", "minLength": 1 },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "x": { "type": "number", "minimum": 0 },
+            "y": { "type": "number", "minimum": 0 },
+            "button": { "type": "string", "enum": ["left", "middle", "right"] },
+            "target_hint": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "scroll_event": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "session_id", "timestamp", "scroll_x", "scroll_y"],
+          "properties": {
+            "event_type": { "const": "scroll" },
+            "session_id": { "type": "string", "minLength": 1 },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "scroll_x": { "type": "number" },
+            "scroll_y": { "type": "number" },
+            "delta_x": { "type": "number" },
+            "delta_y": { "type": "number" }
+          }
+        }
+      ]
+    },
+    "task_event": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "session_id", "timestamp", "task_event_type"],
+          "properties": {
+            "event_type": { "const": "task" },
+            "session_id": { "type": "string", "minLength": 1 },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "task_event_type": {
+              "type": "string",
+              "enum": ["task_started", "task_completed", "task_abandoned"]
+            },
+            "task_id": { "type": "string" },
+            "details": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}

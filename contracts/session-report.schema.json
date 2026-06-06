@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gazeops.dev/contracts/session-report.schema.json",
+  "title": "SessionReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session_id", "quality", "report_summary"],
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "quality": { "$ref": "#/$defs/session_quality_metrics" },
+    "report_summary": { "$ref": "#/$defs/report_summary" }
+  },
+  "$defs": {
+    "session_quality_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quality_score",
+        "quality_band",
+        "calibration_error_mean_px",
+        "low_confidence_sample_rate",
+        "valid_gaze_sample_rate",
+        "tracking_gap_rate"
+      ],
+      "properties": {
+        "quality_score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "quality_band": { "type": "string", "enum": ["poor", "fair", "good", "excellent"] },
+        "calibration_error_mean_px": { "type": "number", "minimum": 0 },
+        "calibration_error_p95_px": { "type": "number", "minimum": 0 },
+        "low_confidence_sample_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "valid_gaze_sample_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tracking_gap_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "report_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_outcome", "task_duration_ms", "time_to_first_fixation_target_ms", "cta_fixated", "cta_clicked"],
+      "properties": {
+        "task_outcome": { "type": "string", "enum": ["completed", "abandoned", "incomplete"] },
+        "task_duration_ms": { "type": "integer", "minimum": 0 },
+        "time_to_first_fixation_target_ms": { "type": "integer", "minimum": 0 },
+        "cta_fixated": { "type": "boolean" },
+        "cta_clicked": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

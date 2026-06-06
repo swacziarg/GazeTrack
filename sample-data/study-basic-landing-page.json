@@ -1,0 +1,34 @@
+{
+  "study_id": "study_basic_landing_page",
+  "name": "Basic Landing Page CTA Study",
+  "objective": "Assess whether testers notice and click the primary CTA",
+  "status": "draft",
+  "pages": [
+    {
+      "page_id": "page_landing_01",
+      "url": "https://example.test/landing",
+      "task_prompt": "Find and click the Start Free Trial button",
+      "aois": [
+        {
+          "aoi_id": "aoi_hero_headline",
+          "name": "Hero headline",
+          "shape": "rect",
+          "coordinates": { "x": 0.18, "y": 0.14, "width": 0.42, "height": 0.16 }
+        },
+        {
+          "aoi_id": "aoi_primary_cta",
+          "name": "Primary CTA",
+          "shape": "rect",
+          "coordinates": { "x": 0.62, "y": 0.2, "width": 0.2, "height": 0.09 }
+        }
+      ]
+    }
+  ],
+  "session": {
+    "session_id": "session_template",
+    "study_id": "study_basic_landing_page",
+    "started_at": "2026-06-06T12:00:00Z",
+    "viewport": { "width": 1440, "height": 900 },
+    "calibration_points": []
+  }
+}

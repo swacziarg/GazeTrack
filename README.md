@@ -5,51 +5,73 @@ Privacy-first, task-based webcam gaze analytics for website builders.
 ## Product overview
 GazeOps helps product teams run structured UX studies where testers complete tasks on a webpage while browser-based gaze estimation and interaction telemetry are captured. It focuses on actionable attention analytics (not medical eye tracking): AOI dwell, fixation timing, click-after-fixation behavior, task outcomes, and confidence-aware quality scoring.
 
-## Target users
-- Website builders and product designers validating key page flows
-- UX researchers running lightweight remote studies
-- Product analytics teams needing visual-attention context for behavior events
+## Current status
+This repository is currently scaffold-first:
+- implementation-ready docs and contracts
+- synthetic sample payloads for safe iteration
+- no production webcam tracking, auth, or persistence wiring yet
 
-## MVP scope
-- Study creation with task prompt + page URL/test page
-- AOI (area of interest) definition on page screenshots/layout
-- Browser calibration and quality/confidence capture
-- Session recording of gaze/click/scroll/task events (no raw video)
-- Report with heatmap, replay timeline, task timing, AOI metrics, and session quality score
-
-## Tech stack
-- Frontend: React + TypeScript + Vite + Tailwind CSS
-- Gaze tracking: WebGazer.js (or equivalent browser-native library)
-- Backend API: FastAPI (Python)
-- Database: PostgreSQL (Supabase-compatible schema)
-- Analytics jobs: Python background jobs/tasks
-
-## Local setup (placeholder)
-1. Configure `.env` from `.env.example`.
-2. Start PostgreSQL/Supabase local instance.
-3. Run backend server.
-4. Run frontend dev server.
-5. Open app and run a sample study.
-
-(Concrete commands will be added as services are scaffolded.)
-
-## Demo flow
-1. Researcher creates study and adds page + task.
-2. Researcher marks AOIs (hero CTA, pricing, nav, etc.).
-3. Tester calibrates webcam tracking in browser.
-4. Tester performs task while gaze + event telemetry is captured.
-5. Researcher reviews heatmap, replay, quality score, and task metrics.
-
-## Privacy principles
+## Safe development principles
 - Process webcam frames locally in browser where possible.
 - Store gaze/event telemetry only; do **not** store raw webcam video.
-- Make calibration confidence and tracking quality explicit in reports.
-- Communicate uncertainty; avoid claims of perfect accuracy.
-- Use least-privilege data access and retention controls.
+- Treat gaze telemetry as sensitive behavioral data.
+- Communicate uncertainty; avoid claims of perfect or medical-grade accuracy.
+- Prefer conservative, low-risk, reviewable increments.
 
-## Roadmap
-- Phase 1: Workspace + data model + ingestion API scaffolding
-- Phase 2: Browser tracker integration + calibration UX
-- Phase 3: Event pipeline + quality-aware analytics metrics
-- Phase 4: Research dashboard + report generation + replay
-- Phase 5: Hardening, benchmarking, and deployment polish
+## Repository structure
+```text
+.github/                  PR + issue templates
+contracts/                JSON Schema draft contracts
+docs/                     product, architecture, workflow, and checklists
+backend/                  backend placeholder notes
+frontend/                 frontend placeholder notes
+sample-data/              synthetic study/session payloads
+scripts/                  lightweight validation utilities
+```
+
+## Documentation index
+- Product and system docs:
+  - `docs/product-spec.md`
+  - `docs/architecture.md`
+  - `docs/data-model.md`
+  - `docs/analytics-metrics.md`
+  - `docs/mvp-roadmap.md`
+- Development and safety:
+  - `CONTRIBUTING.md`
+  - `docs/development-workflow.md`
+  - `docs/privacy-and-safety.md`
+  - `docs/ux-study-lifecycle.md`
+  - `docs/api-contracts.md`
+- Implementation checklists:
+  - `docs/checklists/mvp-implementation-checklist.md`
+  - `docs/checklists/gaze-tracking-integration-checklist.md`
+  - `docs/checklists/reporting-analytics-checklist.md`
+  - `docs/checklists/release-readiness-checklist.md`
+
+## Contracts and sample data
+- Draft schemas live in `contracts/`.
+- Synthetic examples live in `sample-data/`.
+- Validate sample JSON with:
+
+```bash
+python scripts/validate_sample_data.py
+```
+
+## MVP scope (still planned)
+- Study creation with task prompt + page URL/test page
+- AOI definition on page screenshots/layout
+- Calibration and quality/confidence capture
+- Session telemetry ingestion (gaze/click/scroll/task)
+- Report generation with quality-aware metrics
+
+## Intentionally not implemented in this phase
+- Webcam tracking integration
+- Authentication
+- Database persistence wiring
+- Payment/deployment automation
+- Advanced analytics/replay/heatmap runtime features
+
+## Next milestones
+1. Add backend FastAPI stubs matching `docs/api-contracts.md`.
+2. Add frontend static placeholders for study/calibration/report flows.
+3. Add schema validation hooks in CI and basic contract tests.

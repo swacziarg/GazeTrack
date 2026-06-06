@@ -1,0 +1,66 @@
+{
+  "session_id": "session_poor_calibration",
+  "study_id": "study_basic_landing_page",
+  "scenario": "poor_calibration_and_confidence",
+  "events": [
+    {
+      "event_type": "task",
+      "task_event_type": "task_started",
+      "session_id": "session_poor_calibration",
+      "timestamp": "2026-06-06T12:15:00Z",
+      "task_id": "task_click_cta"
+    },
+    {
+      "event_type": "gaze",
+      "session_id": "session_poor_calibration",
+      "timestamp": "2026-06-06T12:15:03Z",
+      "x": 820,
+      "y": 460,
+      "viewport_width": 1440,
+      "viewport_height": 900,
+      "confidence": 0.38
+    },
+    {
+      "event_type": "scroll",
+      "session_id": "session_poor_calibration",
+      "timestamp": "2026-06-06T12:15:06Z",
+      "scroll_x": 0,
+      "scroll_y": 210,
+      "delta_x": 0,
+      "delta_y": 210
+    },
+    {
+      "event_type": "click",
+      "session_id": "session_poor_calibration",
+      "timestamp": "2026-06-06T12:15:12Z",
+      "x": 1030,
+      "y": 690,
+      "button": "left",
+      "target_hint": "unknown"
+    },
+    {
+      "event_type": "task",
+      "task_event_type": "task_completed",
+      "session_id": "session_poor_calibration",
+      "timestamp": "2026-06-06T12:15:31Z",
+      "task_id": "task_click_cta"
+    }
+  ],
+  "quality": {
+    "quality_score": 42,
+    "quality_band": "poor",
+    "calibration_error_mean_px": 142.7,
+    "calibration_error_p95_px": 233.5,
+    "low_confidence_sample_rate": 0.44,
+    "valid_gaze_sample_rate": 0.58,
+    "tracking_gap_rate": 0.29
+  },
+  "report_summary": {
+    "task_outcome": "completed",
+    "task_duration_ms": 31000,
+    "time_to_first_fixation_target_ms": 18400,
+    "cta_fixated": false,
+    "cta_clicked": false,
+    "notes": "Completion likely unreliable due to calibration drift and low confidence"
+  }
+}

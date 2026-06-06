@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gazeops.dev/contracts/study.schema.json",
+  "title": "Study",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["study_id", "name", "status", "pages", "session"],
+  "properties": {
+    "study_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "objective": { "type": "string" },
+    "status": { "type": "string", "enum": ["draft", "active", "archived"] },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/page" }
+    },
+    "session": { "$ref": "#/$defs/tester_session" }
+  },
+  "$defs": {
+    "aoi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aoi_id", "name", "shape", "coordinates"],
+      "properties": {
+        "aoi_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "shape": { "type": "string", "enum": ["rect"] },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 },
+            "width": { "type": "number", "minimum": 0, "maximum": 1 },
+            "height": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page_id", "url", "task_prompt", "aois"],
+      "properties": {
+        "page_id": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "task_prompt": { "type": "string", "minLength": 1 },
+        "aois": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/aoi" }
+        }
+      }
+    },
+    "calibration_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["point_index", "target_x", "target_y", "predicted_x", "predicted_y", "error_px", "confidence", "timestamp"],
+      "properties": {
+        "point_index": { "type": "integer", "minimum": 0 },
+        "target_x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "target_y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "predicted_x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "predicted_y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "error_px": { "type": "number", "minimum": 0 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "tester_session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session_id", "study_id", "started_at", "viewport", "calibration_points"],
+      "properties": {
+        "session_id": { "type": "string", "minLength": 1 },
+        "study_id": { "type": "string", "minLength": 1 },
+        "started_at": { "type": "string", "format": "date-time" },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "calibration_points": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/calibration_point" }
+        }
+      }
+    }
+  }
+}

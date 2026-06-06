@@ -1,0 +1,66 @@
+{
+  "session_id": "session_cta_ignored",
+  "study_id": "study_basic_landing_page",
+  "scenario": "cta_never_fixated",
+  "events": [
+    {
+      "event_type": "task",
+      "task_event_type": "task_started",
+      "session_id": "session_cta_ignored",
+      "timestamp": "2026-06-06T12:25:00Z",
+      "task_id": "task_click_cta"
+    },
+    {
+      "event_type": "gaze",
+      "session_id": "session_cta_ignored",
+      "timestamp": "2026-06-06T12:25:04Z",
+      "x": 420,
+      "y": 210,
+      "viewport_width": 1440,
+      "viewport_height": 900,
+      "confidence": 0.88
+    },
+    {
+      "event_type": "scroll",
+      "session_id": "session_cta_ignored",
+      "timestamp": "2026-06-06T12:25:09Z",
+      "scroll_x": 0,
+      "scroll_y": 540,
+      "delta_x": 0,
+      "delta_y": 540
+    },
+    {
+      "event_type": "click",
+      "session_id": "session_cta_ignored",
+      "timestamp": "2026-06-06T12:25:14Z",
+      "x": 380,
+      "y": 612,
+      "button": "left",
+      "target_hint": "secondary_link"
+    },
+    {
+      "event_type": "task",
+      "task_event_type": "task_abandoned",
+      "session_id": "session_cta_ignored",
+      "timestamp": "2026-06-06T12:25:33Z",
+      "task_id": "task_click_cta"
+    }
+  ],
+  "quality": {
+    "quality_score": 81,
+    "quality_band": "good",
+    "calibration_error_mean_px": 35.1,
+    "calibration_error_p95_px": 58.2,
+    "low_confidence_sample_rate": 0.08,
+    "valid_gaze_sample_rate": 0.9,
+    "tracking_gap_rate": 0.06
+  },
+  "report_summary": {
+    "task_outcome": "abandoned",
+    "task_duration_ms": 33000,
+    "time_to_first_fixation_target_ms": 33000,
+    "cta_fixated": false,
+    "cta_clicked": false,
+    "notes": "Tester interacted with page but never visually focused on primary CTA"
+  }
+}
