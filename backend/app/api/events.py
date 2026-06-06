@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter
+from pydantic import ValidationError
 
 from app.models.api import EventBatchRequest, EventEnvelope, EventIngestResponse
 
@@ -29,21 +30,23 @@ def _contains_media_like_fields(data: Any) -> bool:
 def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestResponse:
     events: list[EventEnvelope] = []
     rejected_reasons: list[str] = []
+    rejected_count = 0
 
     if "events" in payload:
         try:
             batch = EventBatchRequest.model_validate(payload)
             events = batch.events
-        except Exception:
-            rejected_reasons.append("Invalid event batch shape")
+        except ValidationError as exc:
+            rejected_reasons.append(f"Invalid event batch shape: {exc.errors()[0]['msg']}")
+            rejected_count += 1
     else:
         try:
             events = [EventEnvelope.model_validate(payload)]
-        except Exception:
-            rejected_reasons.append("Invalid single event shape")
+        except ValidationError as exc:
+            rejected_reasons.append(f"Invalid single event shape: {exc.errors()[0]['msg']}")
+            rejected_count += 1
 
     accepted_count = 0
-    rejected_count = 0
 
     for event in events:
         if _contains_media_like_fields(event.payload):
@@ -51,8 +54,6 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
             rejected_reasons.append(f"Rejected media-like payload fields in event_type={event.event_type.value}")
             continue
         accepted_count += 1
-
-    rejected_count += len(rejected_reasons) if not events else 0
 
     return EventIngestResponse(
         session_id=session_id,
