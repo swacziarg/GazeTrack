@@ -1,6 +1,6 @@
 # Backend
 
-Minimal FastAPI placeholder API for GazeOps. This backend intentionally exposes stable endpoint stubs without implementing production logic.
+Minimal FastAPI placeholder API for GazeTrack. This backend intentionally exposes stable endpoint stubs without implementing production logic.
 
 ## Install
 

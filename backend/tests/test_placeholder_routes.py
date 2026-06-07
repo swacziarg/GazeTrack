@@ -7,11 +7,11 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_meta_returns_gazeops_metadata() -> None:
+def test_meta_returns_gazetrack_metadata() -> None:
     response = client.get("/api/v1/meta")
     assert response.status_code == 200
     body = response.json()
-    assert body["project"] == "GazeOps"
+    assert body["project"] == "GazeTrack"
     assert "privacy_posture" in body
 
 

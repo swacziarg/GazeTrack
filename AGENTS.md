@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Project mission
-Build **GazeOps** into a production-style, privacy-first, task-based webcam gaze analytics platform for website builders. Prioritize reliable telemetry modeling, quality-aware analytics, and clear reporting over flashy but low-trust demos.
+Build **GazeTrack** into a production-style, privacy-first, task-based webcam gaze analytics platform for website builders. Prioritize reliable telemetry modeling, quality-aware analytics, and clear reporting over flashy but low-trust demos.
 
 ## Coding standards
 - Prefer TypeScript on frontend and typed Python on backend.

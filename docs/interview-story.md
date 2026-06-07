@@ -1,7 +1,7 @@
-# Interview Story: GazeOps
+# Interview Story: GazeTrack
 
 ## Why I built it
-I wanted a flagship portfolio project that combines full-stack product engineering with event modeling and analytics—close to real product/data work I want after graduation. GazeOps turns my analytics background into a shippable UX telemetry system with clear user value.
+I wanted a flagship portfolio project that combines full-stack product engineering with event modeling and analytics—close to real product/data work I want after graduation. GazeTrack turns my analytics background into a shippable UX telemetry system with clear user value.
 
 ## Technical decisions
 - Chose browser-native webcam gaze estimation (WebGazer.js style approach) for practical accessibility.

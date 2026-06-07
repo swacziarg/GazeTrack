@@ -22,7 +22,7 @@ class APIStatus(BaseModel):
 
 
 class MetaResponse(BaseModel):
-    project: str = "GazeOps"
+    project: str = "GazeTrack"
     version: str = "0.1.0"
     status: str = "placeholder"
     privacy_posture: str = "No raw webcam video storage; telemetry-only placeholders."

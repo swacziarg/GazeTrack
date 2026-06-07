@@ -1,9 +1,9 @@
-# GazeOps
+# GazeTrack
 
 Privacy-first, task-based webcam gaze analytics for website builders.
 
 ## Product overview
-GazeOps helps product teams run structured UX studies where testers complete tasks on a webpage while browser-based gaze estimation and interaction telemetry are captured. It focuses on actionable attention analytics (not medical eye tracking): AOI dwell, fixation timing, click-after-fixation behavior, task outcomes, and confidence-aware quality scoring.
+GazeTrack helps product teams run structured UX studies where testers complete tasks on a webpage while browser-based gaze estimation and interaction telemetry are captured. It focuses on actionable attention analytics (not medical eye tracking): AOI dwell, fixation timing, click-after-fixation behavior, task outcomes, and confidence-aware quality scoring.
 
 ## Target users
 - Website builders and product designers validating key page flows
@@ -18,7 +18,7 @@ GazeOps helps product teams run structured UX studies where testers complete tas
 - Report with heatmap, replay timeline, task timing, AOI metrics, and session quality score
 
 ## Tech stack
-- Frontend: React + TypeScript + Vite + Tailwind CSS
+- Frontend: React + TypeScript + Vite
 - Gaze tracking: WebGazer.js (or equivalent browser-native library)
 - Backend API: FastAPI (Python)
 - Database: PostgreSQL (Supabase-compatible schema)

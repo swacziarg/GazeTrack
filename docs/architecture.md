@@ -1,7 +1,7 @@
-# Architecture Overview: GazeOps
+# Architecture Overview: GazeTrack
 
 ## System overview
-GazeOps is a full-stack web system where browser clients capture gaze + interaction telemetry, backend APIs ingest and validate events, and analytics jobs compute quality-aware metrics for reporting.
+GazeTrack is a full-stack web system where browser clients capture gaze + interaction telemetry, backend APIs ingest and validate events, and analytics jobs compute quality-aware metrics for reporting.
 
 ## Frontend/backend/database boundaries
 - **Frontend (React/TS):** Study setup UI, calibration UI, telemetry capture, report rendering.

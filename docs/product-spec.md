@@ -1,7 +1,7 @@
-# Product Spec: GazeOps
+# Product Spec: GazeTrack
 
 ## Problem statement
-Website builders often know what users clicked, but not what users *looked at* before acting. Existing tools underrepresent visual attention and rarely tie gaze behavior to explicit task goals. GazeOps addresses this with privacy-first, task-based webcam gaze analytics and quality-aware reporting.
+Website builders often know what users clicked, but not what users *looked at* before acting. Existing tools underrepresent visual attention and rarely tie gaze behavior to explicit task goals. GazeTrack addresses this with privacy-first, task-based webcam gaze analytics and quality-aware reporting.
 
 ## User personas
 1. **Indie Website Builder**: Needs fast feedback on whether visitors notice key CTAs.
