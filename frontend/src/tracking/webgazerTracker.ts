@@ -9,7 +9,7 @@ import type {
   TrackerStatus,
 } from './types'
 
-type WebGazerPrediction = {
+export type WebGazerPrediction = {
   x: number
   y: number
   confidence?: number
@@ -23,14 +23,36 @@ type WebGazerApi = {
   end?: () => WebGazerApi
   showVideoPreview?: (enabled: boolean) => WebGazerApi
   showPredictionPoints?: (enabled: boolean) => WebGazerApi
+  recordScreenPosition?: (x: number, y: number, eventType?: string) => WebGazerApi
 }
 
 type WindowWithWebGazer = Window & {
   webgazer?: WebGazerApi
 }
 
+type CalibrationMeasurement = {
+  target: NormalizedPoint
+  prediction: WebGazerPrediction | null
+  viewportWidth: number
+  viewportHeight: number
+}
+
+export type CalibrationSummary = {
+  completedPoints: number
+  averageErrorPx: number | null
+  averageErrorNormalized: number | null
+  averageConfidence: number | null
+  quality: 'strong' | 'weak' | 'unavailable'
+  warning: string | null
+}
+
 const DEFAULT_VIEWPORT_WIDTH = 1
 const DEFAULT_VIEWPORT_HEIGHT = 1
+const DEFAULT_SAMPLE_INTERVAL_MS = 150
+const TRACKER_SOURCE = 'webgazer_experimental'
+const DEFAULT_WEBGAZER_SCRIPT_URL = 'https://webgazer.cs.brown.edu/webgazer.js'
+
+let webGazerScriptPromise: Promise<void> | null = null
 
 function getBrowserWindow(): WindowWithWebGazer | null {
   if (typeof window === 'undefined') {
@@ -38,6 +60,10 @@ function getBrowserWindow(): WindowWithWebGazer | null {
   }
 
   return window as WindowWithWebGazer
+}
+
+function getWebGazerScriptUrl() {
+  return import.meta.env.VITE_WEBGAZER_SCRIPT_URL || DEFAULT_WEBGAZER_SCRIPT_URL
 }
 
 function createTimestamp() {
@@ -52,6 +78,18 @@ function roundCoordinate(value: number) {
   return Number(value.toFixed(4))
 }
 
+function roundMetric(value: number) {
+  return Number(value.toFixed(3))
+}
+
+function isFinitePrediction(prediction: WebGazerPrediction | null): prediction is WebGazerPrediction {
+  return Boolean(
+    prediction &&
+      Number.isFinite(prediction.x) &&
+      Number.isFinite(prediction.y),
+  )
+}
+
 function normalizePrediction(
   prediction: WebGazerPrediction,
   viewportWidth: number,
@@ -63,10 +101,86 @@ function normalizePrediction(
   }
 }
 
-function safeConfidence(prediction: WebGazerPrediction) {
-  return typeof prediction.confidence === 'number' && Number.isFinite(prediction.confidence)
-    ? Number(prediction.confidence.toFixed(3))
+function safeConfidence(prediction: WebGazerPrediction | null) {
+  return prediction && typeof prediction.confidence === 'number' && Number.isFinite(prediction.confidence)
+    ? roundMetric(prediction.confidence)
     : null
+}
+
+function average(values: number[]) {
+  if (values.length === 0) {
+    return null
+  }
+
+  return roundMetric(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+function distance(first: NormalizedPoint, second: NormalizedPoint) {
+  return Math.hypot(first.x - second.x, first.y - second.y)
+}
+
+export function summarizeCalibration(measurements: CalibrationMeasurement[]): CalibrationSummary {
+  const errorsPx: number[] = []
+  const errorsNormalized: number[] = []
+  const confidences: number[] = []
+
+  for (const measurement of measurements) {
+    if (!isFinitePrediction(measurement.prediction)) {
+      continue
+    }
+
+    const targetPx = {
+      x: measurement.target.x * measurement.viewportWidth,
+      y: measurement.target.y * measurement.viewportHeight,
+    }
+    errorsPx.push(Math.hypot(measurement.prediction.x - targetPx.x, measurement.prediction.y - targetPx.y))
+    errorsNormalized.push(distance(normalizePrediction(measurement.prediction, measurement.viewportWidth, measurement.viewportHeight), measurement.target))
+    const confidence = safeConfidence(measurement.prediction)
+    if (confidence !== null) {
+      confidences.push(confidence)
+    }
+  }
+
+  const averageErrorPx = average(errorsPx)
+  const averageErrorNormalized = average(errorsNormalized)
+  const averageConfidence = average(confidences)
+
+  if (measurements.length > 0 && errorsPx.length === 0) {
+    return {
+      completedPoints: measurements.length,
+      averageErrorPx,
+      averageErrorNormalized,
+      averageConfidence,
+      quality: 'unavailable',
+      warning: 'Calibration completed, but browser gaze predictions were not available yet.',
+    }
+  }
+
+  if (
+    averageErrorPx === null ||
+    averageErrorNormalized === null ||
+    averageErrorPx > 120 ||
+    averageErrorNormalized > 0.18 ||
+    (averageConfidence !== null && averageConfidence < 0.5)
+  ) {
+    return {
+      completedPoints: measurements.length,
+      averageErrorPx,
+      averageErrorNormalized,
+      averageConfidence,
+      quality: 'weak',
+      warning: 'Calibration quality is weak. Treat report metrics as approximate browser-gaze telemetry.',
+    }
+  }
+
+  return {
+    completedPoints: measurements.length,
+    averageErrorPx,
+    averageErrorNormalized,
+    averageConfidence,
+    quality: 'strong',
+    warning: null,
+  }
 }
 
 export function predictionToGazeEvent(
@@ -76,7 +190,8 @@ export function predictionToGazeEvent(
   const point = normalizePrediction(prediction, options.viewportWidth, options.viewportHeight)
   const payload: TelemetryEventPayload = {
     label: 'Browser gaze sample',
-    source: 'webgazer',
+    source: TRACKER_SOURCE,
+    tracker_type: TRACKER_SOURCE,
     x: point.x,
     y: point.y,
     viewport_width: options.viewportWidth,
@@ -92,6 +207,169 @@ export function predictionToGazeEvent(
   }
 }
 
+function calibrationMeasurementToEvent(
+  measurement: CalibrationMeasurement,
+  options: { eventIndex: number; step: number; pointCount: number },
+): TelemetryEvent {
+  const observedPoint = isFinitePrediction(measurement.prediction)
+    ? normalizePrediction(measurement.prediction, measurement.viewportWidth, measurement.viewportHeight)
+    : undefined
+  const targetPx = {
+    x: measurement.target.x * measurement.viewportWidth,
+    y: measurement.target.y * measurement.viewportHeight,
+  }
+  const errorPx = isFinitePrediction(measurement.prediction)
+    ? roundMetric(Math.hypot(measurement.prediction.x - targetPx.x, measurement.prediction.y - targetPx.y))
+    : undefined
+  const errorNormalized = observedPoint ? roundMetric(distance(observedPoint, measurement.target)) : undefined
+
+  return {
+    id: `webgazer-event-${String(options.eventIndex).padStart(3, '0')}`,
+    event_type: 'calibration_point_recorded',
+    timestamp: createTimestamp(),
+    payload: {
+      label: `Browser calibration target ${options.step}`,
+      source: TRACKER_SOURCE,
+      tracker_type: TRACKER_SOURCE,
+      target_point: measurement.target,
+      observed_point: observedPoint,
+      error_px: errorPx,
+      error_normalized: errorNormalized,
+      confidence: safeConfidence(measurement.prediction),
+      calibration_step: options.step,
+      calibration_point_count: options.pointCount,
+    },
+  }
+}
+
+function calibrationCompletedEvent(eventIndex: number, pointCount: number, summary: CalibrationSummary): TelemetryEvent {
+  return {
+    id: `webgazer-event-${String(eventIndex).padStart(3, '0')}`,
+    event_type: 'calibration_completed',
+    timestamp: createTimestamp(),
+    payload: {
+      label: 'Browser calibration completed',
+      source: TRACKER_SOURCE,
+      tracker_type: TRACKER_SOURCE,
+      confidence: summary.averageConfidence,
+      calibration_points_completed: pointCount,
+      calibration_point_count: pointCount,
+      calibration_error_px: summary.averageErrorPx ?? undefined,
+      calibration_error_normalized: summary.averageErrorNormalized ?? undefined,
+      calibration_quality: summary.quality,
+      quality_warning: summary.warning ?? undefined,
+    },
+  }
+}
+
+function loadWebGazerScript(): Promise<void> {
+  const browserWindow = getBrowserWindow()
+  if (!browserWindow) {
+    return Promise.reject(new Error('WebGazer requires a browser window.'))
+  }
+
+  if (browserWindow.webgazer) {
+    return Promise.resolve()
+  }
+
+  if (typeof document === 'undefined') {
+    return Promise.reject(new Error('WebGazer script loading requires a browser document.'))
+  }
+
+  if (!webGazerScriptPromise) {
+    webGazerScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = getWebGazerScriptUrl()
+      script.async = true
+      script.dataset.gazetrackWebgazer = 'true'
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error(`Could not load WebGazer from ${script.src}`))
+      document.head.appendChild(script)
+    })
+  }
+
+  return webGazerScriptPromise
+}
+
+function removeOverlay(overlay: HTMLElement) {
+  overlay.parentElement?.removeChild(overlay)
+}
+
+function collectCalibrationMeasurements(
+  targets: NormalizedPoint[],
+  getLatestPrediction: () => WebGazerPrediction | null,
+  recordTarget: (x: number, y: number) => void,
+): Promise<CalibrationMeasurement[]> {
+  const browserWindow = getBrowserWindow()
+  if (!browserWindow || typeof document === 'undefined') {
+    return Promise.resolve(
+      targets.map((target) => ({
+        target,
+        prediction: getLatestPrediction(),
+        viewportWidth: DEFAULT_VIEWPORT_WIDTH,
+        viewportHeight: DEFAULT_VIEWPORT_HEIGHT,
+      })),
+    )
+  }
+
+  const calibrationWindow = browserWindow
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div')
+    overlay.className = 'webgazer-calibration-overlay'
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-label', 'Browser gaze calibration')
+
+    const copy = document.createElement('div')
+    copy.className = 'webgazer-calibration-copy'
+    const title = document.createElement('strong')
+    title.textContent = 'Browser gaze calibration'
+    const instructions = document.createElement('span')
+    instructions.textContent = 'Look at each target, then click it. This estimates rough browser-dependent quality only.'
+    copy.append(title, instructions)
+    overlay.appendChild(copy)
+
+    let index = 0
+    const measurements: CalibrationMeasurement[] = []
+
+    function renderTarget() {
+      overlay.querySelector('.webgazer-calibration-target')?.remove()
+
+      const target = targets[index]
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'webgazer-calibration-target'
+      button.textContent = String(index + 1)
+      button.style.left = `${target.x * 100}%`
+      button.style.top = `${target.y * 100}%`
+      button.setAttribute('aria-label', `Calibration target ${index + 1} of ${targets.length}`)
+      button.addEventListener('click', () => {
+        const viewportWidth = calibrationWindow.innerWidth || DEFAULT_VIEWPORT_WIDTH
+        const viewportHeight = calibrationWindow.innerHeight || DEFAULT_VIEWPORT_HEIGHT
+        recordTarget(target.x * viewportWidth, target.y * viewportHeight)
+        measurements.push({
+          target,
+          prediction: getLatestPrediction(),
+          viewportWidth,
+          viewportHeight,
+        })
+        index += 1
+        if (index >= targets.length) {
+          removeOverlay(overlay)
+          resolve(measurements)
+          return
+        }
+        renderTarget()
+      })
+      overlay.appendChild(button)
+      button.focus()
+    }
+
+    document.body.appendChild(overlay)
+    renderTarget()
+  })
+}
+
 export class WebGazerTracker implements TrackerProvider {
   readonly id = 'webgazer'
   readonly label = 'Browser gaze experiment'
@@ -101,6 +379,14 @@ export class WebGazerTracker implements TrackerProvider {
   private webgazer: WebGazerApi | null = null
   private viewportWidth = DEFAULT_VIEWPORT_WIDTH
   private viewportHeight = DEFAULT_VIEWPORT_HEIGHT
+  private latestPrediction: WebGazerPrediction | null = null
+  private lastSampledAt = 0
+  private sampleIntervalMs: number
+  private calibrationSummary: CalibrationSummary | null = null
+
+  constructor(options: { sampleIntervalMs?: number } = {}) {
+    this.sampleIntervalMs = options.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS
+  }
 
   async isAvailable() {
     return Boolean(getBrowserWindow()?.webgazer)
@@ -108,21 +394,32 @@ export class WebGazerTracker implements TrackerProvider {
 
   async initialize() {
     this.status = 'initializing'
+    await loadWebGazerScript()
     const browserWindow = getBrowserWindow()
     const webgazer = browserWindow?.webgazer
 
     if (!webgazer) {
       this.status = 'unavailable'
-      throw new Error('window.webgazer is not available. Load WebGazer only for the flagged browser experiment.')
+      throw new Error('WebGazer is not available after loading the experimental browser tracker script.')
     }
 
     this.webgazer = webgazer
     webgazer.showVideoPreview?.(false)
     webgazer.showPredictionPoints?.(false)
     webgazer.setGazeListener((prediction) => {
-      if (!prediction || this.status !== 'tracking') {
+      if (isFinitePrediction(prediction)) {
+        this.latestPrediction = prediction
+      }
+
+      if (!isFinitePrediction(prediction) || this.status !== 'tracking') {
         return
       }
+
+      const now = Date.now()
+      if (now - this.lastSampledAt < this.sampleIntervalMs) {
+        return
+      }
+      this.lastSampledAt = now
 
       this.events.push(
         predictionToGazeEvent(prediction, {
@@ -139,41 +436,27 @@ export class WebGazerTracker implements TrackerProvider {
 
   async runCalibration(options?: TrackerCalibrationOptions) {
     const targets = options?.targets ?? calibrationTargets
-    const calibrationEvents = targets.map((target, index) => {
-      const event: TelemetryEvent = {
-        id: `webgazer-event-${String(this.eventIndex + index).padStart(3, '0')}`,
-        event_type: 'calibration_point_recorded',
-        timestamp: createTimestamp(),
-        payload: {
-          label: `Browser calibration target ${index + 1}`,
-          source: 'webgazer',
-          target_point: target,
-          observed_point: target,
-          error_px: 0,
-          error_normalized: 0,
-          confidence: null,
-          calibration_step: index + 1,
-          calibration_point_count: targets.length,
-        },
-      }
-      return event
-    })
+    this.status = 'calibrating'
+    const measurements = await collectCalibrationMeasurements(
+      targets,
+      () => this.latestPrediction,
+      (x, y) => this.webgazer?.recordScreenPosition?.(x, y, 'click'),
+    )
+    const summary = summarizeCalibration(measurements)
+    this.calibrationSummary = summary
+    const calibrationEvents = measurements.map((measurement, index) =>
+      calibrationMeasurementToEvent(measurement, {
+        eventIndex: this.eventIndex + index,
+        step: index + 1,
+        pointCount: targets.length,
+      }),
+    )
 
     this.eventIndex += calibrationEvents.length
-    const completedEvent: TelemetryEvent = {
-      id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
-      event_type: 'calibration_completed',
-      timestamp: createTimestamp(),
-      payload: {
-        label: 'Browser calibration completed',
-        source: 'webgazer',
-        confidence: null,
-        calibration_points_completed: targets.length,
-        calibration_point_count: targets.length,
-      },
-    }
+    const completedEvent = calibrationCompletedEvent(this.eventIndex, targets.length, summary)
     this.eventIndex += 1
     this.events.push(...calibrationEvents, completedEvent)
+    this.status = 'tracking'
     return [...calibrationEvents, completedEvent]
   }
 
@@ -181,6 +464,7 @@ export class WebGazerTracker implements TrackerProvider {
     const browserWindow = getBrowserWindow()
     this.viewportWidth = options?.viewportWidth ?? browserWindow?.innerWidth ?? DEFAULT_VIEWPORT_WIDTH
     this.viewportHeight = options?.viewportHeight ?? browserWindow?.innerHeight ?? DEFAULT_VIEWPORT_HEIGHT
+    this.lastSampledAt = 0
     this.events = [
       {
         id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
@@ -188,13 +472,14 @@ export class WebGazerTracker implements TrackerProvider {
         timestamp: createTimestamp(),
         payload: {
           label: 'Browser gaze experiment task started',
-          source: 'webgazer',
+          source: TRACKER_SOURCE,
+          tracker_type: TRACKER_SOURCE,
           target: options?.taskPrompt ?? 'Find the team plan and start checkout',
         },
       },
     ]
     this.eventIndex += 1
-    this.status = 'tracking'
+    this.status = 'ready'
   }
 
   async stopSession() {
@@ -205,7 +490,8 @@ export class WebGazerTracker implements TrackerProvider {
         timestamp: createTimestamp(),
         payload: {
           label: 'Browser gaze experiment task completed',
-          source: 'webgazer',
+          source: TRACKER_SOURCE,
+          tracker_type: TRACKER_SOURCE,
           completed: true,
         },
       })
@@ -214,6 +500,10 @@ export class WebGazerTracker implements TrackerProvider {
     this.webgazer?.pause?.()
     this.status = 'stopped'
     return this.getEvents()
+  }
+
+  getCalibrationSummary() {
+    return this.calibrationSummary
   }
 
   getEvents() {
@@ -225,6 +515,7 @@ export class WebGazerTracker implements TrackerProvider {
     this.webgazer?.pause?.()
     this.events = []
     this.webgazer = null
+    this.latestPrediction = null
     this.status = 'idle'
   }
 }

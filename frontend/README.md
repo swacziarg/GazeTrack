@@ -78,10 +78,22 @@ VITE_ENABLE_WEBGAZER=true
 ```
 
 When enabled, the UI shows `Browser gaze experiment` as an opt-in tracker. The app displays consent copy before
-initializing the adapter. The adapter uses guarded `window.webgazer` access and sends only privacy-safe telemetry:
-normalized gaze points, optional confidence/quality metadata, timestamps, clicks, scrolls, calibration events, and task
-events. Raw video, frames, images, screenshots, blobs, and base64 media are not sent or stored. Browser gaze estimates
-are approximate and not medical-grade eye tracking.
+initializing the adapter. After consent, the adapter loads WebGazer in the browser, hides the local camera preview and
+prediction markers, asks the tester to click/fixate calibration targets, samples predictions at a throttled interval,
+and sends only privacy-safe telemetry: normalized gaze points, optional confidence/quality metadata, timestamps,
+calibration events, and task events. Raw video, frames, images, screenshots, blobs, and base64 media are not sent or
+stored. Browser gaze estimates are approximate and not medical-grade eye tracking.
+
+To try it locally:
+
+```bash
+VITE_ENABLE_WEBGAZER=true npm run dev
+```
+
+Use `localhost` or HTTPS, allow camera permission, select `Browser gaze experiment`, consent, start the session, click
+each calibration target while looking at it, then complete the session after a few seconds of samples. Set
+`VITE_WEBGAZER_SCRIPT_URL` if you need to use a different WebGazer script URL. If predictions do not appear, check
+camera permission, browser support, lighting, tab focus, and script loading.
 
 ## Synthetic Report Visuals
 
@@ -108,7 +120,7 @@ If the backend is offline, the local demo report still renders and the backend p
 ## Intentionally Not Implemented Yet
 
 - Production-grade webcam tracking
-- Bundled WebGazer dependency
+- Default camera/webcam tracking
 - Authentication
 - Production-grade analytics, heatmaps, or report generation
 - CAF delay

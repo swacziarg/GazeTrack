@@ -249,6 +249,10 @@ class SessionReportResponse(BaseModel):
     contains_gaze_events: bool = False
     low_confidence_sample_rate: float | None = None
     session_quality_score: float | None = None
+    tracker_type: str = "unknown"
+    tracker_mode_label: str = "Unknown telemetry source"
+    tracker_experimental: bool = False
+    tracker_notice: str | None = None
     task_count: int = 0
     task_prompts: list[str] = Field(default_factory=list)
     aoi_count: int = 0

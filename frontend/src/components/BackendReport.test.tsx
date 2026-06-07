@@ -19,6 +19,10 @@ const report: BackendSessionReport = {
   contains_gaze_events: true,
   low_confidence_sample_rate: 0.333,
   session_quality_score: 76.4,
+  tracker_type: 'synthetic',
+  tracker_mode_label: 'Synthetic demo telemetry',
+  tracker_experimental: false,
+  tracker_notice: null,
   task_count: 1,
   task_prompts: ['Find checkout.'],
   aoi_count: 1,
@@ -89,6 +93,8 @@ describe('BackendReport', () => {
     expect(html).toContain('Fixation summary')
     expect(html).toContain('simple_dispersion_v1')
     expect(html).toContain('Quality verdict')
+    expect(html).toContain('Tracker mode')
+    expect(html).toContain('Synthetic demo telemetry')
     expect(html).toContain('Calibration events')
     expect(html).toContain('warn')
     expect(html).toContain('Low-confidence gaze sample rate is above 35%.')
@@ -180,5 +186,27 @@ describe('BackendReport', () => {
     )
 
     expect(html).toContain('Replay unavailable for this report.')
+  })
+
+  it('renders experimental browser gaze tracker notices', () => {
+    const browserReport: BackendSessionReport = {
+      ...report,
+      tracker_type: 'webgazer_experimental',
+      tracker_mode_label: 'Experimental browser gaze',
+      tracker_experimental: true,
+      tracker_notice: 'Webcam gaze estimates are approximate, browser-dependent, and not medical-grade eye tracking.',
+    }
+
+    const html = renderToStaticMarkup(
+      <BackendReport
+        ingestResult={null}
+        isFetchingReport={false}
+        reportResult={{ ...reportResult, report: browserReport }}
+      />,
+    )
+
+    expect(html).toContain('Experimental browser gaze')
+    expect(html).toContain('webgazer_experimental')
+    expect(html).toContain('not medical-grade eye tracking')
   })
 })

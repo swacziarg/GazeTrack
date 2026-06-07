@@ -64,9 +64,10 @@ The current frontend demo posts rich synthetic telemetry only. A healthy run inc
 
 The frontend now routes telemetry through tracker providers. `SyntheticTracker` remains the default source. A guarded
 `WebGazerTracker` spike can be exposed locally with `VITE_ENABLE_WEBGAZER=true`, but it requires explicit consent before
-initialization and uses the same backend event envelope. Browser tracker payloads may include `source: "webgazer"`,
-normalized `x`/`y`, viewport dimensions, optional confidence, calibration/task/click/scroll fields, and timestamps. They
-must not include video, frames, images, screenshots, blobs, or base64 media.
+initialization and uses the same backend event envelope. Browser tracker payloads may include
+`source: "webgazer_experimental"`, `tracker_type: "webgazer_experimental"`, normalized `x`/`y`, viewport dimensions,
+optional confidence, calibration/task fields, and timestamps. They must not include video, frames, images, screenshots,
+blobs, or base64 media.
 
 `GET /api/v1/sessions/{session_id}/report` includes:
 
@@ -78,6 +79,10 @@ must not include video, frames, images, screenshots, blobs, or base64 media.
 - `contains_gaze_events`
 - `low_confidence_sample_rate`
 - `session_quality_score`
+- `tracker_type`
+- `tracker_mode_label`
+- `tracker_experimental`
+- `tracker_notice`
 - `task_count`
 - `aoi_count`
 - `has_aoi_metrics`

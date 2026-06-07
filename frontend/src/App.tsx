@@ -66,6 +66,7 @@ function App() {
   const [trackerStatus, setTrackerStatus] = useState<TrackerStatus>('idle')
   const [trackerAvailability, setTrackerAvailability] = useState('Synthetic tracker available')
   const [webGazerConsentGranted, setWebGazerConsentGranted] = useState(false)
+  const [webGazerCalibrationNotice, setWebGazerCalibrationNotice] = useState<string | null>(null)
   const [webGazerEvents, setWebGazerEvents] = useState<MockStudyEvent[]>([])
   const webGazerTrackerRef = useRef<WebGazerTracker | null>(null)
   const trackerOptions = useMemo(() => getTrackerOptions(), [])
@@ -81,7 +82,9 @@ function App() {
   const visibleEvents = trackerEvents.slice(0, visibleEventCount)
   const demoReport = useMemo(() => generateDemoReport(trackerEvents), [trackerEvents])
   const selectedTrackerOption = trackerOptions.find((option) => option.id === trackerId) ?? trackerOptions[0]
-  const canStartSession = trackerId === 'synthetic' || (webGazerConsentGranted && trackerStatus === 'ready')
+  const canStartSession =
+    trackerId === 'synthetic' ||
+    (webGazerConsentGranted && (trackerStatus === 'ready' || trackerStatus === 'stopped'))
   const displayedTotalEventCount =
     trackerId === 'synthetic' ? trackerEvents.length : Math.max(trackerEvents.length, visibleEventCount)
   const calibrationComplete =
@@ -177,7 +180,7 @@ function App() {
         const events = webGazerTrackerRef.current?.getEvents() ?? []
         setWebGazerEvents(events)
         setVisibleEventCount(events.length)
-        setTrackerStatus('tracking')
+        setTrackerStatus('calibrating')
         setSessionPhase('calibration')
       })
       return
@@ -193,8 +196,10 @@ function App() {
     if (trackerId === 'webgazer') {
       void webGazerTrackerRef.current?.runCalibration().then(() => {
         const events = webGazerTrackerRef.current?.getEvents() ?? []
+        const summary = webGazerTrackerRef.current?.getCalibrationSummary()
         setWebGazerEvents(events)
         setVisibleEventCount(events.length)
+        setWebGazerCalibrationNotice(summary?.warning ?? null)
         setTrackerStatus('tracking')
         setSessionPhase('active')
       })
@@ -224,6 +229,7 @@ function App() {
     setIngestResult(null)
     setBackendReportResult(null)
     setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'consent_required' : 'idle')
+    setWebGazerCalibrationNotice(null)
   }
 
   function saveConfiguredStudy(mode: 'update' | 'create') {
@@ -324,6 +330,7 @@ function App() {
     setBackendReportResult(null)
     setIsIngestingEvents(false)
     setIsFetchingBackendReport(false)
+    setWebGazerCalibrationNotice(null)
 
     if (nextTrackerId === 'webgazer') {
       setWebGazerConsentGranted(false)
@@ -333,6 +340,7 @@ function App() {
       setTrackerStatus('idle')
       setTrackerAvailability('Synthetic tracker available')
       setWebGazerEvents([])
+      setWebGazerCalibrationNotice(null)
     }
   }
 
@@ -346,6 +354,7 @@ function App() {
     setWebGazerConsentGranted(true)
     setTrackerStatus('initializing')
     setTrackerAvailability('Checking browser tracker')
+    setWebGazerCalibrationNotice(null)
 
     void tracker
       .initialize()
@@ -541,6 +550,7 @@ function App() {
               taskPrompt={configuredDemoStudy.taskPrompt}
               qualityMode={qualityMode}
               calibrationEventCount={calibrationEventCount}
+              trackerNotice={webGazerCalibrationNotice}
               onQualityModeChange={updateQualityMode}
               onOpenStudy={openDemoStudy}
               onStartSession={startMockSession}

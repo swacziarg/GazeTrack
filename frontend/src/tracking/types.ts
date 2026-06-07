@@ -1,4 +1,5 @@
 export type TrackerId = 'synthetic' | 'webgazer'
+export type TrackerEventSource = TrackerId | 'webgazer_experimental'
 
 export type SyntheticTelemetryMode = 'healthy' | 'low_confidence' | 'bad_calibration' | 'no_gaze'
 
@@ -35,7 +36,8 @@ export type SyntheticStudyConfig = {
 
 export type TelemetryEventPayload = {
   label: string
-  source?: TrackerId
+  source?: TrackerEventSource
+  tracker_type?: TrackerEventSource
   synthetic?: true
   mode?: SyntheticTelemetryMode
   aoi?: string
@@ -54,6 +56,8 @@ export type TelemetryEventPayload = {
   calibration_step?: number
   calibration_point_count?: number
   calibration_points_completed?: number
+  calibration_quality?: 'strong' | 'weak' | 'unavailable'
+  quality_warning?: string
   dwell_ms?: number
   scroll_depth_percent?: number
   target?: string
@@ -70,7 +74,15 @@ export type TelemetryEvent = {
   payload: TelemetryEventPayload
 }
 
-export type TrackerStatus = 'idle' | 'consent_required' | 'initializing' | 'ready' | 'tracking' | 'stopped' | 'unavailable'
+export type TrackerStatus =
+  | 'idle'
+  | 'consent_required'
+  | 'initializing'
+  | 'ready'
+  | 'calibrating'
+  | 'tracking'
+  | 'stopped'
+  | 'unavailable'
 
 export type TrackerCalibrationOptions = {
   targets?: NormalizedPoint[]

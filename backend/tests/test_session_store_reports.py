@@ -47,6 +47,8 @@ def test_report_after_ingest_returns_matching_event_count() -> None:
     assert report["low_confidence_sample_rate"] == 0
     assert report["session_quality_score"] > 0
     assert report["analytics_version"] == "fixation_demo_v1"
+    assert report["tracker_type"] == "synthetic"
+    assert report["tracker_experimental"] is False
     assert report["fixation_summary"]["fixation_count"] > 0
     assert report["fixation_summary"]["fixation_algorithm"] == "simple_dispersion_v1"
     assert "Backend demo report generated from persisted SQLite telemetry." in report["insights"]
@@ -83,6 +85,60 @@ def test_report_after_ingest_returns_matching_event_count() -> None:
     assert report["replay_fixations"][0]["type"] == "fixation"
     assert report["replay_fixations"][0]["duration_ms"] > 0
     assert report["replay_fixations"][0]["sample_count"] >= 3
+
+
+def test_report_identifies_experimental_webgazer_tracker() -> None:
+    session_id = uuid4()
+    payload = {
+        "events": [
+            {
+                "event_type": "task_start",
+                "timestamp": "2026-01-15T17:30:00.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "target": "Find checkout.",
+                },
+            },
+            {
+                "event_type": "calibration",
+                "timestamp": "2026-01-15T17:30:01.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "calibration_points_completed": 5,
+                    "calibration_quality": "weak",
+                    "quality_warning": "Calibration quality is weak.",
+                },
+            },
+            {
+                "event_type": "gaze",
+                "timestamp": "2026-01-15T17:30:02.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "x": 0.52,
+                    "y": 0.41,
+                    "viewport_width": 1440,
+                    "viewport_height": 900,
+                    "confidence": 0.62,
+                },
+            },
+        ]
+    }
+
+    ingest_response = client.post(f"/api/v1/sessions/{session_id}/events", json=payload)
+    report_response = client.get(f"/api/v1/sessions/{session_id}/report")
+
+    assert ingest_response.status_code == 200
+    assert report_response.status_code == 200
+    report = report_response.json()
+    assert report["tracker_type"] == "webgazer_experimental"
+    assert report["tracker_mode_label"] == "Experimental browser gaze"
+    assert report["tracker_experimental"] is True
+    assert "not medical-grade" in report["tracker_notice"]
+    assert report["privacy_summary"]["tracker_type"] == "webgazer_experimental"
+    assert any("not medical-grade" in insight for insight in report["insights"])
 
 
 def test_report_before_ingest_returns_safe_empty_report() -> None:

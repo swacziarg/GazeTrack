@@ -507,6 +507,52 @@ dd {
   color: #405166;
 }
 
+.webgazer-calibration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(13, 23, 40, 0.72);
+}
+
+.webgazer-calibration-copy {
+  position: absolute;
+  left: 50%;
+  top: 1.25rem;
+  display: grid;
+  width: min(92vw, 620px);
+  gap: 0.25rem;
+  transform: translateX(-50%);
+  border: 1px solid #d8c489;
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  background: #fff8e6;
+  color: #172033;
+  box-shadow: 0 12px 36px rgba(13, 23, 40, 0.2);
+}
+
+.webgazer-calibration-copy span {
+  color: #405166;
+}
+
+.webgazer-calibration-target {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  transform: translate(-50%, -50%);
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #2d6f7a;
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(13, 23, 40, 0.3);
+}
+
+.webgazer-calibration-target:focus-visible {
+  outline: 4px solid #f2cc5c;
+  outline-offset: 4px;
+}
+
 .task-prompt {
   border-left: 4px solid #2d6f7a;
   padding-left: 0.85rem;

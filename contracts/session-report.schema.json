@@ -11,6 +11,9 @@
     "event_count",
     "event_type_counts",
     "contains_gaze_events",
+    "tracker_type",
+    "tracker_mode_label",
+    "tracker_experimental",
     "task_count",
     "aoi_count",
     "has_aoi_metrics",
@@ -84,6 +87,19 @@
       "type": ["number", "null"],
       "minimum": 0,
       "maximum": 100
+    },
+    "tracker_type": {
+      "type": "string",
+      "enum": ["synthetic", "webgazer_experimental", "unknown"]
+    },
+    "tracker_mode_label": {
+      "type": "string"
+    },
+    "tracker_experimental": {
+      "type": "boolean"
+    },
+    "tracker_notice": {
+      "type": ["string", "null"]
     },
     "task_count": {
       "type": "integer",

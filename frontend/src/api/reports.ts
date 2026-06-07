@@ -106,6 +106,10 @@ export type BackendSessionReport = {
   contains_gaze_events: boolean
   low_confidence_sample_rate: number | null
   session_quality_score: number | null
+  tracker_type: string
+  tracker_mode_label: string
+  tracker_experimental: boolean
+  tracker_notice: string | null
   task_count: number
   task_prompts: string[]
   aoi_count: number

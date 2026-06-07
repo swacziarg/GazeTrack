@@ -19,6 +19,7 @@ function statusLabel(status: TrackerStatus) {
     consent_required: 'Consent required',
     initializing: 'Initializing',
     ready: 'Ready',
+    calibrating: 'Calibrating',
     tracking: 'Tracking active',
     stopped: 'Stopped',
     unavailable: 'Unavailable',

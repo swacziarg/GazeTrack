@@ -46,6 +46,6 @@ Calibration and quality events may include `confidence`, `calibration_error_px`,
 - `calibration_step`
 - `calibration_point_count`
 
-The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment.
+The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, emits `webgazer_experimental` telemetry only, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment.
 
 Privacy rule: events must not contain raw media fields, webcam frame content, images, screenshots, blobs, or base64 media.

@@ -51,6 +51,39 @@ def _first_task_start_timestamp(events: list[EventEnvelope]) -> str | None:
     return sorted(task_start_timestamps)[0] if task_start_timestamps else None
 
 
+def _tracker_report_metadata(events: list[EventEnvelope]) -> dict[str, str | bool | None]:
+    sources = {
+        str(event.payload.get("tracker_type") or event.payload.get("source"))
+        for event in events
+        if event.payload.get("tracker_type") or event.payload.get("source")
+    }
+
+    if "webgazer_experimental" in sources or "webgazer" in sources:
+        return {
+            "tracker_type": "webgazer_experimental",
+            "tracker_mode_label": "Experimental browser gaze",
+            "tracker_experimental": True,
+            "tracker_notice": (
+                "Webcam gaze estimates are approximate, browser-dependent, and not medical-grade eye tracking."
+            ),
+        }
+
+    if "synthetic" in sources or any(event.payload.get("synthetic") is True for event in events):
+        return {
+            "tracker_type": "synthetic",
+            "tracker_mode_label": "Synthetic demo telemetry",
+            "tracker_experimental": False,
+            "tracker_notice": None,
+        }
+
+    return {
+        "tracker_type": "unknown",
+        "tracker_mode_label": "Unknown telemetry source",
+        "tracker_experimental": False,
+        "tracker_notice": None,
+    }
+
+
 @router.get("/sessions/{session_id}/report", response_model=SessionReportResponse)
 def get_session_report(session_id: UUID) -> SessionReportResponse:
     repository = get_repository()
@@ -76,10 +109,12 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
     replay_fixations = build_replay_fixations(fixations, events, aois)
     replay_aoi_overlay = build_replay_aoi_overlay(aois)
     replay_summary = build_replay_summary(events, replay_events, replay_fixations)
+    tracker_metadata = _tracker_report_metadata(events)
     privacy_summary = {
         "raw_media_stored": False,
         "stored_payload_type": "validated JSON telemetry",
         "media_like_payload_policy": "Rejected before persistence",
+        "tracker_type": tracker_metadata["tracker_type"],
     }
     first_event_timestamp = events[0].timestamp if events else None
     last_event_timestamp = events[-1].timestamp if events else None
@@ -91,6 +126,8 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
         ),
         "No raw webcam media is stored by GazeTrack.",
     ]
+    if tracker_metadata["tracker_experimental"]:
+        insights.append(str(tracker_metadata["tracker_notice"]))
     report = SessionReportResponse(
         session_id=session_id,
         study_id=session.study_id,
@@ -104,6 +141,12 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
         contains_gaze_events=event_counts.get("gaze", 0) > 0,
         low_confidence_sample_rate=low_confidence_rate,
         session_quality_score=quality_summary["score"],
+        tracker_type=str(tracker_metadata["tracker_type"]),
+        tracker_mode_label=str(tracker_metadata["tracker_mode_label"]),
+        tracker_experimental=bool(tracker_metadata["tracker_experimental"]),
+        tracker_notice=(
+            str(tracker_metadata["tracker_notice"]) if tracker_metadata["tracker_notice"] is not None else None
+        ),
         task_count=len(tasks),
         task_prompts=[task.prompt for task in tasks],
         aoi_count=len(aois),
@@ -127,6 +170,8 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
             "quality": quality_summary,
             "privacy": privacy_summary,
             "replay_summary": replay_summary,
+            "tracker_type": tracker_metadata["tracker_type"],
+            "tracker_experimental": tracker_metadata["tracker_experimental"],
         },
         privacy_summary=privacy_summary,
         fixation_summary=fixation_summary,

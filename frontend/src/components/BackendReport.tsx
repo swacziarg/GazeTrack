@@ -165,8 +165,8 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
       </div>
 
       <p className="privacy-note compact">
-        Backend demo report generated from SQLite-backed synthetic telemetry. This is not real gaze tracking or a
-        production analytics job.
+        Backend report generated from SQLite-backed telemetry. Browser gaze sessions are experimental,
+        approximate, and not medical-grade eye tracking.
       </p>
 
       {isFetchingReport ? <p>Loading backend demo report from the local API.</p> : null}
@@ -207,6 +207,14 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
               <dd>{report.contains_gaze_events ? 'Yes' : 'No'}</dd>
             </div>
             <div>
+              <dt>Tracker mode</dt>
+              <dd>{report.tracker_mode_label}</dd>
+            </div>
+            <div>
+              <dt>Tracker type</dt>
+              <dd>{report.tracker_type}</dd>
+            </div>
+            <div>
               <dt>Low-confidence sample rate</dt>
               <dd>{formatPercent(report.low_confidence_sample_rate)}</dd>
             </div>
@@ -231,6 +239,10 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
               <dd>{report.aoi_count}</dd>
             </div>
           </dl>
+
+          {report.tracker_experimental && report.tracker_notice ? (
+            <p className="backend-unavailable compact">{report.tracker_notice}</p>
+          ) : null}
 
           {taskPrompts.length > 0 ? (
             <section className="backend-report-section">

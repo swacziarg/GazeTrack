@@ -50,7 +50,8 @@ def test_event_ingest_accepts_webgazer_normalized_gaze_event() -> None:
         "event_type": "gaze",
         "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
-            "source": "webgazer",
+            "source": "webgazer_experimental",
+            "tracker_type": "webgazer_experimental",
             "x": 0.52,
             "y": 0.41,
             "viewport_width": 1440,
@@ -71,7 +72,8 @@ def test_event_ingest_rejects_webgazer_media_like_payload() -> None:
         "event_type": "gaze",
         "timestamp": "2026-01-01T00:00:00Z",
         "payload": {
-            "source": "webgazer",
+            "source": "webgazer_experimental",
+            "tracker_type": "webgazer_experimental",
             "x": 0.52,
             "y": 0.41,
             "image_blob": "not-allowed",

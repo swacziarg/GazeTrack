@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTrackerProvider } from './trackerFactory'
-import { WebGazerTracker, predictionToGazeEvent } from './webgazerTracker'
+import { WebGazerTracker, predictionToGazeEvent, summarizeCalibration } from './webgazerTracker'
 
 const forbiddenMediaKeys = ['video', 'frame', 'image', 'base64', 'blob', 'webcam_frame']
 
@@ -40,7 +40,8 @@ describe('WebGazerTracker', () => {
     expect(event.event_type).toBe('gaze_sample_recorded')
     expect(event.payload).toEqual(
       expect.objectContaining({
-        source: 'webgazer',
+        source: 'webgazer_experimental',
+        tracker_type: 'webgazer_experimental',
         x: 0.5,
         y: 0.5,
         viewport_width: 1280,
@@ -48,6 +49,31 @@ describe('WebGazerTracker', () => {
         confidence: 0.876,
       }),
     )
+    expect(event.payload.source).toBe('webgazer_experimental')
+  })
+
+  it('summarizes calibration quality from mocked predictions', () => {
+    const summary = summarizeCalibration([
+      {
+        target: { x: 0.5, y: 0.5 },
+        prediction: { x: 650, y: 365, confidence: 0.81 },
+        viewportWidth: 1280,
+        viewportHeight: 720,
+      },
+      {
+        target: { x: 0.2, y: 0.2 },
+        prediction: { x: 260, y: 145, confidence: 0.78 },
+        viewportWidth: 1280,
+        viewportHeight: 720,
+      },
+    ])
+
+    expect(summary.completedPoints).toBe(2)
+    expect(summary.averageErrorPx).toBeLessThan(20)
+    expect(summary.averageErrorNormalized).toBeLessThan(0.03)
+    expect(summary.averageConfidence).toBe(0.795)
+    expect(summary.quality).toBe('strong')
+    expect(summary.warning).toBeNull()
   })
 
   it('does not generate forbidden media-like fields', async () => {

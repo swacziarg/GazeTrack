@@ -14,6 +14,7 @@ type SessionControlsProps = {
   taskPrompt: string
   qualityMode: SyntheticTelemetryMode
   calibrationEventCount: number
+  trackerNotice?: string | null
   onQualityModeChange: (mode: SyntheticTelemetryMode) => void
   onOpenStudy: () => void
   onStartSession: () => void
@@ -52,6 +53,7 @@ export function SessionControls({
   taskPrompt,
   qualityMode,
   calibrationEventCount,
+  trackerNotice,
   onQualityModeChange,
   onOpenStudy,
   onStartSession,
@@ -135,6 +137,7 @@ export function SessionControls({
               <dd>{calibrationEventCount}</dd>
             </div>
           </dl>
+          {!isSynthetic && trackerNotice ? <p className="backend-unavailable compact">{trackerNotice}</p> : null}
         </section>
       ) : null}
 

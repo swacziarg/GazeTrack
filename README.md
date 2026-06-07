@@ -8,7 +8,7 @@ GazeTrack is currently a safe full-stack demo that shows the shape of a product/
 
 The repository currently has a `v0.1-demo` Git tag, verified with `git tag --list` on 2026-06-07. Check tags, test results, and release notes in the current checkout before relying on release status.
 
-This demo is not production webcam eye tracking. Browser gaze estimation is present only as an experimental, feature-flagged spike behind `VITE_ENABLE_WEBGAZER`, explicit consent, and guarded `window.webgazer` access. WebGazer is not bundled, and the project does not claim medical-grade accuracy, biometric identity, real heatmaps, screenshot replay, DOM AOI detection, CAF delay, auth, deployment, export, or sharing.
+This demo is not production webcam eye tracking. Browser gaze estimation is present only as an experimental, feature-flagged spike behind `VITE_ENABLE_WEBGAZER`, explicit consent, and guarded WebGazer script loading. The project does not claim medical-grade accuracy, biometric identity, real heatmaps, screenshot replay, DOM AOI detection, CAF delay, auth, deployment, export, or sharing.
 
 ## Target users
 
@@ -34,9 +34,9 @@ The optional `WebGazerTracker` path can be exposed locally with:
 VITE_ENABLE_WEBGAZER=true
 ```
 
-When enabled, the UI labels it as a browser gaze experiment and requires explicit consent before initialization. The adapter is guarded against missing `window.webgazer` and sends only compatible privacy-safe telemetry fields such as normalized gaze points, optional confidence/quality metadata, timestamps, clicks, scrolls, calibration events, and task events.
+When enabled, the UI labels it as a browser gaze experiment and requires explicit consent before initialization. After consent, the adapter loads WebGazer in the browser, hides WebGazer's local camera preview/prediction points, shows a click/fixate calibration overlay, samples predictions at a throttled interval, and sends only compatible privacy-safe telemetry fields such as normalized gaze points, optional confidence/quality metadata, timestamps, calibration events, and task events.
 
-It is not bundled, not part of the default demo path, and does not provide evidence of production real gaze tracking.
+It is not part of the default demo path and does not provide evidence of production real gaze tracking. Set `VITE_WEBGAZER_SCRIPT_URL` only if you need to point the browser to a different WebGazer script URL.
 
 ## Tech stack
 
@@ -75,6 +75,24 @@ It is not bundled, not part of the default demo path, and does not provide evide
 4. Open `http://localhost:5173`, complete the synthetic demo session, and fetch the backend report.
 
 The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETRACK_DATABASE_URL` or `DATABASE_URL` is set. This SQLite file is local state, not a release artifact. No Docker, Postgres, Supabase, webcam permission, or bundled WebGazer dependency is required for the current demo.
+
+### Try experimental browser gaze locally
+
+Use a modern browser on `localhost` or HTTPS so camera permission can be requested:
+
+```bash
+cd frontend
+VITE_ENABLE_WEBGAZER=true npm run dev
+```
+
+Then open `http://localhost:5173`, click `Open demo study`, select `Browser gaze experiment`, grant consent, allow browser camera permission, start the session, and click each calibration target while looking at it. Complete the session after a few seconds of gaze samples. The backend report should show `Experimental browser gaze`, `webgazer_experimental`, the calibration quality warning when applicable, and the not-medical-grade notice.
+
+Troubleshooting:
+
+- If initialization fails, check camera permission, browser support, and network access to the WebGazer script URL.
+- If calibration quality is weak, improve lighting, face the camera, reduce glare, and rerun calibration.
+- If no gaze samples appear, keep the tab focused and allow a few seconds after camera permission.
+- Synthetic mode remains the default and does not request camera permission.
 
 ## Demo flow
 
