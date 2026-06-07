@@ -1,0 +1,71 @@
+{
+  "session_id": "11111111-1111-4111-8111-111111111111",
+  "events": [
+    {
+      "event_type": "task_start",
+      "timestamp": "2026-01-15T17:30:00.000Z",
+      "payload": {
+        "label": "Synthetic demo task started",
+        "synthetic": true,
+        "target": "Find the team plan and start checkout"
+      }
+    },
+    {
+      "event_type": "calibration",
+      "timestamp": "2026-01-15T17:30:02.400Z",
+      "payload": {
+        "label": "Synthetic demo calibration completed",
+        "synthetic": true,
+        "calibration_error_px": 42,
+        "confidence": 0.86
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:04.100Z",
+      "payload": {
+        "label": "Synthetic demo gaze sample on pricing navigation",
+        "synthetic": true,
+        "aoi": "Pricing navigation link",
+        "x": 672,
+        "y": 96,
+        "viewport_width": 1440,
+        "viewport_height": 900,
+        "confidence": 0.82
+      }
+    },
+    {
+      "event_type": "scroll",
+      "timestamp": "2026-01-15T17:30:07.300Z",
+      "payload": {
+        "label": "Synthetic demo scroll toward plans",
+        "synthetic": true,
+        "scroll_depth_percent": 48,
+        "confidence": 0.8
+      }
+    },
+    {
+      "event_type": "click",
+      "timestamp": "2026-01-15T17:30:17.800Z",
+      "payload": {
+        "label": "Synthetic demo click on checkout CTA",
+        "synthetic": true,
+        "aoi": "Hero CTA",
+        "x": 862,
+        "y": 404,
+        "viewport_width": 1440,
+        "viewport_height": 900,
+        "confidence": 0.84
+      }
+    },
+    {
+      "event_type": "task_complete",
+      "timestamp": "2026-01-15T17:30:22.800Z",
+      "payload": {
+        "label": "Synthetic demo task completed",
+        "synthetic": true,
+        "completed": true
+      }
+    }
+  ]
+}

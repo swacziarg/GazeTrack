@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://gazeops.local/contracts/session-report.schema.json",
+  "$id": "https://gazetrack.local/contracts/session-report.schema.json",
   "title": "SessionReport",
   "type": "object",
   "required": ["session_id", "report_status", "generated_at", "metrics", "notes"],
