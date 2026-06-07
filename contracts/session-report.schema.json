@@ -18,6 +18,13 @@
     "aoi_count",
     "has_aoi_metrics",
     "aoi_metrics",
+    "report_summary",
+    "quality_interpretation",
+    "aoi_attention_ranking",
+    "first_noticed_aoi",
+    "most_attended_aoi",
+    "weak_or_ignored_aois",
+    "recommended_next_actions",
     "fixation_summary",
     "quality_summary",
     "replay_summary",
@@ -124,6 +131,57 @@
         "$ref": "#/$defs/aoi_metric"
       }
     },
+    "report_summary": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 4,
+      "items": {
+        "type": "string"
+      }
+    },
+    "quality_interpretation": {
+      "$ref": "#/$defs/quality_interpretation"
+    },
+    "aoi_attention_ranking": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/aoi_attention_ranking_item"
+      }
+    },
+    "first_noticed_aoi": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/aoi_insight"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "most_attended_aoi": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/aoi_insight"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "weak_or_ignored_aois": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/aoi_insight"
+      }
+    },
+    "recommended_next_actions": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 4,
+      "items": {
+        "type": "string"
+      }
+    },
     "completed": {
       "type": "boolean"
     },
@@ -183,9 +241,12 @@
         "coordinate_space",
         "gaze_sample_count",
         "approximate_dwell_ms",
+        "dwell_time_ms",
         "click_count_inside_aoi",
+        "click_count",
         "fixation_count",
-        "fixation_dwell_ms"
+        "fixation_dwell_ms",
+        "attention_share_pct"
       ],
       "properties": {
         "aoi_id": {
@@ -212,7 +273,15 @@
           "type": "integer",
           "minimum": 0
         },
+        "dwell_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
         "click_count_inside_aoi": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "click_count": {
           "type": "integer",
           "minimum": 0
         },
@@ -231,8 +300,137 @@
           "type": ["integer", "null"],
           "minimum": 0
         },
+        "click_after_fixation_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "attention_share_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
         "average_fixation_confidence": {
           "type": ["number", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "aoi_insight": {
+      "type": "object",
+      "required": [
+        "aoi_id",
+        "label",
+        "dwell_time_ms",
+        "fixation_count",
+        "time_to_first_fixation_ms",
+        "click_count",
+        "click_after_fixation_ms",
+        "attention_share_pct"
+      ],
+      "properties": {
+        "aoi_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "dwell_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time_to_first_fixation_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "click_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "click_after_fixation_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "attention_share_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "aoi_attention_ranking_item": {
+      "type": "object",
+      "required": [
+        "aoi_id",
+        "label",
+        "dwell_time_ms",
+        "fixation_count",
+        "time_to_first_fixation_ms",
+        "click_count",
+        "click_after_fixation_ms",
+        "attention_share_pct",
+        "rank",
+        "attention_score"
+      ],
+      "properties": {
+        "aoi_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "dwell_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time_to_first_fixation_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "click_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "click_after_fixation_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "attention_share_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attention_score": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "quality_interpretation": {
+      "type": "object",
+      "required": ["label", "explanation"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "enum": ["Usable", "Use with caution", "Limited"]
+        },
+        "explanation": {
+          "type": "string"
         }
       },
       "additionalProperties": false

@@ -12,7 +12,7 @@ const guideSteps = [
   {
     title: '3. Inspect backend report',
     description:
-      'After ingest, check the SQLite-backed report for event counts, AOI hits, fixation demo metrics, TTFF, replay, and quality verdicts.',
+      'After ingest, check the SQLite-backed report for executive summary, quality interpretation, AOI ranking, attention callouts, recommendations, and replay.',
   },
   {
     title: '4. Optional browser gaze',
@@ -23,7 +23,8 @@ const guideSteps = [
 
 const reportChecks = [
   'Synthetic telemetry remains the default and does not request camera permission.',
-  'Quality indicators explain confidence, calibration, low-confidence samples, and missing gaze.',
+  'Quality indicators explain confidence, calibration, low-confidence samples, missing gaze, and limited-interpretation cases.',
+  'AOI insight sections show first noticed, most attended, weak attention, and recommended next actions.',
   'Reports are generated from persisted telemetry, not raw webcam video, frames, screenshots, or image blobs.',
 ]
 

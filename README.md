@@ -11,8 +11,15 @@ GazeTrack is a privacy-first, task-based UX analytics demo for website builders.
 - Optional `WebGazerTracker` experiment hidden behind `VITE_ENABLE_WEBGAZER=true`, consent, and browser support checks.
 - FastAPI + SQLite persistence for studies, tasks, AOIs, tester sessions, accepted telemetry events, and report payloads.
 - Privacy-safe ingest validation that rejects media-like payload keys before persistence.
-- Backend reports with event counts, AOI hit metrics, approximate dwell, demo fixation detection, TTFF, quality verdicts, privacy summary, and schematic replay data.
+- Backend reports with executive summaries, quality interpretation, AOI attention ranking, first/most/weak attention callouts, recommended next actions, event counts, AOI metrics, CAF delay when available, and schematic replay data.
 - In-app Demo Guide for reviewers and placeholders/instructions for future screenshots or GIFs.
+
+## Current status
+
+- Synthetic mode: stable default portfolio/demo path with deterministic, camera-free telemetry.
+- Experimental browser gaze: opt-in browser experiment behind `VITE_ENABLE_WEBGAZER=true`; approximate, browser-dependent, and not medical-grade.
+- Reports: quality-aware UX insight reports with AOI ranking, attention callouts, cautious interpretation, and next-action recommendations.
+- Privacy: no raw webcam video, frames, screenshots, image blobs, base64 media, or media-like payloads are stored.
 
 ## Synthetic mode quickstart
 
@@ -117,7 +124,7 @@ cd frontend
 npx playwright install chromium
 ```
 
-Validation run for this checkout during portfolio polish: frontend unit tests `56 passed`, frontend build passed, backend tests `42 passed`, and Playwright E2E `1 passed`. Re-run the commands above after future changes before relying on status.
+Validation run for this checkout during portfolio polish: frontend unit tests `56 passed`, frontend build passed, backend tests `44 passed`, and Playwright E2E `1 passed`. Re-run the commands above after future changes before relying on status.
 
 ## Current limitations
 
@@ -127,7 +134,6 @@ Validation run for this checkout during portfolio polish: frontend unit tests `5
 - Session replay is a schematic normalized-coordinate visualization, not video replay or screenshot playback.
 - Fixations and quality scores are deterministic demo heuristics, not validated clinical or hardware-eye-tracking metrics.
 - No auth, teams, deployment, exports, share links, retention/deletion UI, or production analytics jobs yet.
-- CAF delay is documented as future terminology but not claimed as an implemented report metric.
 
 ## Roadmap / next milestones
 
@@ -147,17 +153,24 @@ See [docs/mvp-roadmap.md](docs/mvp-roadmap.md) for more detail.
 3. Keep `Synthetic demo` selected and explain that it is deterministic, camera-free demo data.
 4. Start the demo session, run synthetic calibration, wait for all events, and complete the session.
 5. Inspect ingest status: accepted, rejected, and stored event counts.
-6. Review the backend report: tracker mode, event counts, AOI metrics, TTFF, fixation summary, quality verdict, and privacy summary.
+6. Review the backend report: executive summary, quality interpretation, AOI ranking, first/most/weak attention callouts, recommendations, tracker mode, event counts, AOI metrics, CAF delay when available, and privacy summary.
 7. Show the schematic replay and clarify that it is generated from telemetry, not webcam video or screenshots.
 8. Optionally restart with `VITE_ENABLE_WEBGAZER=true` to show the consent-gated browser experiment and its limitations.
 
-## Screenshot / GIF placeholders
+## Demo Assets / Screenshots / GIFs
 
 Add screenshots or short GIFs later under a future `docs/assets/` folder, for example:
 
-- `docs/assets/demo-guide.png`
-- `docs/assets/synthetic-session.gif`
-- `docs/assets/backend-report.png`
-- `docs/assets/browser-gaze-consent.png`
+- Study Builder screenshot: `docs/assets/study-builder.png`
+- Synthetic report screenshot: `docs/assets/synthetic-report.png`
+- Experimental gaze debug overlay screenshot/GIF: `docs/assets/browser-gaze-debug.gif`
+- Backend report/insights screenshot: `docs/assets/backend-report-insights.png`
 
 Do not add real tester webcam imagery, raw frames, screenshots containing private data, or base64 media payload examples.
+
+## Portfolio / interview bullets
+
+- Built a privacy-first React/FastAPI UX analytics demo with configurable studies, task prompts, normalized AOIs, synthetic telemetry, SQLite persistence, and backend-generated reports.
+- Implemented quality-aware AOI insight reporting with TTFF, fixation dwell, attention share, CAF delay, weak-attention detection, and cautious next-action recommendations.
+- Preserved strict privacy boundaries by rejecting media-like payloads and storing only telemetry needed for UX analysis.
+- Added deterministic tests across ingestion, schema validation, quality scoring, report insights, frontend rendering, build, and Playwright synthetic happy path.

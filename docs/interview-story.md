@@ -48,5 +48,5 @@ I wanted a flagship portfolio project that combines full-stack product engineeri
 ## Resume bullets (quantified placeholders)
 - Built a privacy-first synthetic UX telemetry demo capturing **[X]+ events/session** across gaze-like, click, scroll, calibration, and task streams.
 - Designed SQLite-backed event/report persistence with a documented PostgreSQL/Supabase schema direction.
-- Implemented synthetic calibration, quality modes, and confidence-aware report verdicts across React/FastAPI.
+- Implemented synthetic calibration, quality modes, confidence-aware report verdicts, AOI attention ranking, TTFF, attention share, and CAF-style click-after-fixation insights across React/FastAPI.
 - Delivered an end-to-end React/FastAPI demo from study setup to backend-generated report and schematic replay in **[N] weeks**.

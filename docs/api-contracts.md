@@ -93,6 +93,13 @@ summary payloads may include `calibration_quality` and `calibration_recommendati
 - `aoi_count`
 - `has_aoi_metrics`
 - `aoi_metrics`
+- `report_summary`
+- `quality_interpretation`
+- `aoi_attention_ranking`
+- `first_noticed_aoi`
+- `most_attended_aoi`
+- `weak_or_ignored_aois`
+- `recommended_next_actions`
 - `fixation_summary`
 - `privacy_summary`
 - `quality_summary`
@@ -111,16 +118,32 @@ Each `aoi_metrics` item includes:
 - `gaze_sample_count`
 - `first_gaze_timestamp`
 - `approximate_dwell_ms`
+- `dwell_time_ms`
 - `click_count_inside_aoi`
+- `click_count`
 - `fixation_count`
 - `fixation_dwell_ms`
 - `first_fixation_timestamp`
 - `time_to_first_fixation_ms`
+- `click_after_fixation_ms`
+- `attention_share_pct`
 - `average_fixation_confidence`
 
-`approximate_dwell_ms` is a demo estimate. The backend sums bounded gaps up to 500 ms between gaze samples inside the AOI, with a deterministic fallback of `gaze_sample_count * 100 ms` when timestamps are missing or unparsable. It is not real fixation detection.
+`approximate_dwell_ms` is a demo estimate. The backend sums bounded gaps up to 500 ms between gaze samples inside the AOI, with a deterministic fallback of `gaze_sample_count * 100 ms` when timestamps are missing or unparsable. It is not real fixation detection. `dwell_time_ms` uses fixation dwell when available and falls back to approximate dwell so ranking remains deterministic.
 
 Fixation-derived fields are computed from accepted gaze events at report generation time; no separate fixation table is stored yet. A fixation belongs to an AOI when its normalized centroid falls inside the AOI rectangle.
+
+Quality-aware insight fields are deterministic heuristics:
+
+- `report_summary`: 2-4 concise bullets for what happened and how much to trust it.
+- `quality_interpretation`: label (`Usable`, `Use with caution`, or `Limited`) plus a cautious explanation.
+- `aoi_attention_ranking`: AOIs sorted by attention strength from dwell, fixations, clicks, and gaze samples.
+- `first_noticed_aoi`: earliest AOI with a detected fixation when determinable.
+- `most_attended_aoi`: top ranked AOI when there is usable AOI signal.
+- `weak_or_ignored_aois`: AOIs with zero fixations or less than 10% AOI attention share.
+- `recommended_next_actions`: 2-4 grounded suggestions, with limited-interpretation warnings for weak quality.
+
+`click_after_fixation_ms` is the delay from first detected fixation in an AOI to the first later click inside that AOI when both signals exist. It is a demo CAF-style heuristic, not validated clinical gaze analysis.
 
 `fixation_summary` includes:
 

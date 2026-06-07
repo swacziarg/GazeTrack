@@ -196,14 +196,23 @@ def test_report_generation_includes_aoi_metrics_for_gaze_and_clicks() -> None:
             "gaze_sample_count": 3,
             "first_gaze_timestamp": "2026-01-01T00:00:00.000Z",
             "approximate_dwell_ms": 300,
+            "dwell_time_ms": 300,
             "click_count_inside_aoi": 1,
+            "click_count": 1,
             "fixation_count": 1,
             "fixation_dwell_ms": 300,
             "first_fixation_timestamp": "2026-01-01T00:00:00.000Z",
             "time_to_first_fixation_ms": None,
+            "click_after_fixation_ms": 1000,
+            "attention_share_pct": 100,
             "average_fixation_confidence": 0.91,
         }
     ]
+    assert report["report_summary"]
+    assert report["quality_interpretation"]["label"] == "Usable"
+    assert report["aoi_attention_ranking"][0]["label"] == "Primary CTA"
+    assert report["most_attended_aoi"]["label"] == "Primary CTA"
+    assert report["recommended_next_actions"]
     assert report["analytics_version"] == "fixation_demo_v1"
     assert report["fixation_summary"]["fixation_count"] == 1
     assert report["metrics"]["task_count"] == 1
@@ -227,6 +236,7 @@ def test_compute_aoi_metrics_uses_fallback_dwell_when_timestamps_are_missing() -
 
     assert metrics[0].gaze_sample_count == 2
     assert metrics[0].approximate_dwell_ms == 200
+    assert metrics[0].dwell_time_ms == 200
     assert metrics[0].fixation_count == 0
     assert metrics[0].fixation_dwell_ms == 0
 
@@ -254,6 +264,81 @@ def test_reports_still_work_when_study_has_no_aois() -> None:
     assert report["aoi_count"] == 0
     assert report["has_aoi_metrics"] is False
     assert report["aoi_metrics"] == []
+
+
+def test_report_generates_quality_aware_aoi_insights() -> None:
+    repository = GazeTrackRepository()
+    study = repository.create_study(title="Insight report study", description="Compare CTA and trust attention.")
+    repository.create_task(study_id=study.id, title="Compare plans", prompt="Choose a plan.")
+    cta = repository.create_aoi(study_id=study.id, label="Primary CTA", x=0.5, y=0.38, width=0.2, height=0.12)
+    trust = repository.create_aoi(study_id=study.id, label="Trust badges", x=0.2, y=0.62, width=0.2, height=0.12)
+    ignored = repository.create_aoi(study_id=study.id, label="Footer signup", x=0.1, y=0.85, width=0.2, height=0.1)
+    session = repository.create_session(study.id)
+    repository.append_accepted_events(
+        session.id,
+        [
+            EventEnvelope(event_type="task_start", timestamp="2026-01-01T00:00:00.000Z", payload={}),
+            EventEnvelope(
+                event_type="calibration",
+                timestamp="2026-01-01T00:00:00.200Z",
+                payload={"calibration_error_px": 24, "calibration_points_completed": 5},
+            ),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:00.500Z", payload={"x": 0.25, "y": 0.66, "confidence": 0.9}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:00.650Z", payload={"x": 0.255, "y": 0.665, "confidence": 0.9}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:00.800Z", payload={"x": 0.26, "y": 0.66, "confidence": 0.9}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:01.200Z", payload={"x": 0.58, "y": 0.43, "confidence": 0.92}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:01.400Z", payload={"x": 0.585, "y": 0.435, "confidence": 0.92}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:01.600Z", payload={"x": 0.59, "y": 0.44, "confidence": 0.92}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:01.800Z", payload={"x": 0.595, "y": 0.445, "confidence": 0.92}),
+            EventEnvelope(event_type="click", timestamp="2026-01-01T00:00:02.200Z", payload={"x": 0.58, "y": 0.43}),
+        ],
+    )
+
+    response = client.get(f"/api/v1/sessions/{session.id}/report")
+
+    assert response.status_code == 200
+    report = response.json()
+    assert [item["label"] for item in report["aoi_attention_ranking"]] == [
+        "Primary CTA",
+        "Trust badges",
+        "Footer signup",
+    ]
+    assert report["first_noticed_aoi"]["aoi_id"] == str(trust.id)
+    assert report["most_attended_aoi"]["aoi_id"] == str(cta.id)
+    assert [item["label"] for item in report["weak_or_ignored_aois"]] == ["Footer signup"]
+    assert report["aoi_attention_ranking"][0]["attention_share_pct"] > report["aoi_attention_ranking"][1]["attention_share_pct"]
+    assert any("Primary CTA" in action for action in report["recommended_next_actions"])
+    assert ignored.label == "Footer signup"
+
+
+def test_low_quality_report_limits_interpretation() -> None:
+    repository = GazeTrackRepository()
+    study = repository.create_study(title="Low quality insight study")
+    repository.create_aoi(study_id=study.id, label="Primary CTA", x=0.5, y=0.38, width=0.2, height=0.12)
+    session = repository.create_session(study.id)
+    repository.append_accepted_events(
+        session.id,
+        [
+            EventEnvelope(event_type="task_start", timestamp="2026-01-01T00:00:00.000Z", payload={}),
+            EventEnvelope(
+                event_type="calibration",
+                timestamp="2026-01-01T00:00:00.200Z",
+                payload={"calibration_error_px": 140, "calibration_points_completed": 5},
+            ),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:00.500Z", payload={"x": 0.58, "y": 0.43, "confidence": 0.9}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:00.650Z", payload={"x": 0.585, "y": 0.435, "confidence": 0.9}),
+            EventEnvelope(event_type="gaze", timestamp="2026-01-01T00:00:00.800Z", payload={"x": 0.59, "y": 0.44, "confidence": 0.9}),
+        ],
+    )
+
+    response = client.get(f"/api/v1/sessions/{session.id}/report")
+
+    assert response.status_code == 200
+    report = response.json()
+    assert report["quality_summary"]["quality_verdict"] == "fail"
+    assert report["quality_interpretation"]["label"] == "Limited"
+    assert "Interpretation is limited" in report["quality_interpretation"]["explanation"]
+    assert any("Rerun the task" in action for action in report["recommended_next_actions"])
 
 
 def test_aoi_endpoints_return_404_for_unknown_study() -> None:

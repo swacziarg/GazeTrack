@@ -175,12 +175,37 @@ class AoiMetricResponse(BaseModel):
     gaze_sample_count: int = 0
     first_gaze_timestamp: str | None = None
     approximate_dwell_ms: int = 0
+    dwell_time_ms: int = 0
     click_count_inside_aoi: int = 0
+    click_count: int = 0
     fixation_count: int = 0
     fixation_dwell_ms: int = 0
     first_fixation_timestamp: str | None = None
     time_to_first_fixation_ms: int | None = None
+    click_after_fixation_ms: int | None = None
+    attention_share_pct: float = 0
     average_fixation_confidence: float | None = None
+
+
+class AoiInsightResponse(BaseModel):
+    aoi_id: UUID
+    label: str
+    dwell_time_ms: int = 0
+    fixation_count: int = 0
+    time_to_first_fixation_ms: int | None = None
+    click_count: int = 0
+    click_after_fixation_ms: int | None = None
+    attention_share_pct: float = 0
+
+
+class AoiAttentionRankingItemResponse(AoiInsightResponse):
+    rank: int
+    attention_score: float = 0
+
+
+class QualityInterpretationResponse(BaseModel):
+    label: Literal["Usable", "Use with caution", "Limited"]
+    explanation: str
 
 
 class ReplaySummaryResponse(BaseModel):
@@ -258,6 +283,18 @@ class SessionReportResponse(BaseModel):
     aoi_count: int = 0
     has_aoi_metrics: bool = False
     aoi_metrics: list[AoiMetricResponse] = Field(default_factory=list)
+    report_summary: list[str] = Field(default_factory=list)
+    quality_interpretation: QualityInterpretationResponse = Field(
+        default_factory=lambda: QualityInterpretationResponse(
+            label="Limited",
+            explanation="No gaze telemetry has been accepted yet, so interpretation is limited.",
+        )
+    )
+    aoi_attention_ranking: list[AoiAttentionRankingItemResponse] = Field(default_factory=list)
+    first_noticed_aoi: AoiInsightResponse | None = None
+    most_attended_aoi: AoiInsightResponse | None = None
+    weak_or_ignored_aois: list[AoiInsightResponse] = Field(default_factory=list)
+    recommended_next_actions: list[str] = Field(default_factory=list)
     completed: bool = False
     insights: list[str] = Field(default_factory=list)
     metrics: dict[str, Any] = Field(default_factory=dict)

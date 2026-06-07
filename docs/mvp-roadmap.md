@@ -11,7 +11,7 @@ The current repository contains a local full-stack synthetic demo path:
 - Feature-flagged `WebGazerTracker` spike behind `VITE_ENABLE_WEBGAZER`, consent, and guarded `window.webgazer` access
 - FastAPI + SQLite persistence for studies, tasks, AOIs, sessions, accepted telemetry events, and persisted reports
 - Privacy validation that rejects media-like payload keys before persistence
-- Backend report helpers for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, quality verdicts, and replay payloads
+- Backend report helpers for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, CAF-style click-after-fixation delay, quality-aware AOI insights, and replay payloads
 - Frontend local report, backend ingest/report panels, synthetic visuals, and schematic normalized-coordinate replay
 
 The repository currently has a `v0.1-demo` Git tag, verified with `git tag --list` on 2026-06-07. Confirm tag state in the current checkout before publishing or relying on release notes.
@@ -38,7 +38,6 @@ See [v0.1-demo Validation Notes](v0.1-demo-release-checklist.md) for recorded lo
 - Real heatmaps
 - Screenshot or video replay
 - DOM-derived AOI detection
-- CAF delay in backend reports
 - Authentication, deployment, export, or sharing features
 - Multi-session analytics
 
@@ -48,6 +47,6 @@ See [v0.1-demo Validation Notes](v0.1-demo-release-checklist.md) for recorded lo
 - Stronger privacy regression tests, including broader recursive media-key rejection cases
 - Database reset/seed documentation
 - Multi-session reporting and comparison views
-- Metrics evolution for task completion time, CAF delay, entropy, dispersion, and heatmap generation after backend support exists
+- Metrics evolution for task completion time, entropy, dispersion, and heatmap generation after backend support exists
 - Browser gaze research mode with documented consent, privacy, accuracy, and browser-compatibility evidence
 - Production hardening candidates such as auth, retention/deletion workflows, deployment, export, and sharing after those areas enter implemented scope

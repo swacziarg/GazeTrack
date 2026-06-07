@@ -67,6 +67,10 @@ function formatDwell(value: number) {
   return `${value}ms`
 }
 
+function formatAttentionShare(value: number) {
+  return `${value.toFixed(1)}%`
+}
+
 function getQualityPillClass(verdict: BackendSessionReport['quality_summary']['quality_verdict']) {
   if (verdict === 'pass') {
     return 'ok'
@@ -77,6 +81,94 @@ function getQualityPillClass(verdict: BackendSessionReport['quality_summary']['q
   }
 
   return 'pending'
+}
+
+function getQualityInterpretationClass(label: BackendSessionReport['quality_interpretation']['label']) {
+  if (label === 'Usable') {
+    return 'ok'
+  }
+
+  if (label === 'Limited') {
+    return 'error'
+  }
+
+  return 'pending'
+}
+
+function renderAoiCallout(title: string, aoi: BackendSessionReport['first_noticed_aoi']) {
+  if (!aoi) {
+    return (
+      <article className="backend-aoi-callout">
+        <span>{title}</span>
+        <strong>Not determinable</strong>
+        <p>No fixation-backed AOI signal was available.</p>
+      </article>
+    )
+  }
+
+  return (
+    <article className="backend-aoi-callout">
+      <span>{title}</span>
+      <strong>{aoi.label}</strong>
+      <p>
+        {formatDwell(aoi.dwell_time_ms)} dwell, {aoi.fixation_count} fixation
+        {aoi.fixation_count === 1 ? '' : 's'}, {formatAttentionShare(aoi.attention_share_pct)} AOI share.
+      </p>
+    </article>
+  )
+}
+
+function renderWeakAoiCallout(aois: BackendSessionReport['weak_or_ignored_aois']) {
+  if (aois.length === 0) {
+    return (
+      <article className="backend-aoi-callout">
+        <span>Weak attention</span>
+        <strong>None flagged</strong>
+        <p>No configured AOI fell below the weak-attention heuristic.</p>
+      </article>
+    )
+  }
+
+  return (
+    <article className="backend-aoi-callout">
+      <span>Weak attention</span>
+      <strong>{aois.map((aoi) => aoi.label).join(', ')}</strong>
+      <p>These AOIs were ignored or received less than 10.0% of AOI dwell in this demo session.</p>
+    </article>
+  )
+}
+
+function renderAttentionRanking(report: BackendSessionReport) {
+  if (report.aoi_attention_ranking.length === 0) {
+    return <p className="muted">No AOI attention ranking is available for this session.</p>
+  }
+
+  return (
+    <div className="backend-ranking-table" role="table" aria-label="AOI attention ranking">
+      <div className="backend-ranking-row heading" role="row">
+        <span role="columnheader">Rank</span>
+        <span role="columnheader">AOI</span>
+        <span role="columnheader">Dwell</span>
+        <span role="columnheader">Fixations</span>
+        <span role="columnheader">TTFF</span>
+        <span role="columnheader">Clicks</span>
+        <span role="columnheader">Share</span>
+      </div>
+      {report.aoi_attention_ranking.map((item) => (
+        <div className="backend-ranking-row" key={item.aoi_id} role="row">
+          <span role="cell">#{item.rank}</span>
+          <strong role="cell">{item.label}</strong>
+          <span role="cell">{formatDwell(item.dwell_time_ms)}</span>
+          <span role="cell">{item.fixation_count}</span>
+          <span role="cell">
+            {item.time_to_first_fixation_ms === null ? 'N/A' : formatDwell(item.time_to_first_fixation_ms)}
+          </span>
+          <span role="cell">{item.click_count}</span>
+          <span role="cell">{formatAttentionShare(item.attention_share_pct)}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function renderAoiMetrics(report: BackendSessionReport) {
@@ -102,6 +194,10 @@ function renderAoiMetrics(report: BackendSessionReport) {
               <dd>{formatDwell(metric.approximate_dwell_ms)}</dd>
             </div>
             <div>
+              <dt>Attention dwell</dt>
+              <dd>{formatDwell(metric.dwell_time_ms)}</dd>
+            </div>
+            <div>
               <dt>Clicks inside</dt>
               <dd>{metric.click_count_inside_aoi}</dd>
             </div>
@@ -124,6 +220,16 @@ function renderAoiMetrics(report: BackendSessionReport) {
                   ? 'Not available'
                   : formatDwell(metric.time_to_first_fixation_ms)}
               </dd>
+            </div>
+            <div>
+              <dt>CAF delay</dt>
+              <dd>
+                {metric.click_after_fixation_ms === null ? 'Not available' : formatDwell(metric.click_after_fixation_ms)}
+              </dd>
+            </div>
+            <div>
+              <dt>Attention share</dt>
+              <dd>{formatAttentionShare(metric.attention_share_pct)}</dd>
             </div>
             <div>
               <dt>First gaze</dt>
@@ -243,6 +349,48 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
           {report.tracker_experimental && report.tracker_notice ? (
             <p className="backend-unavailable compact">{report.tracker_notice}</p>
           ) : null}
+
+          <section className="backend-report-section">
+            <h4>Executive summary</h4>
+            <ul className="backend-insight-list">
+              {report.report_summary.map((summary) => (
+                <li key={summary}>{summary}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="backend-report-section">
+            <h4>Quality interpretation</h4>
+            <div className={`backend-quality-banner ${getQualityInterpretationClass(report.quality_interpretation.label)}`}>
+              <span className={`status-pill ${getQualityInterpretationClass(report.quality_interpretation.label)}`}>
+                {report.quality_interpretation.label}
+              </span>
+              <p>{report.quality_interpretation.explanation}</p>
+            </div>
+          </section>
+
+          <section className="backend-report-section">
+            <h4>Attention callouts</h4>
+            <div className="backend-aoi-callout-grid">
+              {renderAoiCallout('First noticed', report.first_noticed_aoi)}
+              {renderAoiCallout('Most attended', report.most_attended_aoi)}
+              {renderWeakAoiCallout(report.weak_or_ignored_aois)}
+            </div>
+          </section>
+
+          <section className="backend-report-section">
+            <h4>AOI attention ranking</h4>
+            {renderAttentionRanking(report)}
+          </section>
+
+          <section className="backend-report-section">
+            <h4>Recommended next actions</h4>
+            <ul className="backend-insight-list">
+              {report.recommended_next_actions.map((action) => (
+                <li key={action}>{action}</li>
+              ))}
+            </ul>
+          </section>
 
           {taskPrompts.length > 0 ? (
             <section className="backend-report-section">

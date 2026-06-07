@@ -136,7 +136,7 @@ def compute_aoi_metrics(
 
     for aoi in aois:
         gaze_timestamps: list[str] = []
-        click_count = 0
+        click_timestamps: list[str] = []
         aoi_fixation_start_timestamps: list[str] = []
         aoi_fixation_dwell_ms = 0
         aoi_fixation_confidences: list[float] = []
@@ -153,7 +153,7 @@ def compute_aoi_metrics(
             if point is None:
                 continue
             if is_point_inside_aoi(point[0], point[1], aoi):
-                click_count += 1
+                click_timestamps.append(event.timestamp)
 
         for fixation in fixations:
             centroid = _fixation_centroid(fixation)
@@ -168,8 +168,19 @@ def compute_aoi_metrics(
                 aoi_fixation_confidences.append(confidence)
 
         sorted_gaze_timestamps = sorted(gaze_timestamps)
+        sorted_click_timestamps = sorted(click_timestamps)
         sorted_fixation_timestamps = sorted(aoi_fixation_start_timestamps)
         first_fixation_timestamp = sorted_fixation_timestamps[0] if sorted_fixation_timestamps else None
+        approximate_dwell_ms = estimate_dwell_ms(gaze_timestamps, len(gaze_timestamps))
+        dwell_time_ms = aoi_fixation_dwell_ms if aoi_fixation_dwell_ms > 0 else approximate_dwell_ms
+        click_after_fixation_ms = None
+        if first_fixation_timestamp is not None:
+            click_delays = [
+                delay_ms
+                for click_timestamp in sorted_click_timestamps
+                if (delay_ms := milliseconds_between(first_fixation_timestamp, click_timestamp)) is not None
+            ]
+            click_after_fixation_ms = click_delays[0] if click_delays else None
         metrics.append(
             AoiMetricResponse(
                 aoi_id=aoi.id,
@@ -178,14 +189,24 @@ def compute_aoi_metrics(
                 coordinate_space=aoi.coordinate_space,
                 gaze_sample_count=len(gaze_timestamps),
                 first_gaze_timestamp=sorted_gaze_timestamps[0] if sorted_gaze_timestamps else None,
-                approximate_dwell_ms=estimate_dwell_ms(gaze_timestamps, len(gaze_timestamps)),
-                click_count_inside_aoi=click_count,
+                approximate_dwell_ms=approximate_dwell_ms,
+                dwell_time_ms=dwell_time_ms,
+                click_count_inside_aoi=len(click_timestamps),
+                click_count=len(click_timestamps),
                 fixation_count=len(aoi_fixation_start_timestamps),
                 fixation_dwell_ms=aoi_fixation_dwell_ms,
                 first_fixation_timestamp=first_fixation_timestamp,
                 time_to_first_fixation_ms=milliseconds_between(task_start_timestamp, first_fixation_timestamp),
+                click_after_fixation_ms=click_after_fixation_ms,
                 average_fixation_confidence=_average(aoi_fixation_confidences),
             )
         )
+
+    total_dwell_ms = sum(metric.dwell_time_ms for metric in metrics)
+    if total_dwell_ms > 0:
+        metrics = [
+            metric.model_copy(update={"attention_share_pct": round((metric.dwell_time_ms / total_dwell_ms) * 100, 1)})
+            for metric in metrics
+        ]
 
     return metrics

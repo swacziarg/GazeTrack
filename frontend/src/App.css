@@ -1095,6 +1095,93 @@ dd {
   font-size: 1rem;
 }
 
+.backend-quality-banner {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  border: 1px solid #d8c489;
+  border-radius: 6px;
+  padding: 0.85rem;
+  background: #fff8e6;
+}
+
+.backend-quality-banner.ok {
+  border-color: #9fd6bd;
+  background: #eaf8f1;
+}
+
+.backend-quality-banner.error {
+  border-color: #e8b0b0;
+  background: #fff0f0;
+}
+
+.backend-quality-banner p {
+  color: #334155;
+  font-weight: 650;
+}
+
+.backend-aoi-callout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.backend-aoi-callout {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  border: 1px solid #e1e8f1;
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.backend-aoi-callout span {
+  color: #2d6f7a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.backend-aoi-callout strong {
+  overflow-wrap: anywhere;
+}
+
+.backend-aoi-callout p {
+  color: #405166;
+}
+
+.backend-ranking-table {
+  display: grid;
+  gap: 0.35rem;
+  overflow-x: auto;
+}
+
+.backend-ranking-row {
+  display: grid;
+  grid-template-columns: 4rem minmax(10rem, 1.4fr) repeat(5, minmax(5.5rem, 0.7fr));
+  gap: 0.5rem;
+  min-width: 720px;
+  align-items: center;
+  border: 1px solid #e1e8f1;
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  background: #ffffff;
+}
+
+.backend-ranking-row.heading {
+  background: #f8fafc;
+  color: #657185;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.backend-ranking-row strong,
+.backend-ranking-row span {
+  overflow-wrap: anywhere;
+}
+
 .backend-aoi-metric-list {
   display: grid;
   gap: 0.75rem;
@@ -1298,6 +1385,7 @@ dd {
   .backend-report-stats,
   .backend-count-list,
   .tracker-status-grid,
+  .backend-aoi-callout-grid,
   .backend-aoi-metric dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1334,6 +1422,7 @@ dd {
   .backend-report-stats,
   .backend-count-list,
   .tracker-status-grid,
+  .backend-aoi-callout-grid,
   .backend-aoi-metric dl {
     grid-template-columns: 1fr;
   }

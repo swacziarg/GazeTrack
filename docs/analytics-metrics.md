@@ -21,8 +21,8 @@ This is demo-grade HCI telemetry, not medical-grade fixation detection.
 
 ## Click-after-fixation delay
 **Plain English:** Delay between first fixation on target AOI and first relevant click.
-**Current status:** Defined future metric. Not returned by the `v0.1-demo` backend report and should not be listed as an implemented MVP claim.
-**Compute:** `first_click_timestamp_on_target - first_fixation_timestamp_on_target`.
+**Current status:** Implemented in backend AOI metrics as `click_after_fixation_ms` when a fixation and later click are both available inside the same AOI. It is a demo CAF-style heuristic, not validated clinical gaze analysis.
+**Compute:** `first_later_click_timestamp_on_target_aoi - first_fixation_timestamp_on_target_aoi`.
 
 ## Task completion time
 **Plain English:** Total time to complete the assigned task.

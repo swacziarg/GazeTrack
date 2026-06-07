@@ -62,8 +62,10 @@ In the local report and backend report, point out:
 
 - Accepted/rejected/stored ingest counts.
 - Tracker mode and tracker type.
+- Executive summary bullets, quality interpretation, AOI attention ranking, and recommended next actions.
+- First noticed, most attended, and weak/ignored AOI callouts.
 - Event type counts.
-- AOI gaze samples, clicks, fixation counts, fixation dwell, and TTFF.
+- AOI gaze samples, clicks, fixation counts, fixation dwell, TTFF, attention share, and CAF-style click-after-fixation delay when available.
 - Quality verdict and quality reasons.
 - Privacy summary showing raw media is not stored.
 - Schematic replay generated from telemetry, not video or screenshots.
@@ -88,7 +90,9 @@ Future portfolio media can be added under `docs/assets/`:
 - `demo-guide.png`: first viewport with Demo Guide and privacy copy.
 - `study-builder.png`: configured study/tasks/AOIs.
 - `synthetic-session.gif`: default synthetic session flow.
-- `backend-report.png`: persisted telemetry report and quality summary.
+- `synthetic-report.png`: default synthetic report with quality-aware AOI insights.
+- `backend-report-insights.png`: persisted telemetry report, AOI ranking, and recommendations.
 - `browser-gaze-consent.png`: optional consent panel.
+- `browser-gaze-debug.gif`: optional approximate gaze debug overlay.
 
 Do not include real webcam frames or private user data in demo assets.

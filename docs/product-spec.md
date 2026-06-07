@@ -18,7 +18,7 @@ Website builders often know what users clicked, but have less structured context
 - FastAPI + SQLite persistence for studies, tasks, AOIs, tester sessions, accepted telemetry events, and report payloads
 - Manual/demo AOIs stored as normalized 0-1 rectangles
 - Event ingestion endpoint with schema validation and recursive rejection of media-like payload keys
-- Backend report helpers for event counts, AOI gaze/click hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, heuristic quality verdicts, privacy summary, and schematic replay payloads
+- Backend report helpers for event counts, AOI gaze/click hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, CAF-style click-after-fixation delay, quality-aware AOI insight summaries, heuristic quality verdicts, privacy summary, and schematic replay payloads
 - Frontend local report, backend ingest/report panels, synthetic visual previews, and normalized-coordinate schematic replay
 
 ## Experimental implementation
@@ -36,7 +36,6 @@ Website builders often know what users clicked, but have less structured context
 - Raw video, image, screenshot, frame, blob, or base64 persistence
 - Real heatmaps or screenshot/page replay
 - DOM-derived AOI detection
-- CAF delay in implemented report claims
 - Authentication/authorization
 - Deployment, export, or shareable report features
 - Generic session-recording/Hotjar clone behavior
@@ -50,7 +49,7 @@ The long-term product can evolve toward a real browser-native gaze analytics pla
 - Study creation/editing beyond the seeded demo flow
 - DOM-assisted or screenshot-assisted AOI authoring
 - Production fixation analytics, heatmap generation, and report exports
-- CAF delay and additional attention metrics once backend support exists
+- Additional attention metrics such as entropy and dispersion once backend support exists
 - Multi-session study summaries and variant comparison
 - Team/auth model, retention/deletion workflows, and deployment hardening
 - Shareable report snapshots after access control and privacy review

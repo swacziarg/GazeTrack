@@ -13,6 +13,15 @@ from app.repository import get_repository
 from app.services.aoi_metrics import compute_aoi_metrics
 from app.services.fixations import detect_fixations, summarize_fixations
 from app.services.replay import build_replay_aoi_overlay, build_replay_events, build_replay_fixations, build_replay_summary
+from app.services.report_insights import (
+    aoi_attention_ranking,
+    first_noticed_aoi,
+    most_attended_aoi,
+    quality_interpretation,
+    recommended_next_actions,
+    report_summary,
+    weak_or_ignored_aois,
+)
 from app.services.session_quality import (
     event_type_counts,
     gaze_confidences,
@@ -110,6 +119,25 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
     replay_aoi_overlay = build_replay_aoi_overlay(aois)
     replay_summary = build_replay_summary(events, replay_events, replay_fixations)
     tracker_metadata = _tracker_report_metadata(events)
+    quality_interpretation_payload = quality_interpretation(quality_summary)
+    aoi_attention_ranking_payload = aoi_attention_ranking(aoi_metrics)
+    first_noticed_aoi_payload = first_noticed_aoi(aoi_metrics)
+    most_attended_aoi_payload = most_attended_aoi(aoi_attention_ranking_payload)
+    weak_or_ignored_aois_payload = weak_or_ignored_aois(aoi_metrics)
+    report_summary_payload = report_summary(
+        event_count=event_count,
+        quality=quality_interpretation_payload,
+        first_noticed=first_noticed_aoi_payload,
+        most_attended=most_attended_aoi_payload,
+        weak_aois=weak_or_ignored_aois_payload,
+    )
+    recommended_next_actions_payload = recommended_next_actions(
+        quality=quality_interpretation_payload,
+        first_noticed=first_noticed_aoi_payload,
+        most_attended=most_attended_aoi_payload,
+        weak_aois=weak_or_ignored_aois_payload,
+        tracker_experimental=bool(tracker_metadata["tracker_experimental"]),
+    )
     privacy_summary = {
         "raw_media_stored": False,
         "stored_payload_type": "validated JSON telemetry",
@@ -152,6 +180,13 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
         aoi_count=len(aois),
         has_aoi_metrics=bool(aoi_metrics),
         aoi_metrics=aoi_metrics,
+        report_summary=report_summary_payload,
+        quality_interpretation=quality_interpretation_payload,
+        aoi_attention_ranking=aoi_attention_ranking_payload,
+        first_noticed_aoi=first_noticed_aoi_payload,
+        most_attended_aoi=most_attended_aoi_payload,
+        weak_or_ignored_aois=weak_or_ignored_aois_payload,
+        recommended_next_actions=recommended_next_actions_payload,
         completed=session.status == "completed",
         insights=insights,
         metrics={
@@ -168,6 +203,17 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
             "aoi_metrics": [metric.model_dump(mode="json") for metric in aoi_metrics],
             "fixation_summary": fixation_summary,
             "quality": quality_summary,
+            "quality_interpretation": quality_interpretation_payload.model_dump(mode="json"),
+            "report_summary": report_summary_payload,
+            "aoi_attention_ranking": [item.model_dump(mode="json") for item in aoi_attention_ranking_payload],
+            "first_noticed_aoi": (
+                first_noticed_aoi_payload.model_dump(mode="json") if first_noticed_aoi_payload else None
+            ),
+            "most_attended_aoi": (
+                most_attended_aoi_payload.model_dump(mode="json") if most_attended_aoi_payload else None
+            ),
+            "weak_or_ignored_aois": [item.model_dump(mode="json") for item in weak_or_ignored_aois_payload],
+            "recommended_next_actions": recommended_next_actions_payload,
             "privacy": privacy_summary,
             "replay_summary": replay_summary,
             "tracker_type": tracker_metadata["tracker_type"],

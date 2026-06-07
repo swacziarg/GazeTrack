@@ -6,12 +6,37 @@ export type BackendAoiMetric = {
   gaze_sample_count: number
   first_gaze_timestamp: string | null
   approximate_dwell_ms: number
+  dwell_time_ms: number
   click_count_inside_aoi: number
+  click_count: number
   fixation_count: number
   fixation_dwell_ms: number
   first_fixation_timestamp: string | null
   time_to_first_fixation_ms: number | null
+  click_after_fixation_ms: number | null
+  attention_share_pct: number
   average_fixation_confidence: number | null
+}
+
+export type BackendAoiInsight = {
+  aoi_id: string
+  label: string
+  dwell_time_ms: number
+  fixation_count: number
+  time_to_first_fixation_ms: number | null
+  click_count: number
+  click_after_fixation_ms: number | null
+  attention_share_pct: number
+}
+
+export type BackendAoiAttentionRankingItem = BackendAoiInsight & {
+  rank: number
+  attention_score: number
+}
+
+export type BackendQualityInterpretation = {
+  label: 'Usable' | 'Use with caution' | 'Limited'
+  explanation: string
 }
 
 export type BackendFixationSummary = {
@@ -115,6 +140,13 @@ export type BackendSessionReport = {
   aoi_count: number
   has_aoi_metrics: boolean
   aoi_metrics: BackendAoiMetric[]
+  report_summary: string[]
+  quality_interpretation: BackendQualityInterpretation
+  aoi_attention_ranking: BackendAoiAttentionRankingItem[]
+  first_noticed_aoi: BackendAoiInsight | null
+  most_attended_aoi: BackendAoiInsight | null
+  weak_or_ignored_aois: BackendAoiInsight[]
+  recommended_next_actions: string[]
   completed: boolean
   insights: string[]
   metrics: Record<string, unknown>

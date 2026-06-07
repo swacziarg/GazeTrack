@@ -36,13 +36,65 @@ const report: BackendSessionReport = {
       gaze_sample_count: 3,
       first_gaze_timestamp: '2026-01-15T17:30:09.400Z',
       approximate_dwell_ms: 300,
+      dwell_time_ms: 160,
       click_count_inside_aoi: 1,
+      click_count: 1,
       fixation_count: 1,
       fixation_dwell_ms: 160,
       first_fixation_timestamp: '2026-01-15T17:30:09.400Z',
       time_to_first_fixation_ms: 9400,
+      click_after_fixation_ms: 1200,
+      attention_share_pct: 100,
       average_fixation_confidence: 0.86,
     },
+  ],
+  report_summary: [
+    'Report generated from 8 accepted telemetry events; no raw webcam media is stored.',
+    'Quality interpretation: Use with caution. Some quality signals are weak.',
+    'First noticed AOI appears to be Primary CTA.',
+  ],
+  quality_interpretation: {
+    label: 'Use with caution',
+    explanation: 'Some quality signals are weak, so treat AOI patterns as directional rather than precise.',
+  },
+  aoi_attention_ranking: [
+    {
+      aoi_id: '33333333-3333-4333-8333-333333333333',
+      label: 'Primary CTA',
+      rank: 1,
+      dwell_time_ms: 160,
+      fixation_count: 1,
+      time_to_first_fixation_ms: 9400,
+      click_count: 1,
+      click_after_fixation_ms: 1200,
+      attention_share_pct: 100,
+      attention_score: 335,
+    },
+  ],
+  first_noticed_aoi: {
+    aoi_id: '33333333-3333-4333-8333-333333333333',
+    label: 'Primary CTA',
+    dwell_time_ms: 160,
+    fixation_count: 1,
+    time_to_first_fixation_ms: 9400,
+    click_count: 1,
+    click_after_fixation_ms: 1200,
+    attention_share_pct: 100,
+  },
+  most_attended_aoi: {
+    aoi_id: '33333333-3333-4333-8333-333333333333',
+    label: 'Primary CTA',
+    dwell_time_ms: 160,
+    fixation_count: 1,
+    time_to_first_fixation_ms: 9400,
+    click_count: 1,
+    click_after_fixation_ms: 1200,
+    attention_share_pct: 100,
+  },
+  weak_or_ignored_aois: [],
+  recommended_next_actions: [
+    'Use this run as directional evidence and confirm the pattern with another higher-quality session.',
+    'Compare attention on Primary CTA with the task objective to confirm it supports the intended user action.',
   ],
   completed: false,
   insights: ['Backend demo report generated from persisted SQLite telemetry.'],
@@ -85,11 +137,20 @@ const reportResult: BackendReportResult = {
 }
 
 describe('BackendReport', () => {
-  it('renders fixation summary, quality verdict, reasons, and AOI fixation fields', () => {
+  it('renders insight summary, quality interpretation, ranking, recommendations, and AOI fields', () => {
     const html = renderToStaticMarkup(
       <BackendReport ingestResult={null} isFetchingReport={false} reportResult={reportResult} />,
     )
 
+    expect(html).toContain('Executive summary')
+    expect(html).toContain('Quality interpretation')
+    expect(html).toContain('Use with caution')
+    expect(html).toContain('Attention callouts')
+    expect(html).toContain('First noticed')
+    expect(html).toContain('Most attended')
+    expect(html).toContain('AOI attention ranking')
+    expect(html).toContain('Recommended next actions')
+    expect(html).toContain('Compare attention on Primary CTA')
     expect(html).toContain('Fixation summary')
     expect(html).toContain('simple_dispersion_v1')
     expect(html).toContain('Quality verdict')
@@ -99,6 +160,8 @@ describe('BackendReport', () => {
     expect(html).toContain('warn')
     expect(html).toContain('Low-confidence gaze sample rate is above 35%.')
     expect(html).toContain('Fixation dwell')
+    expect(html).toContain('CAF delay')
+    expect(html).toContain('Attention share')
     expect(html).toContain('160ms')
   })
 

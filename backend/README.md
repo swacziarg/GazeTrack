@@ -79,14 +79,14 @@ AOIs use normalized coordinates from 0 to 1:
 - `width`, `height`: normalized dimensions
 - an event point is inside an AOI when it falls within the inclusive rectangle bounds
 
-`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored privacy-safe telemetry, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, TTFF from task start when available, fixation summary, replay overlay data, heuristic quality summary, and privacy-first insights.
+`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored privacy-safe telemetry, including executive summary bullets, quality interpretation, AOI attention ranking, first/most/weak attention callouts, recommended next actions, event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, TTFF from task start when available, CAF-style click-after-fixation delay when available, fixation summary, replay overlay data, heuristic quality summary, and privacy-first insights.
 
 Synthetic calibration events may include target/observed normalized points, `error_px`, `error_normalized`, `calibration_step`, `calibration_point_count`, `calibration_points_completed`, and confidence. The parser remains defensive and backwards compatible with aggregate `calibration_error_px` and `calibration_error_normalized` fields.
 
 AOI metrics include both raw sample fields and fixation-derived fields:
 
 - `gaze_sample_count`, `first_gaze_timestamp`, `approximate_dwell_ms`, and `click_count_inside_aoi` preserve the original sample/click behavior.
-- `fixation_count`, `fixation_dwell_ms`, `first_fixation_timestamp`, `time_to_first_fixation_ms`, and optional `average_fixation_confidence` are derived from detected fixation centroids inside the normalized AOI rectangle.
+- `dwell_time_ms`, `fixation_count`, `fixation_dwell_ms`, `first_fixation_timestamp`, `time_to_first_fixation_ms`, `click_after_fixation_ms`, `attention_share_pct`, and optional `average_fixation_confidence` are derived from detected fixation centroids inside the normalized AOI rectangle.
 
 `approximate_dwell_ms` remains a deterministic raw-sample approximation: gaze samples inside an AOI are sorted by timestamp and bounded gaps up to 500 ms are summed. ISO timestamps are supported, and parser helpers also accept numeric seconds or milliseconds for service-level compatibility. If timestamps cannot be parsed, the fallback is `gaze_sample_count * 100 ms`.
 
@@ -110,7 +110,6 @@ Replay is not video replay. It does not persist or return raw payloads wholesale
 - No bundled or production WebGazer integration.
 - No production-grade webcam tracking implementation.
 - No screenshot uploads or DOM-derived AOI detection.
-- No CAF delay metric in the current report.
 - No production analytics jobs, background workers, or medical-grade fixation detection.
 - No production video/session replay engine.
 - No raw webcam video/image/frame/base64/blob storage.
