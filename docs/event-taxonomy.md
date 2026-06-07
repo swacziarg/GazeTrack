@@ -11,6 +11,24 @@ Allowed event types for telemetry ingestion:
 - `quality`
 - `page_view`
 
+Tracker sources may set `payload.source` to `"synthetic"` or `"webgazer"`. Both sources use the same privacy-safe
+event envelope. A browser gaze event should look like:
+
+```json
+{
+  "event_type": "gaze",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "payload": {
+    "source": "webgazer",
+    "x": 0.52,
+    "y": 0.41,
+    "viewport_width": 1440,
+    "viewport_height": 900,
+    "confidence": null
+  }
+}
+```
+
 AOI report metrics use accepted `gaze` and `click` events with compatible coordinates. If `x` and `y` are already between 0 and 1, they are treated as normalized. If coordinates are pixel values, `viewport_width` and `viewport_height` are required so the backend can normalize them.
 
 AOIs are normalized 0-1 rectangles. Demo reports count gaze/click events inside those rectangles and compute approximate raw-sample dwell from bounded timestamp gaps.
@@ -28,6 +46,6 @@ Calibration and quality events may include `confidence`, `calibration_error_px`,
 - `calibration_step`
 - `calibration_point_count`
 
-The current frontend calibration UI is synthetic only: it renders five target dots and generates telemetry without requesting camera permission. The current quality verdict is heuristic and should be treated as a synthetic-compatible reliability signal, not a medical or biometric assessment.
+The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment.
 
 Privacy rule: events must not contain raw media fields, webcam frame content, images, screenshots, blobs, or base64 media.

@@ -24,16 +24,18 @@ GazeTrack is a full-stack web system where browser clients capture gaze + intera
 AOI coordinates are normalized 0-1 rectangles. They are currently demo placeholders; screenshot uploads and DOM-based AOI detection are not part of this milestone.
 
 ## Gaze tracking flow
-1. Current demo emits rich synthetic gaze samples clustered around known AOIs, with either normalized `x`/`y` or pixel coordinates plus viewport dimensions.
-2. Backend report helpers normalize compatible event points into 0-1 coordinates.
-3. Future browser tracker work can initialize WebGazer.js or an equivalent browser-native estimator.
-4. Stored telemetry must remain coordinates, confidence, events, and quality metadata only; no raw frames/video are persisted.
+1. Frontend tracker providers implement a shared boundary for calibration, session start/stop, and telemetry events.
+2. The default `SyntheticTracker` emits rich synthetic gaze samples clustered around known AOIs, with normalized `x`/`y`, confidence, calibration, scroll, click, and task events.
+3. The optional `WebGazerTracker` spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, and uses guarded `window.webgazer` access.
+4. Backend report helpers normalize compatible event points into 0-1 coordinates.
+5. Stored telemetry must remain coordinates, confidence/quality metadata, events, and timestamps only; no raw frames/video/images/screenshots/blobs/base64 payloads are persisted.
 
 ## Calibration flow
-1. Current frontend renders five synthetic calibration target dots.
-2. The demo generator emits target/observed/error telemetry per point and an aggregate calibration summary.
-3. Backend quality helpers read calibration error + confidence fields for report verdicts.
-4. Future tracker work can replace this with real browser-native calibration while keeping raw frames/video out of persistence.
+1. Current frontend renders five calibration target dots through the selected tracker flow.
+2. Synthetic mode emits target/observed/error telemetry per point and an aggregate calibration summary without camera access.
+3. Browser gaze experiment mode records calibration target events only after consent and adapter initialization.
+4. Backend quality helpers read calibration error + confidence fields for report verdicts.
+5. Future tracker work can improve browser-native calibration while keeping raw frames/video out of persistence.
 
 ## Analytics/reporting flow
 1. Read accepted telemetry events for a session.
@@ -55,6 +57,7 @@ Calibration/session quality is also heuristic. The backend summarizes calibratio
 - Webcam image processing local to browser where feasible.
 - Persist telemetry only (coordinates, confidence, events, quality metadata).
 - Reject raw webcam/video/image/frame/base64/blob payloads before persistence.
+- Keep browser gaze tracking feature-flagged and consent-gated; synthetic telemetry remains the default.
 - Avoid sensitive fields unless necessary for study operation.
 - Plan for retention/deletion controls and auditability.
 

@@ -40,12 +40,14 @@ function eventToPercentPoint(event: MockStudyEvent): PercentPoint | null {
     return null
   }
 
+  const confidence = typeof event.payload.confidence === 'number' ? event.payload.confidence : undefined
+
   return {
     id: event.id,
     timestamp: event.timestamp,
     xPercent: normalizeCoordinate(x, viewportWidth),
     yPercent: normalizeCoordinate(y, viewportHeight),
-    confidence: event.payload.confidence,
+    confidence,
     dwellMs: event.payload.dwell_ms,
     aoi: event.payload.aoi,
   }

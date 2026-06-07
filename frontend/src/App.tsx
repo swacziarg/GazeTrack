@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ingestSessionEvents, type EventIngestResult } from './api/events'
 import { fetchBackendHealth, type BackendHealth } from './api/health'
 import { fetchSessionReport, type BackendReportResult } from './api/reports'
@@ -10,9 +10,17 @@ import { FlowCard } from './components/FlowCard'
 import { PlaceholderPanel } from './components/PlaceholderPanel'
 import { SessionControls, type SessionPhase } from './components/SessionControls'
 import { StatusCard } from './components/StatusCard'
+import { TrackerModePanel } from './components/TrackerModePanel'
 import { demoStudy, flowSteps } from './data/demoStudy'
-import { countCalibrationEvents, generateMockStudyEvents, type SyntheticTelemetryMode } from './lib/mockEvents'
+import { countCalibrationEvents, type MockStudyEvent, type SyntheticTelemetryMode } from './lib/mockEvents'
 import { generateDemoReport } from './lib/mockReport'
+import {
+  WebGazerTracker,
+  createTrackerProvider,
+  getTrackerOptions,
+  type TrackerId,
+  type TrackerStatus,
+} from './tracking'
 
 const initialHealth: BackendHealth = {
   ok: false,
@@ -39,10 +47,28 @@ function App() {
   const [backendReportResult, setBackendReportResult] = useState<BackendReportResult | null>(null)
   const [studySetupResult, setStudySetupResult] = useState<StudySetupResult | null>(null)
   const [isFetchingStudySetup, setIsFetchingStudySetup] = useState(true)
-  const mockEvents = useMemo(() => generateMockStudyEvents(qualityMode), [qualityMode])
-  const calibrationEventCount = useMemo(() => countCalibrationEvents(mockEvents), [mockEvents])
-  const visibleEvents = mockEvents.slice(0, visibleEventCount)
-  const demoReport = useMemo(() => generateDemoReport(mockEvents), [mockEvents])
+  const [trackerId, setTrackerId] = useState<TrackerId>('synthetic')
+  const [trackerStatus, setTrackerStatus] = useState<TrackerStatus>('idle')
+  const [trackerAvailability, setTrackerAvailability] = useState('Synthetic tracker available')
+  const [webGazerConsentGranted, setWebGazerConsentGranted] = useState(false)
+  const [webGazerEvents, setWebGazerEvents] = useState<MockStudyEvent[]>([])
+  const webGazerTrackerRef = useRef<WebGazerTracker | null>(null)
+  const trackerOptions = useMemo(() => getTrackerOptions(), [])
+  const syntheticTracker = useMemo(
+    () => createTrackerProvider('synthetic', { syntheticMode: qualityMode }),
+    [qualityMode],
+  )
+  const syntheticEvents = useMemo(() => syntheticTracker.getEvents(), [syntheticTracker])
+  const trackerEvents = trackerId === 'synthetic' ? syntheticEvents : webGazerEvents
+  const calibrationEventCount = useMemo(() => countCalibrationEvents(trackerEvents), [trackerEvents])
+  const visibleEvents = trackerEvents.slice(0, visibleEventCount)
+  const demoReport = useMemo(() => generateDemoReport(trackerEvents), [trackerEvents])
+  const selectedTrackerOption = trackerOptions.find((option) => option.id === trackerId) ?? trackerOptions[0]
+  const canStartSession = trackerId === 'synthetic' || (webGazerConsentGranted && trackerStatus === 'ready')
+  const displayedTotalEventCount =
+    trackerId === 'synthetic' ? trackerEvents.length : Math.max(trackerEvents.length, visibleEventCount)
+  const calibrationComplete =
+    (sessionPhase === 'active' || sessionPhase === 'completed') && calibrationEventCount > 0
   const elapsedSeconds =
     visibleEvents.length > 1
       ? (Date.parse(visibleEvents[visibleEvents.length - 1].timestamp) - Date.parse(visibleEvents[0].timestamp)) /
@@ -70,16 +96,36 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (sessionPhase !== 'active' || visibleEventCount >= mockEvents.length) {
+    if (sessionPhase !== 'active' || trackerId !== 'synthetic' || visibleEventCount >= trackerEvents.length) {
       return
     }
 
     const intervalId = window.setInterval(() => {
-      setVisibleEventCount((currentCount) => Math.min(currentCount + 1, mockEvents.length))
+      setVisibleEventCount((currentCount) => Math.min(currentCount + 1, trackerEvents.length))
     }, 120)
 
     return () => window.clearInterval(intervalId)
-  }, [mockEvents.length, sessionPhase, visibleEventCount])
+  }, [trackerEvents.length, sessionPhase, trackerId, visibleEventCount])
+
+  useEffect(() => {
+    if (sessionPhase !== 'active' || trackerId !== 'webgazer') {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      const events = webGazerTrackerRef.current?.getEvents() ?? []
+      setWebGazerEvents(events)
+      setVisibleEventCount(events.length)
+    }, 250)
+
+    return () => window.clearInterval(intervalId)
+  }, [sessionPhase, trackerId])
+
+  useEffect(() => {
+    return () => {
+      webGazerTrackerRef.current?.dispose()
+    }
+  }, [])
 
   function openDemoStudy() {
     setSessionPhase('detail')
@@ -88,6 +134,7 @@ function App() {
     setIsIngestingEvents(false)
     setIsFetchingBackendReport(false)
     setBackendReportResult(null)
+    setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'consent_required' : 'idle')
     window.setTimeout(() => {
       document.getElementById('mock-session-panel')?.scrollIntoView({ behavior: 'smooth' })
     }, 0)
@@ -95,17 +142,48 @@ function App() {
 
   function startMockSession() {
     setDemoSessionId(createDemoSessionId())
-    setSessionPhase('calibration')
-    setVisibleEventCount(1)
     setIngestResult(null)
     setIsIngestingEvents(false)
     setIsFetchingBackendReport(false)
     setBackendReportResult(null)
+
+    if (trackerId === 'webgazer') {
+      if (!webGazerConsentGranted || !webGazerTrackerRef.current) {
+        setTrackerStatus('consent_required')
+        return
+      }
+
+      void webGazerTrackerRef.current.startSession({ taskPrompt: demoStudy.taskPrompt }).then(() => {
+        const events = webGazerTrackerRef.current?.getEvents() ?? []
+        setWebGazerEvents(events)
+        setVisibleEventCount(events.length)
+        setTrackerStatus('tracking')
+        setSessionPhase('calibration')
+      })
+      return
+    }
+
+    void syntheticTracker.startSession({ mode: qualityMode })
+    setTrackerStatus('ready')
+    setSessionPhase('calibration')
+    setVisibleEventCount(1)
   }
 
   function runSyntheticCalibration() {
+    if (trackerId === 'webgazer') {
+      void webGazerTrackerRef.current?.runCalibration().then(() => {
+        const events = webGazerTrackerRef.current?.getEvents() ?? []
+        setWebGazerEvents(events)
+        setVisibleEventCount(events.length)
+        setTrackerStatus('tracking')
+        setSessionPhase('active')
+      })
+      return
+    }
+
     setSessionPhase('active')
-    setVisibleEventCount(Math.min(1 + calibrationEventCount, mockEvents.length))
+    setTrackerStatus('tracking')
+    setVisibleEventCount(Math.min(1 + calibrationEventCount, trackerEvents.length))
   }
 
   function updateQualityMode(mode: SyntheticTelemetryMode) {
@@ -116,10 +194,27 @@ function App() {
     setIsIngestingEvents(false)
     setIsFetchingBackendReport(false)
     setBackendReportResult(null)
+    setTrackerStatus('idle')
   }
 
   function completeMockSession() {
-    setVisibleEventCount(mockEvents.length)
+    if (trackerId === 'webgazer') {
+      void webGazerTrackerRef.current?.stopSession().then((events) => {
+        setWebGazerEvents(events)
+        setTrackerStatus('stopped')
+        completeSessionWithEvents(events)
+      })
+      return
+    }
+
+    completeSessionWithEvents(trackerEvents)
+  }
+
+  function completeSessionWithEvents(events: MockStudyEvent[]) {
+    if (trackerId === 'synthetic') {
+      setTrackerStatus('stopped')
+    }
+    setVisibleEventCount(events.length)
     setSessionPhase('completed')
     setIngestResult(null)
     setBackendReportResult(null)
@@ -127,7 +222,7 @@ function App() {
     setIsIngestingEvents(true)
 
     void (async () => {
-      const result = await ingestSessionEvents(demoSessionId, mockEvents)
+      const result = await ingestSessionEvents(demoSessionId, events)
       setIngestResult(result)
       setIsIngestingEvents(false)
 
@@ -161,6 +256,55 @@ function App() {
     window.setTimeout(() => {
       document.getElementById('demo-report-panel')?.scrollIntoView({ behavior: 'smooth' })
     }, 0)
+  }
+
+  function handleTrackerChange(nextTrackerId: TrackerId) {
+    if (nextTrackerId === trackerId) {
+      return
+    }
+
+    webGazerTrackerRef.current?.dispose()
+    webGazerTrackerRef.current = null
+    setTrackerId(nextTrackerId)
+    setSessionPhase('detail')
+    setVisibleEventCount(0)
+    setIngestResult(null)
+    setBackendReportResult(null)
+    setIsIngestingEvents(false)
+    setIsFetchingBackendReport(false)
+
+    if (nextTrackerId === 'webgazer') {
+      setWebGazerConsentGranted(false)
+      setTrackerStatus('consent_required')
+      setTrackerAvailability('Waiting for consent before checking WebGazer')
+    } else {
+      setTrackerStatus('idle')
+      setTrackerAvailability('Synthetic tracker available')
+      setWebGazerEvents([])
+    }
+  }
+
+  function cancelToSyntheticTracker() {
+    handleTrackerChange('synthetic')
+  }
+
+  function grantWebGazerConsent() {
+    const tracker = new WebGazerTracker()
+    webGazerTrackerRef.current = tracker
+    setWebGazerConsentGranted(true)
+    setTrackerStatus('initializing')
+    setTrackerAvailability('Checking browser tracker')
+
+    void tracker
+      .initialize()
+      .then(() => {
+        setTrackerStatus('ready')
+        setTrackerAvailability('WebGazer global available')
+      })
+      .catch((error: unknown) => {
+        setTrackerStatus('unavailable')
+        setTrackerAvailability(error instanceof Error ? error.message : 'WebGazer is unavailable')
+      })
   }
 
   return (
@@ -314,10 +458,24 @@ function App() {
             <h2>Mock test session</h2>
           </div>
           <div className="session-grid">
+            <TrackerModePanel
+              options={trackerOptions}
+              selectedTrackerId={trackerId}
+              availabilityLabel={trackerAvailability}
+              consentGranted={webGazerConsentGranted}
+              calibrationComplete={calibrationComplete}
+              status={trackerStatus}
+              onTrackerChange={handleTrackerChange}
+              onGrantConsent={grantWebGazerConsent}
+              onCancelToSynthetic={cancelToSyntheticTracker}
+            />
             <SessionControls
               phase={sessionPhase}
+              trackerId={trackerId}
+              trackerLabel={selectedTrackerOption.label}
+              canStartSession={canStartSession}
               eventCount={visibleEventCount}
-              totalEventCount={mockEvents.length}
+              totalEventCount={displayedTotalEventCount}
               elapsedSeconds={elapsedSeconds}
               taskPrompt={demoStudy.taskPrompt}
               qualityMode={qualityMode}
@@ -337,7 +495,7 @@ function App() {
         <section id="demo-report-panel" className="section-block">
           <DemoReport
             report={demoReport}
-            events={mockEvents}
+            events={trackerEvents}
             aois={demoStudy.aois}
             ingestResult={ingestResult}
             isIngestingEvents={isIngestingEvents}

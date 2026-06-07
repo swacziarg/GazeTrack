@@ -369,9 +369,51 @@ dd {
 }
 
 .session-controls,
-.event-log {
+.event-log,
+.tracker-mode-panel {
   display: grid;
   gap: 1rem;
+}
+
+.tracker-mode-panel {
+  grid-column: 1 / -1;
+}
+
+.tracker-status-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.tracker-status-grid div {
+  min-width: 0;
+  border: 1px solid #e1e8f1;
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.tracker-status-grid dd {
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.consent-panel {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid #d8c489;
+  border-radius: 6px;
+  padding: 0.85rem;
+  background: #fff8e6;
+}
+
+.consent-panel h4 {
+  color: #172033;
+  font-size: 1rem;
+}
+
+.consent-panel p {
+  color: #405166;
 }
 
 .task-prompt {
@@ -858,6 +900,7 @@ dd {
   .study-builder-grid,
   .backend-report-stats,
   .backend-count-list,
+  .tracker-status-grid,
   .backend-aoi-metric dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -883,6 +926,7 @@ dd {
   .study-builder-grid,
   .backend-report-stats,
   .backend-count-list,
+  .tracker-status-grid,
   .backend-aoi-metric dl {
     grid-template-columns: 1fr;
   }

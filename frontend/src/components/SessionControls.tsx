@@ -1,9 +1,13 @@
 import { calibrationTargets, type SyntheticTelemetryMode } from '../lib/mockEvents'
+import type { TrackerId } from '../tracking'
 
 export type SessionPhase = 'preview' | 'detail' | 'calibration' | 'active' | 'completed'
 
 type SessionControlsProps = {
   phase: SessionPhase
+  trackerId: TrackerId
+  trackerLabel: string
+  canStartSession: boolean
   eventCount: number
   totalEventCount: number
   elapsedSeconds: number
@@ -17,17 +21,17 @@ type SessionControlsProps = {
   onCompleteSession: () => void
 }
 
-function getStatusLabel(phase: SessionPhase) {
+function getStatusLabel(phase: SessionPhase, trackerLabel: string) {
   if (phase === 'calibration') {
-    return 'Synthetic calibration'
+    return `${trackerLabel} calibration`
   }
 
   if (phase === 'active') {
-    return 'Active demo session'
+    return 'Active test session'
   }
 
   if (phase === 'completed') {
-    return 'Completed demo session'
+    return 'Completed test session'
   }
 
   if (phase === 'detail') {
@@ -39,6 +43,9 @@ function getStatusLabel(phase: SessionPhase) {
 
 export function SessionControls({
   phase,
+  trackerId,
+  trackerLabel,
+  canStartSession,
   eventCount,
   totalEventCount,
   elapsedSeconds,
@@ -53,15 +60,18 @@ export function SessionControls({
 }: SessionControlsProps) {
   const canComplete = phase === 'active' && eventCount === totalEventCount
   const calibrationVisible = phase === 'calibration' || phase === 'active' || phase === 'completed'
+  const isSynthetic = trackerId === 'synthetic'
 
   return (
     <article className="card session-controls">
       <div className="card-header">
         <div>
-          <p className="eyebrow">Mock study flow</p>
+          <p className="eyebrow">{isSynthetic ? 'Mock study flow' : 'Browser experiment flow'}</p>
           <h3>Demo session</h3>
         </div>
-        <span className={`status-pill ${phase === 'active' ? 'ok' : 'pending'}`}>{getStatusLabel(phase)}</span>
+        <span className={`status-pill ${phase === 'active' ? 'ok' : 'pending'}`}>
+          {getStatusLabel(phase, trackerLabel)}
+        </span>
       </div>
 
       <p className="task-prompt">{taskPrompt}</p>
@@ -71,7 +81,7 @@ export function SessionControls({
         <select
           value={qualityMode}
           onChange={(event) => onQualityModeChange(event.target.value as SyntheticTelemetryMode)}
-          disabled={phase === 'calibration' || phase === 'active'}
+          disabled={!isSynthetic || phase === 'calibration' || phase === 'active'}
         >
           <option value="healthy">Healthy</option>
           <option value="low_confidence">Low confidence</option>
@@ -82,7 +92,7 @@ export function SessionControls({
 
       <dl className="session-stats">
         <div>
-          <dt>Synthetic events</dt>
+          <dt>{isSynthetic ? 'Synthetic events' : 'Tracker events'}</dt>
           <dd>
             {eventCount} / {totalEventCount}
           </dd>
@@ -94,11 +104,13 @@ export function SessionControls({
       </dl>
 
       {calibrationVisible ? (
-        <section className="calibration-panel" aria-label="Synthetic demo calibration">
+        <section className="calibration-panel" aria-label={`${trackerLabel} calibration`}>
           <div className="calibration-copy">
-            <h4>Synthetic calibration</h4>
+            <h4>{trackerLabel} calibration</h4>
             <p className="muted">
-              Five target points generate calibration telemetry only. No camera permission is requested.
+              {isSynthetic
+                ? 'Five target points generate calibration telemetry only. No camera permission is requested.'
+                : 'Five target points generate calibration telemetry after consent. Raw camera media is not sent to ingest.'}
             </p>
           </div>
           <div className="calibration-target-map" aria-label="Five synthetic calibration targets">
@@ -132,13 +144,13 @@ export function SessionControls({
             Open demo study
           </button>
         ) : phase === 'detail' || phase === 'completed' ? (
-          <button type="button" className="secondary-button" onClick={onStartSession}>
+          <button type="button" className="secondary-button" onClick={onStartSession} disabled={!canStartSession}>
             {phase === 'completed' ? 'Restart demo session' : 'Start demo session'}
           </button>
         ) : null}
         {phase === 'calibration' ? (
           <button type="button" className="primary-button" onClick={onRunCalibration}>
-            Run synthetic calibration
+            Run {isSynthetic ? 'synthetic' : 'browser'} calibration
           </button>
         ) : null}
         {phase === 'active' ? (
@@ -149,8 +161,9 @@ export function SessionControls({
       </div>
 
       <p className="privacy-note compact">
-        Demo sessions use synthetic gaze/event telemetry. GazeTrack is designed to store telemetry only,
-        not webcam video.
+        {isSynthetic
+          ? 'Demo sessions use synthetic gaze/event telemetry. GazeTrack is designed to store telemetry only, not webcam video.'
+          : 'Browser gaze experiment sessions store telemetry only. GazeTrack does not send webcam video to the backend.'}
       </p>
     </article>
   )

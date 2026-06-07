@@ -26,7 +26,7 @@ npm run build
 npm run test
 ```
 
-Tests currently cover the synthetic telemetry generator, event contract adapter, backend ingest client, demo report utilities, backend report rendering, and synthetic visualization helpers.
+Tests currently cover the synthetic tracker, feature-flagged tracker selection, WebGazer adapter normalization, event contract adapter, backend ingest client, demo report utilities, backend report rendering, and synthetic visualization helpers.
 
 ## Backend URL
 
@@ -46,6 +46,24 @@ GET {VITE_API_BASE_URL}/api/v1/sessions/{session_id}/report
 
 The backend report panel is labeled as a demo report and is generated from SQLite-backed persisted demo telemetry. It is rendered separately from the local demo report.
 
+## Tracker Modes
+
+Synthetic telemetry is the default tracker mode. It does not load browser gaze code and does not request camera
+permission. The synthetic tracker keeps the existing `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze`
+quality modes.
+
+The browser gaze experiment is hidden unless this flag is set:
+
+```bash
+VITE_ENABLE_WEBGAZER=true
+```
+
+When enabled, the UI shows `Browser gaze experiment` as an opt-in tracker. The app displays consent copy before
+initializing the adapter. The adapter uses guarded `window.webgazer` access and sends only privacy-safe telemetry:
+normalized gaze points, optional confidence/quality metadata, timestamps, clicks, scrolls, calibration events, and task
+events. Raw video, frames, images, screenshots, blobs, and base64 media are not sent or stored. Browser gaze estimates
+are approximate and not medical-grade eye tracking.
+
 ## Synthetic Report Visuals
 
 After completing the mock session, the local report renders synthetic visual previews:
@@ -56,7 +74,7 @@ After completing the mock session, the local report renders synthetic visual pre
 
 These visuals are generated from mock telemetry positions and demo AOI boxes only. They are not webcam tracking, WebGazer output, raw media processing, or production heatmap analytics.
 
-The synthetic generator supports `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes so the backend report can demonstrate pass/warn/fail verdicts. No mode requests camera permission or stores webcam video, frames, images, blobs, or base64 media.
+The synthetic generator supports `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes so the backend report can demonstrate pass/warn/fail verdicts. No synthetic mode requests camera permission or stores webcam video, frames, images, blobs, or base64 media.
 
 Set `VITE_API_BASE_URL` in a local `.env` file if the FastAPI backend is not running on the default URL:
 
@@ -68,8 +86,8 @@ If the backend is offline, the local demo report still renders and the backend p
 
 ## Intentionally Not Implemented Yet
 
-- Webcam tracking and browser permission prompts
-- WebGazer integration
+- Production-grade webcam tracking
+- Bundled WebGazer dependency
 - Authentication
 - Real analytics computation or production report generation
 - Real heatmaps, real gaze replay tracking, or chart visualizations

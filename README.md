@@ -15,6 +15,7 @@ GazeTrack helps product teams run structured UX studies where testers complete t
 - AOI (area of interest) definition as normalized 0-1 page regions
 - Synthetic calibration step with five target points and generated error/confidence telemetry
 - Session recording of rich synthetic gaze/click/scroll/task events in the current demo (no raw video)
+- Tracker adapter boundary with synthetic telemetry as the default and an opt-in browser gaze experiment behind `VITE_ENABLE_WEBGAZER`
 - Report with task counts, AOI metrics, fixation summary, event counts, privacy summary, and session quality verdict
 
 ## Tech stack
@@ -51,6 +52,15 @@ GazeTrack helps product teams run structured UX studies where testers complete t
 
 4. Open `http://localhost:5173`, complete the synthetic demo session, and fetch the backend report.
 
+The synthetic tracker is the default. To expose the experimental browser gaze mode locally, set:
+
+```bash
+VITE_ENABLE_WEBGAZER=true
+```
+
+The browser gaze option requires explicit in-app consent before initialization. It expects a guarded `window.webgazer`
+global if you want to exercise the spike; normal synthetic mode does not load WebGazer or request camera permission.
+
 The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETRACK_DATABASE_URL` or `DATABASE_URL` is set. No Docker, Postgres, or Supabase instance is required for the current local demo.
 
 ## Demo flow
@@ -62,7 +72,7 @@ The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETR
 
 AOIs are normalized rectangles where `x` and `y` are top-left coordinates and `width`/`height` are dimensions from 0 to 1. Current AOIs are demo placeholders; screenshot uploads, DOM-derived AOIs, and webcam gaze estimation are future milestones. AOI dwell still includes the existing bounded-gap raw sample estimate, and reports now add fixation-derived dwell from a simple deterministic normalized-coordinate clustering algorithm. Fixation dwell is more meaningful than raw sample dwell, but it is still approximate and not medical-grade eye tracking or production fixation analytics.
 
-The current demo generator can run `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes. These modes exist to exercise report quality verdicts and are not real tracker output.
+The current demo generator can run `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes. These modes exist to exercise report quality verdicts and are not real tracker output. A frontend tracker adapter now separates this synthetic generator from the optional browser gaze spike. The browser gaze experiment is feature-flagged, approximate, not medical-grade eye tracking, and sends only normalized gaze telemetry, confidence/quality metadata, timestamps, clicks, scrolls, calibration events, and task events to the backend.
 
 The current fixation detector is `simple_dispersion_v1`: accepted gaze samples are normalized to 0-1 coordinates, grouped when nearby in space and time, and promoted to a fixation only when the candidate has enough samples and duration. Calibration/session quality is a heuristic verdict (`pass`, `warn`, or `fail`) based on accepted gaze events, confidence, calibration errors when present, and whether fixations can be detected. WebGazer/browser webcam integration remains a future milestone, and the current calibration UI does not request camera permission.
 
@@ -70,6 +80,7 @@ The current fixation detector is `simple_dispersion_v1`: accepted gaze samples a
 - Process webcam frames locally in browser where possible.
 - Store gaze/event telemetry only; do **not** store raw webcam video.
 - Do **not** store webcam images, frames, screenshots, blobs, or base64 media payloads.
+- Keep browser gaze tracking opt-in and require consent before camera-capable tracker initialization.
 - Make calibration confidence and tracking quality explicit in reports.
 - Communicate uncertainty; avoid claims of perfect accuracy.
 - Use least-privilege data access and retention controls.

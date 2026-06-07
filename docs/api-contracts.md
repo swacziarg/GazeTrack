@@ -62,6 +62,12 @@ Current AOIs are manual/demo placeholders only. Screenshot uploads and DOM-deriv
 
 The current frontend demo posts rich synthetic telemetry only. A healthy run includes task start/complete events, five synthetic calibration target events plus a calibration summary, 30-80 clustered gaze samples, at least one scroll, and a click inside the `Primary CTA` AOI. `low_confidence`, `bad_calibration`, and `no_gaze` modes are used to exercise quality verdicts. None of these modes request webcam permission or send raw media.
 
+The frontend now routes telemetry through tracker providers. `SyntheticTracker` remains the default source. A guarded
+`WebGazerTracker` spike can be exposed locally with `VITE_ENABLE_WEBGAZER=true`, but it requires explicit consent before
+initialization and uses the same backend event envelope. Browser tracker payloads may include `source: "webgazer"`,
+normalized `x`/`y`, viewport dimensions, optional confidence, calibration/task/click/scroll fields, and timestamps. They
+must not include video, frames, images, screenshots, blobs, or base64 media.
+
 `GET /api/v1/sessions/{session_id}/report` includes:
 
 - `analytics_version`
@@ -149,4 +155,4 @@ Event payloads containing keys that look like raw media are rejected (case-insen
 
 Accepted telemetry is stored in local SQLite by default. Rejected media-like payloads are not persisted. The current schema uses UUID/string IDs, timestamp columns, append-only telemetry rows, and JSON payloads serialized as text to keep a straightforward future migration path to PostgreSQL/Supabase.
 
-No auth, webcam tracking, WebGazer integration, screenshot uploads, production analytics jobs, medical-grade fixation detection, or raw media storage is implemented in this phase.
+No auth, production-grade webcam tracking, bundled WebGazer dependency, screenshot uploads, production analytics jobs, medical-grade fixation detection, or raw media storage is implemented in this phase.
