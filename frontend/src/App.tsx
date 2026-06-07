@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ingestSessionEvents, type EventIngestResult } from './api/events'
 import { fetchBackendHealth, type BackendHealth } from './api/health'
+import { fetchSessionReport, type BackendReportResult } from './api/reports'
+import { BackendReport } from './components/BackendReport'
 import { DemoReport } from './components/DemoReport'
 import { EventLog } from './components/EventLog'
 import { FlowCard } from './components/FlowCard'
@@ -26,6 +28,8 @@ function App() {
   const [visibleEventCount, setVisibleEventCount] = useState(0)
   const [isIngestingEvents, setIsIngestingEvents] = useState(false)
   const [ingestResult, setIngestResult] = useState<EventIngestResult | null>(null)
+  const [isFetchingBackendReport, setIsFetchingBackendReport] = useState(false)
+  const [backendReportResult, setBackendReportResult] = useState<BackendReportResult | null>(null)
   const mockEvents = useMemo(() => generateMockStudyEvents(), [])
   const visibleEvents = mockEvents.slice(0, visibleEventCount)
   const demoReport = useMemo(() => generateDemoReport(mockEvents), [mockEvents])
@@ -70,6 +74,8 @@ function App() {
     setVisibleEventCount(0)
     setIngestResult(null)
     setIsIngestingEvents(false)
+    setIsFetchingBackendReport(false)
+    setBackendReportResult(null)
     window.setTimeout(() => {
       document.getElementById('mock-session-panel')?.scrollIntoView({ behavior: 'smooth' })
     }, 0)
@@ -80,21 +86,49 @@ function App() {
     setVisibleEventCount(1)
     setIngestResult(null)
     setIsIngestingEvents(false)
+    setIsFetchingBackendReport(false)
+    setBackendReportResult(null)
   }
 
   function completeMockSession() {
     setVisibleEventCount(mockEvents.length)
     setSessionPhase('completed')
     setIngestResult(null)
+    setBackendReportResult(null)
+    setIsFetchingBackendReport(false)
     setIsIngestingEvents(true)
 
-    void ingestSessionEvents(DEMO_SESSION_ID, mockEvents)
-      .then((result) => {
-        setIngestResult(result)
+    void (async () => {
+      const result = await ingestSessionEvents(DEMO_SESSION_ID, mockEvents)
+      setIngestResult(result)
+      setIsIngestingEvents(false)
+
+      if (result.ok) {
+        setIsFetchingBackendReport(true)
+        try {
+          const reportResult = await fetchSessionReport(DEMO_SESSION_ID)
+          setBackendReportResult(reportResult)
+        } finally {
+          setIsFetchingBackendReport(false)
+        }
+      }
+    })().catch(() => {
+      setIngestResult({
+        ok: false,
+        backendAvailable: false,
+        apiBaseUrl: initialHealth.apiBaseUrl,
+        response: {
+          session_id: DEMO_SESSION_ID,
+          accepted_count: 0,
+          rejected_count: 0,
+          stored_count_for_session: 0,
+          note: 'Backend unavailable — showing local demo report only.',
+          rejected_reasons: [],
+        },
       })
-      .finally(() => {
-        setIsIngestingEvents(false)
-      })
+      setIsIngestingEvents(false)
+      setIsFetchingBackendReport(false)
+    })
 
     window.setTimeout(() => {
       document.getElementById('demo-report-panel')?.scrollIntoView({ behavior: 'smooth' })
@@ -212,6 +246,11 @@ function App() {
       {sessionPhase === 'completed' ? (
         <section id="demo-report-panel" className="section-block">
           <DemoReport report={demoReport} ingestResult={ingestResult} isIngestingEvents={isIngestingEvents} />
+          <BackendReport
+            ingestResult={ingestResult}
+            isFetchingReport={isFetchingBackendReport}
+            reportResult={backendReportResult}
+          />
         </section>
       ) : null}
 
