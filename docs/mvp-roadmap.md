@@ -1,8 +1,10 @@
 # MVP Roadmap
 
-## `v0.1-demo` completed baseline
+This document describes the current documented implementation state and possible future directions. It is not a release-readiness statement or a prioritized execution plan.
 
-GazeTrack now has a credible local full-stack demo shape:
+## Current documented state
+
+The current repository contains a local full-stack synthetic demo path:
 
 - React/Vite/TypeScript dashboard with a synthetic study/session/report flow
 - Default synthetic tracker with multiple quality modes
@@ -11,45 +13,41 @@ GazeTrack now has a credible local full-stack demo shape:
 - Privacy validation that rejects media-like payload keys before persistence
 - Backend report helpers for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, quality verdicts, and replay payloads
 - Frontend local report, backend ingest/report panels, synthetic visuals, and schematic normalized-coordinate replay
-- Backend tests, frontend tests, and frontend production build covering the current demo surface
 
-## Release definition
+The repository currently has a `v0.1-demo` Git tag, verified with `git tag --list` on 2026-06-07. Confirm tag state in the current checkout before publishing or relying on release notes.
 
-`v0.1-demo` is a synthetic-first portfolio/demo release. It should be tagged only as a privacy-first synthetic telemetry demo pipeline for task-based UX testing, not as production webcam eye tracking.
+## Validation evidence
 
-The release can mention the browser gaze spike only as experimental, feature-flagged, unbundled, consent-gated, and not production-ready.
+Validation evidence is local and time-scoped. Re-run the relevant commands in the current environment before relying on test status:
 
-## Remaining release-confidence tests
+```bash
+git tag --list "v0.1-demo"
+git status --short
+cd backend && PYTHONPATH=. pytest
+cd ../frontend && npm test
+npm run build
+npm run e2e
+```
 
-These are the two main blockers before calling the tag polished rather than just functional:
+See [v0.1-demo Validation Notes](v0.1-demo-release-checklist.md) for recorded local validation details.
 
-1. Add Playwright or similar E2E happy path with the backend running.
-2. Validate actual backend report responses against `contracts/session-report.schema.json`.
+## Known non-goals and not currently claimed
 
-## Next milestones
+- Production webcam tracking
+- Medical-grade eye tracking
+- Real heatmaps
+- Screenshot or video replay
+- DOM-derived AOI detection
+- CAF delay in backend reports
+- Authentication, deployment, export, or sharing features
+- Multi-session analytics
 
-### 1. Release hardening
+## Possible future directions
 
-- Add E2E happy path covering frontend demo completion, backend ingest, and backend report fetch.
-- Validate backend report responses against the JSON schema contract.
-- Expand nested media-key rejection tests if coverage is not exhaustive.
-- Add database reset/seed instructions.
-- Ensure `backend/gazetrack_demo.db` is treated as local state, not a release artifact.
-
-### 2. Product narrative polish
-
-- Tighten frontend copy around synthetic mode and the experimental browser gaze mode.
-- Add screenshots/GIF and deterministic demo instructions.
-- Keep README, product spec, backend/frontend READMEs, metrics docs, and interview story aligned on synthetic-first language.
-
-### 3. Metrics evolution
-
-- Either implement backend CAF delay with tests and contract updates or keep it out of MVP claims.
-- Keep entropy, dispersion, and production heatmap generation documented as future metrics until they are returned by the backend.
-- Keep fixation logic labeled as `simple_dispersion_v1` demo analytics until validated against real browser gaze input.
-
-### 4. Future production path
-
-- Evaluate a bundled browser gaze implementation only after consent, privacy, accuracy, and browser compatibility risks are documented.
-- Add production-quality calibration gates and quality thresholds.
-- Add auth, retention/deletion workflows, deployment hardening, export/share features, and multi-session reporting only when they are part of the implemented scope.
+- Configurable study setup beyond the seeded demo study
+- Stronger privacy regression tests, including broader recursive media-key rejection cases
+- Database reset/seed documentation
+- Multi-session reporting and comparison views
+- Metrics evolution for task completion time, CAF delay, entropy, dispersion, and heatmap generation after backend support exists
+- Browser gaze research mode with documented consent, privacy, accuracy, and browser-compatibility evidence
+- Production hardening candidates such as auth, retention/deletion workflows, deployment, export, and sharing after those areas enter implemented scope

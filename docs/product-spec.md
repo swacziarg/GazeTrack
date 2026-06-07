@@ -4,7 +4,7 @@
 
 For `v0.1-demo`, GazeTrack is a privacy-first synthetic telemetry demo pipeline for task-based website UX testing. It demonstrates how a credible product/data system can model study setup, telemetry ingestion, quality-aware analytics, and reporting without storing raw webcam media.
 
-This release should not be described as production webcam eye tracking. Browser gaze estimation is experimental and future-facing.
+Do not describe the current demo as production webcam eye tracking. Browser gaze estimation is experimental and future-facing.
 
 ## Problem statement
 
@@ -26,7 +26,7 @@ Website builders often know what users clicked, but have less structured context
 - `WebGazerTracker` exists behind `VITE_ENABLE_WEBGAZER`
 - The browser gaze option is hidden by default, requires explicit consent, and guards against missing `window.webgazer`
 - WebGazer is not bundled
-- This path is not release-ready as real gaze tracking and should be described only as a browser gaze spike
+- This path does not establish production real gaze tracking and is described only as a browser gaze spike
 - Compatible browser gaze telemetry must remain privacy-safe: coordinates, timestamps, confidence/quality metadata, calibration/task/click/scroll events, and no raw media
 
 ## Current non-goals
@@ -41,9 +41,9 @@ Website builders often know what users clicked, but have less structured context
 - Deployment, export, or shareable report features
 - Generic session-recording/Hotjar clone behavior
 
-## Future product requirements
+## Possible future product directions
 
-The long-term product can evolve toward a real browser-native gaze analytics platform, but these items are future work until implemented and validated:
+The long-term product can evolve toward a real browser-native gaze analytics platform, but these items remain possible directions unless implementation and validation evidence is added:
 
 - Production browser gaze integration and calibration quality gates
 - Webcam permission flow for real tracker mode, with consent and local frame processing
@@ -71,13 +71,13 @@ The long-term product can evolve toward a real browser-native gaze analytics pla
 6. Review local and backend-generated demo reports.
 7. Inspect schematic normalized-coordinate replay when backend replay data exists.
 
-## Future workflow target
+## Possible future workflow
 
 1. Create a study with page/task setup.
 2. Define AOIs manually or with future page/DOM assistance.
 3. Run tester through consent, camera permission, calibration, and task execution.
 4. Ingest gaze + interaction events with confidence metadata.
-5. Generate quality-aware reports with production-validated metrics.
+5. Generate quality-aware reports with metrics validated for the implemented tracker mode.
 
 ## UX principles
 

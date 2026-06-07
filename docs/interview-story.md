@@ -29,10 +29,10 @@ I wanted a flagship portfolio project that combines full-stack product engineeri
 - Treat data minimization and transparent confidence reporting as product features.
 
 ## Validation approach
-- Validate ingestion with contract/integration tests.
-- Validate metrics on deterministic sample sessions with expected outputs.
-- Compare session quality bands against known-good/known-poor synthetic quality modes.
-- Add remaining release-confidence tests: E2E happy path with backend running and backend report schema validation.
+- Ingestion is covered by contract/integration tests in the backend suite.
+- Metrics are checked on deterministic sample sessions with expected outputs.
+- Session quality bands are compared against known-good/known-poor synthetic quality modes.
+- The current repo includes a Playwright synthetic happy path and backend report schema validation test; re-run them locally before relying on validation status.
 
 ## What went wrong / likely risks
 - Browser/device variability may reduce consistency.

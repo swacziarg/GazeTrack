@@ -5,7 +5,7 @@ GazeTrack is currently a full-stack synthetic telemetry demo where the browser e
 
 ## Frontend/backend/database boundaries
 - **Frontend (React/TS):** Study setup UI, calibration UI, telemetry capture, report rendering.
-- **Backend (FastAPI):** Auth-ready API surface, study/task/AOI/session/event endpoints, report orchestration.
+- **Backend (FastAPI):** Study/task/AOI/session/event endpoints and report orchestration. Authentication is not implemented in the current demo.
 - **Database:** SQLite for current local development; schema is shaped for a later PostgreSQL/Supabase migration with core entities, task/AOI setup tables, append-only event tables, and persisted report payloads.
 
 ## Event ingestion flow
@@ -65,9 +65,9 @@ Session replay v1 is a privacy-safe schematic overlay. The backend emits ordered
 - Avoid sensitive fields unless necessary for study operation.
 - Plan for retention/deletion controls and auditability.
 
-## Deployment model
+## Local and possible deployment model
 - Local-first dev setup for frontend + backend + SQLite.
-- Future deploy path: frontend static hosting + FastAPI service + managed Postgres/Supabase.
+- Possible future deploy path: frontend static hosting + FastAPI service + managed Postgres/Supabase.
 - Optional future background worker process for periodic analytics recompute.
 
 ## Suggested folder structure
