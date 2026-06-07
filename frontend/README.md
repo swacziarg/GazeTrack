@@ -42,10 +42,10 @@ Run the synthetic happy path:
 npm run e2e
 ```
 
-Run this after the backend install step has created `backend/.venv`. The Playwright config starts FastAPI on
-`http://127.0.0.1:8000` with `GAZETRACK_DATABASE_URL=sqlite:////private/tmp/gazetrack-e2e.db`, starts Vite on
-`http://127.0.0.1:5173`, runs the default synthetic session, and verifies successful backend ingest/report UI.
-WebGazer remains disabled.
+Run this after the backend install step has created `backend/.venv` and installed `backend/requirements.txt` into it.
+The Playwright config starts FastAPI on `http://127.0.0.1:8000` with
+`GAZETRACK_DATABASE_URL=sqlite:////private/tmp/gazetrack-e2e.db`, starts Vite on `http://127.0.0.1:5173`, runs the
+default synthetic session, and verifies successful backend ingest/report UI. WebGazer remains disabled.
 
 ## Backend URL
 

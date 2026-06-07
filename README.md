@@ -105,22 +105,31 @@ See [docs/v0.1-demo-release-checklist.md](docs/v0.1-demo-release-checklist.md) f
 
 Release-confidence checks:
 
-- Backend report schema validation:
+- Backend unit/integration tests and report schema validation:
 
   ```bash
   cd backend
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+  PYTHONPATH=. pytest
   PYTHONPATH=. pytest tests/test_session_report_schema_contract.py
   ```
 
-- Synthetic E2E happy path:
+- Frontend unit tests, build, and synthetic E2E happy path:
 
   ```bash
   cd frontend
+  npm install
+  npx playwright install chromium
+  npm test
+  npm run build
   npm run e2e
   ```
 
-The E2E starts a local FastAPI backend and Vite frontend, keeps the default synthetic tracker selected, runs the
-synthetic session, and verifies successful backend ingest/report UI. It does not enable WebGazer.
+Run the E2E after the backend `.venv` exists and `backend/requirements.txt` has been installed. The E2E starts a local
+FastAPI backend and Vite frontend, keeps the default synthetic tracker selected, runs the synthetic session, and verifies
+successful backend ingest/report UI. It does not enable WebGazer.
 
 ## Roadmap
 
