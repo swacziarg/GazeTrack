@@ -461,12 +461,14 @@ dd {
 
 .session-controls,
 .event-log,
-.tracker-mode-panel {
+.tracker-mode-panel,
+.browser-gaze-status-panel {
   display: grid;
   gap: 1rem;
 }
 
-.tracker-mode-panel {
+.tracker-mode-panel,
+.browser-gaze-status-panel {
   grid-column: 1 / -1;
 }
 
@@ -474,6 +476,10 @@ dd {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.live-tracker-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .tracker-status-grid div {
@@ -505,6 +511,68 @@ dd {
 
 .consent-panel p {
   color: #405166;
+}
+
+.toggle-control {
+  display: inline-flex;
+  width: fit-content;
+  gap: 0.5rem;
+  align-items: center;
+  color: #405166;
+  font-weight: 800;
+}
+
+.toggle-control input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.tracker-fallback-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #d8c489;
+  border-radius: 6px;
+  padding: 0.85rem;
+  background: #fff8e6;
+}
+
+.tracker-fallback-panel p {
+  color: #6b4e00;
+  font-weight: 700;
+}
+
+.gaze-debug-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+
+.gaze-debug-dot {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  background: #d84f3f;
+  box-shadow: 0 0 0 2px rgba(13, 23, 40, 0.45), 0 8px 22px rgba(13, 23, 40, 0.25);
+}
+
+.gaze-debug-label {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  border: 1px solid #d8c489;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  background: #fff8e6;
+  color: #6b4e00;
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .webgazer-calibration-overlay {
@@ -613,6 +681,27 @@ dd {
   border-radius: 6px;
   padding: 0.85rem;
   background: #f0faf8;
+}
+
+.calibration-feedback {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.quality-text {
+  text-transform: capitalize;
+}
+
+.quality-text.good {
+  color: #0e6240;
+}
+
+.quality-text.usable {
+  color: #6b4e00;
+}
+
+.quality-text.weak {
+  color: #9b1c1c;
 }
 
 .calibration-copy {

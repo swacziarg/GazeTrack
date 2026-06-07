@@ -69,6 +69,12 @@ initialization and uses the same backend event envelope. Browser tracker payload
 optional confidence, calibration/task fields, and timestamps. They must not include video, frames, images, screenshots,
 blobs, or base64 media.
 
+The frontend-only browser gaze debug UI may show a local approximate gaze dot, tracker state, sample counts, elapsed
+capture time, weak-signal messages, and calibration feedback (`good`, `usable`, or `weak`). These are operator-facing
+debug signals. Backend ingest still receives only the existing privacy-safe telemetry event envelope. Calibration
+summary payloads may include `calibration_quality` and `calibration_recommendation`; reports continue to label
+`tracker_type: "webgazer_experimental"` sessions as experimental and not medical-grade.
+
 `GET /api/v1/sessions/{session_id}/report` includes:
 
 - `analytics_version`

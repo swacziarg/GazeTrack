@@ -1,5 +1,5 @@
 import { calibrationTargets, type SyntheticTelemetryMode } from '../lib/mockEvents'
-import type { TrackerId } from '../tracking'
+import type { CalibrationSummary, TrackerId } from '../tracking'
 
 export type SessionPhase = 'preview' | 'detail' | 'calibration' | 'active' | 'completed'
 
@@ -14,6 +14,7 @@ type SessionControlsProps = {
   taskPrompt: string
   qualityMode: SyntheticTelemetryMode
   calibrationEventCount: number
+  calibrationSummary?: CalibrationSummary | null
   trackerNotice?: string | null
   onQualityModeChange: (mode: SyntheticTelemetryMode) => void
   onOpenStudy: () => void
@@ -42,6 +43,15 @@ function getStatusLabel(phase: SessionPhase, trackerLabel: string) {
   return 'Preview only'
 }
 
+function formatCalibrationRecommendation(summary: CalibrationSummary) {
+  const labels: Record<CalibrationSummary['recommendation'], string> = {
+    continue: 'Continue',
+    retry_calibration: 'Retry calibration',
+    use_synthetic_demo: 'Use synthetic demo',
+  }
+  return labels[summary.recommendation]
+}
+
 export function SessionControls({
   phase,
   trackerId,
@@ -53,6 +63,7 @@ export function SessionControls({
   taskPrompt,
   qualityMode,
   calibrationEventCount,
+  calibrationSummary,
   trackerNotice,
   onQualityModeChange,
   onOpenStudy,
@@ -137,6 +148,30 @@ export function SessionControls({
               <dd>{calibrationEventCount}</dd>
             </div>
           </dl>
+          {!isSynthetic && calibrationSummary ? (
+            <section className="calibration-feedback" aria-label="Browser gaze calibration feedback">
+              <dl className="session-stats compact-stats">
+                <div>
+                  <dt>Points completed</dt>
+                  <dd>{calibrationSummary.completedPoints}</dd>
+                </div>
+                <div>
+                  <dt>Quality</dt>
+                  <dd className={`quality-text ${calibrationSummary.quality}`}>{calibrationSummary.quality}</dd>
+                </div>
+                <div>
+                  <dt>Recommendation</dt>
+                  <dd>{formatCalibrationRecommendation(calibrationSummary)}</dd>
+                </div>
+              </dl>
+              <p className="muted compact-text">
+                Average error:{' '}
+                {calibrationSummary.averageErrorPx === null ? 'Unavailable' : `${calibrationSummary.averageErrorPx}px`}
+                {' '} / confidence:{' '}
+                {calibrationSummary.averageConfidence === null ? 'Unavailable' : calibrationSummary.averageConfidence}
+              </p>
+            </section>
+          ) : null}
           {!isSynthetic && trackerNotice ? <p className="backend-unavailable compact">{trackerNotice}</p> : null}
         </section>
       ) : null}

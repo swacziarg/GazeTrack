@@ -56,7 +56,8 @@ export type TelemetryEventPayload = {
   calibration_step?: number
   calibration_point_count?: number
   calibration_points_completed?: number
-  calibration_quality?: 'strong' | 'weak' | 'unavailable'
+  calibration_quality?: 'good' | 'usable' | 'weak'
+  calibration_recommendation?: 'continue' | 'retry_calibration' | 'use_synthetic_demo'
   quality_warning?: string
   dwell_ms?: number
   scroll_depth_percent?: number
@@ -76,13 +77,14 @@ export type TelemetryEvent = {
 
 export type TrackerStatus =
   | 'idle'
-  | 'consent_required'
-  | 'initializing'
+  | 'permission_needed'
+  | 'loading'
   | 'ready'
   | 'calibrating'
-  | 'tracking'
+  | 'active'
+  | 'weak_signal'
   | 'stopped'
-  | 'unavailable'
+  | 'error'
 
 export type TrackerCalibrationOptions = {
   targets?: NormalizedPoint[]

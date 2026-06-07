@@ -8,6 +8,13 @@ import type {
   TrackerSessionOptions,
   TrackerStatus,
 } from './types'
+import {
+  categorizeCalibrationQuality,
+  deriveTrackingState,
+  type BrowserGazeStatusSnapshot,
+  type CalibrationQualityCategory,
+  type CalibrationRecommendation,
+} from './webgazerStatus'
 
 export type WebGazerPrediction = {
   x: number
@@ -42,7 +49,8 @@ export type CalibrationSummary = {
   averageErrorPx: number | null
   averageErrorNormalized: number | null
   averageConfidence: number | null
-  quality: 'strong' | 'weak' | 'unavailable'
+  quality: CalibrationQualityCategory
+  recommendation: CalibrationRecommendation
   warning: string | null
 }
 
@@ -115,6 +123,45 @@ function average(values: number[]) {
   return roundMetric(values.reduce((sum, value) => sum + value, 0) / values.length)
 }
 
+function isLocalDevelopmentHost(hostname: string | undefined) {
+  return !hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
+}
+
+function classifyWebGazerError(error: unknown) {
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'NotAllowedError') {
+    return {
+      status: 'permission_needed' as const,
+      message: 'Camera permission was denied. Allow camera access or use the synthetic demo.',
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error)
+  if (/permission|notallowed|denied/i.test(message)) {
+    return {
+      status: 'permission_needed' as const,
+      message: 'Camera permission was denied or unavailable. Allow camera access or use the synthetic demo.',
+    }
+  }
+
+  return {
+    status: 'error' as const,
+    message: message || 'WebGazer failed to initialize.',
+  }
+}
+
+function assertBrowserSupport(browserWindow: WindowWithWebGazer) {
+  if (browserWindow.isSecureContext === false && !isLocalDevelopmentHost(browserWindow.location?.hostname)) {
+    throw new Error('Browser gaze requires HTTPS or localhost so camera permission can be requested.')
+  }
+
+  if (browserWindow.navigator && 'mediaDevices' in browserWindow.navigator) {
+    const mediaDevices = browserWindow.navigator.mediaDevices
+    if (!mediaDevices?.getUserMedia) {
+      throw new Error('This browser does not expose camera capture APIs required by WebGazer.')
+    }
+  }
+}
+
 function distance(first: NormalizedPoint, second: NormalizedPoint) {
   return Math.hypot(first.x - second.x, first.y - second.y)
 }
@@ -144,42 +191,19 @@ export function summarizeCalibration(measurements: CalibrationMeasurement[]): Ca
   const averageErrorPx = average(errorsPx)
   const averageErrorNormalized = average(errorsNormalized)
   const averageConfidence = average(confidences)
-
-  if (measurements.length > 0 && errorsPx.length === 0) {
-    return {
-      completedPoints: measurements.length,
-      averageErrorPx,
-      averageErrorNormalized,
-      averageConfidence,
-      quality: 'unavailable',
-      warning: 'Calibration completed, but browser gaze predictions were not available yet.',
-    }
-  }
-
-  if (
-    averageErrorPx === null ||
-    averageErrorNormalized === null ||
-    averageErrorPx > 120 ||
-    averageErrorNormalized > 0.18 ||
-    (averageConfidence !== null && averageConfidence < 0.5)
-  ) {
-    return {
-      completedPoints: measurements.length,
-      averageErrorPx,
-      averageErrorNormalized,
-      averageConfidence,
-      quality: 'weak',
-      warning: 'Calibration quality is weak. Treat report metrics as approximate browser-gaze telemetry.',
-    }
-  }
-
+  const feedback = categorizeCalibrationQuality({
+    completedPoints: measurements.length,
+    expectedPoints: measurements.length,
+    averageErrorPx,
+    averageErrorNormalized,
+    averageConfidence,
+  })
   return {
     completedPoints: measurements.length,
     averageErrorPx,
     averageErrorNormalized,
     averageConfidence,
-    quality: 'strong',
-    warning: null,
+    ...feedback,
   }
 }
 
@@ -257,6 +281,7 @@ function calibrationCompletedEvent(eventIndex: number, pointCount: number, summa
       calibration_error_px: summary.averageErrorPx ?? undefined,
       calibration_error_normalized: summary.averageErrorNormalized ?? undefined,
       calibration_quality: summary.quality,
+      calibration_recommendation: summary.recommendation,
       quality_warning: summary.warning ?? undefined,
     },
   }
@@ -283,7 +308,10 @@ function loadWebGazerScript(): Promise<void> {
       script.async = true
       script.dataset.gazetrackWebgazer = 'true'
       script.onload = () => resolve()
-      script.onerror = () => reject(new Error(`Could not load WebGazer from ${script.src}`))
+      script.onerror = () => {
+        webGazerScriptPromise = null
+        reject(new Error(`Could not load WebGazer from ${script.src}`))
+      }
       document.head.appendChild(script)
     })
   }
@@ -383,6 +411,13 @@ export class WebGazerTracker implements TrackerProvider {
   private lastSampledAt = 0
   private sampleIntervalMs: number
   private calibrationSummary: CalibrationSummary | null = null
+  private trackingStartedAt: number | null = null
+  private lastValidPredictionAt: number | null = null
+  private sampleCount = 0
+  private validSampleCount = 0
+  private missingPredictionCount = 0
+  private lowConfidenceCount = 0
+  private lastErrorMessage: string | null = null
 
   constructor(options: { sampleIntervalMs?: number } = {}) {
     this.sampleIntervalMs = options.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS
@@ -393,45 +428,66 @@ export class WebGazerTracker implements TrackerProvider {
   }
 
   async initialize() {
-    this.status = 'initializing'
-    await loadWebGazerScript()
-    const browserWindow = getBrowserWindow()
-    const webgazer = browserWindow?.webgazer
+    this.status = 'loading'
+    this.lastErrorMessage = null
+    try {
+      const browserWindow = getBrowserWindow()
+      if (!browserWindow) {
+        throw new Error('WebGazer requires a browser window.')
+      }
+      assertBrowserSupport(browserWindow)
+      await loadWebGazerScript()
+      const webgazer = browserWindow.webgazer
 
-    if (!webgazer) {
-      this.status = 'unavailable'
-      throw new Error('WebGazer is not available after loading the experimental browser tracker script.')
-    }
+      if (!webgazer) {
+        throw new Error('WebGazer is not available after loading the experimental browser tracker script.')
+      }
 
-    this.webgazer = webgazer
-    webgazer.showVideoPreview?.(false)
-    webgazer.showPredictionPoints?.(false)
-    webgazer.setGazeListener((prediction) => {
-      if (isFinitePrediction(prediction)) {
+      this.webgazer = webgazer
+      webgazer.showVideoPreview?.(false)
+      webgazer.showPredictionPoints?.(false)
+      webgazer.setGazeListener((prediction) => {
+        const now = Date.now()
+        this.sampleCount += 1
+
+        if (!isFinitePrediction(prediction)) {
+          this.missingPredictionCount += 1
+          return
+        }
+
         this.latestPrediction = prediction
-      }
+        this.validSampleCount += 1
+        this.lastValidPredictionAt = now
+        if (safeConfidence(prediction) !== null && (safeConfidence(prediction) ?? 1) < 0.5) {
+          this.lowConfidenceCount += 1
+        }
 
-      if (!isFinitePrediction(prediction) || this.status !== 'tracking') {
-        return
-      }
+        if (this.status !== 'active' && this.status !== 'weak_signal') {
+          return
+        }
 
-      const now = Date.now()
-      if (now - this.lastSampledAt < this.sampleIntervalMs) {
-        return
-      }
-      this.lastSampledAt = now
+        if (now - this.lastSampledAt < this.sampleIntervalMs) {
+          return
+        }
+        this.lastSampledAt = now
 
-      this.events.push(
-        predictionToGazeEvent(prediction, {
-          eventIndex: this.eventIndex,
-          viewportWidth: this.viewportWidth,
-          viewportHeight: this.viewportHeight,
-        }),
-      )
-      this.eventIndex += 1
-    })
-    await Promise.resolve(webgazer.begin())
-    this.status = 'ready'
+        this.events.push(
+          predictionToGazeEvent(prediction, {
+            eventIndex: this.eventIndex,
+            viewportWidth: this.viewportWidth,
+            viewportHeight: this.viewportHeight,
+          }),
+        )
+        this.eventIndex += 1
+      })
+      await Promise.resolve(webgazer.begin())
+      this.status = 'ready'
+    } catch (error) {
+      const classified = classifyWebGazerError(error)
+      this.status = classified.status
+      this.lastErrorMessage = classified.message
+      throw new Error(classified.message)
+    }
   }
 
   async runCalibration(options?: TrackerCalibrationOptions) {
@@ -456,15 +512,27 @@ export class WebGazerTracker implements TrackerProvider {
     const completedEvent = calibrationCompletedEvent(this.eventIndex, targets.length, summary)
     this.eventIndex += 1
     this.events.push(...calibrationEvents, completedEvent)
-    this.status = 'tracking'
+    this.status = 'active'
     return [...calibrationEvents, completedEvent]
   }
 
   async startSession(options?: TrackerSessionOptions) {
+    if (!this.webgazer) {
+      this.status = 'error'
+      this.lastErrorMessage = 'WebGazer is not initialized. Consent and initialize before starting browser gaze.'
+      throw new Error(this.lastErrorMessage)
+    }
+
     const browserWindow = getBrowserWindow()
     this.viewportWidth = options?.viewportWidth ?? browserWindow?.innerWidth ?? DEFAULT_VIEWPORT_WIDTH
     this.viewportHeight = options?.viewportHeight ?? browserWindow?.innerHeight ?? DEFAULT_VIEWPORT_HEIGHT
     this.lastSampledAt = 0
+    this.trackingStartedAt = Date.now()
+    this.lastValidPredictionAt = null
+    this.sampleCount = 0
+    this.validSampleCount = 0
+    this.missingPredictionCount = 0
+    this.lowConfidenceCount = 0
     this.events = [
       {
         id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
@@ -483,7 +551,7 @@ export class WebGazerTracker implements TrackerProvider {
   }
 
   async stopSession() {
-    if (this.status === 'tracking') {
+    if (this.status === 'active' || this.status === 'weak_signal') {
       this.events.push({
         id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
         event_type: 'task_completed',
@@ -510,12 +578,46 @@ export class WebGazerTracker implements TrackerProvider {
     return [...this.events]
   }
 
+  getTrackingStatus(now = Date.now()): BrowserGazeStatusSnapshot {
+    const elapsedMs = this.trackingStartedAt ? Math.max(0, now - this.trackingStartedAt) : 0
+    const state = deriveTrackingState({
+      baseState: this.status,
+      sampleCount: this.sampleCount,
+      validSampleCount: this.validSampleCount,
+      missingPredictionCount: this.missingPredictionCount,
+      lowConfidenceCount: this.lowConfidenceCount,
+      elapsedMs,
+      msSinceLastValidPrediction: this.lastValidPredictionAt ? Math.max(0, now - this.lastValidPredictionAt) : null,
+      lastErrorMessage: this.lastErrorMessage,
+    })
+
+    return {
+      trackerState: state.trackerState,
+      sampleCount: this.sampleCount,
+      validSampleCount: this.validSampleCount,
+      missingPredictionCount: this.missingPredictionCount,
+      lowConfidenceCount: this.lowConfidenceCount,
+      elapsedMs,
+      latestPoint: this.latestPrediction
+        ? normalizePrediction(this.latestPrediction, this.viewportWidth, this.viewportHeight)
+        : null,
+      message: state.message,
+    }
+  }
+
   dispose() {
     this.webgazer?.clearGazeListener?.()
     this.webgazer?.pause?.()
     this.events = []
     this.webgazer = null
     this.latestPrediction = null
+    this.trackingStartedAt = null
+    this.lastValidPredictionAt = null
+    this.sampleCount = 0
+    this.validSampleCount = 0
+    this.missingPredictionCount = 0
+    this.lowConfidenceCount = 0
+    this.lastErrorMessage = null
     this.status = 'idle'
   }
 }

@@ -5,7 +5,14 @@ export {
   generateMockStudyEvents,
   generateSyntheticStudyEvents,
 } from './syntheticTracker'
-export { WebGazerTracker, predictionToGazeEvent } from './webgazerTracker'
+export { WebGazerTracker, predictionToGazeEvent, type CalibrationSummary } from './webgazerTracker'
+export {
+  categorizeCalibrationQuality,
+  deriveTrackingState,
+  type BrowserGazeStatusSnapshot,
+  type CalibrationQualityCategory,
+  type CalibrationRecommendation,
+} from './webgazerStatus'
 export { createTrackerProvider, getTrackerOptions, isWebGazerFeatureEnabled, type TrackerOption } from './trackerFactory'
 export type {
   NormalizedPoint,

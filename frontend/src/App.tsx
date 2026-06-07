@@ -9,9 +9,11 @@ import {
   type StudySetupResult,
 } from './api/studies'
 import { BackendReport } from './components/BackendReport'
+import { BrowserGazeStatusPanel } from './components/BrowserGazeStatusPanel'
 import { DemoReport } from './components/DemoReport'
 import { EventLog } from './components/EventLog'
 import { FlowCard } from './components/FlowCard'
+import { GazeDebugOverlay } from './components/GazeDebugOverlay'
 import { PlaceholderPanel } from './components/PlaceholderPanel'
 import { SessionControls, type SessionPhase } from './components/SessionControls'
 import { StatusCard } from './components/StatusCard'
@@ -30,6 +32,8 @@ import {
   WebGazerTracker,
   createTrackerProvider,
   getTrackerOptions,
+  type BrowserGazeStatusSnapshot,
+  type CalibrationSummary,
   type TrackerId,
   type TrackerStatus,
 } from './tracking'
@@ -41,6 +45,22 @@ const initialHealth: BackendHealth = {
 }
 
 const DEMO_SESSION_ID = '11111111-1111-4111-8111-111111111111'
+
+function createBrowserGazeStatusSnapshot(
+  trackerState: TrackerStatus,
+  message: string | null = null,
+): BrowserGazeStatusSnapshot {
+  return {
+    trackerState,
+    sampleCount: 0,
+    validSampleCount: 0,
+    missingPredictionCount: 0,
+    lowConfidenceCount: 0,
+    elapsedMs: 0,
+    latestPoint: null,
+    message,
+  }
+}
 
 function createDemoSessionId() {
   return window.crypto?.randomUUID?.() ?? DEMO_SESSION_ID
@@ -67,7 +87,10 @@ function App() {
   const [trackerAvailability, setTrackerAvailability] = useState('Synthetic tracker available')
   const [webGazerConsentGranted, setWebGazerConsentGranted] = useState(false)
   const [webGazerCalibrationNotice, setWebGazerCalibrationNotice] = useState<string | null>(null)
+  const [webGazerCalibrationSummary, setWebGazerCalibrationSummary] = useState<CalibrationSummary | null>(null)
   const [webGazerEvents, setWebGazerEvents] = useState<MockStudyEvent[]>([])
+  const [webGazerTrackingStatus, setWebGazerTrackingStatus] = useState<BrowserGazeStatusSnapshot | null>(null)
+  const [debugOverlayEnabled, setDebugOverlayEnabled] = useState(true)
   const webGazerTrackerRef = useRef<WebGazerTracker | null>(null)
   const trackerOptions = useMemo(() => getTrackerOptions(), [])
   const configuredDemoStudy = useMemo(() => toDemoStudy(studyBuilderConfig), [studyBuilderConfig])
@@ -90,10 +113,12 @@ function App() {
   const calibrationComplete =
     (sessionPhase === 'active' || sessionPhase === 'completed') && calibrationEventCount > 0
   const elapsedSeconds =
-    visibleEvents.length > 1
-      ? (Date.parse(visibleEvents[visibleEvents.length - 1].timestamp) - Date.parse(visibleEvents[0].timestamp)) /
-        1000
-      : 0
+    trackerId === 'webgazer'
+      ? (webGazerTrackingStatus?.elapsedMs ?? 0) / 1000
+      : visibleEvents.length > 1
+        ? (Date.parse(visibleEvents[visibleEvents.length - 1].timestamp) - Date.parse(visibleEvents[0].timestamp)) /
+          1000
+        : 0
 
   useEffect(() => {
     let isMounted = true
@@ -131,14 +156,20 @@ function App() {
   }, [trackerEvents.length, sessionPhase, trackerId, visibleEventCount])
 
   useEffect(() => {
-    if (sessionPhase !== 'active' || trackerId !== 'webgazer') {
+    if (trackerId !== 'webgazer' || sessionPhase === 'preview') {
       return
     }
 
     const intervalId = window.setInterval(() => {
-      const events = webGazerTrackerRef.current?.getEvents() ?? []
+      const tracker = webGazerTrackerRef.current
+      const events = tracker?.getEvents() ?? []
+      const status = tracker?.getTrackingStatus() ?? null
       setWebGazerEvents(events)
       setVisibleEventCount(events.length)
+      if (status) {
+        setWebGazerTrackingStatus(status)
+        setTrackerStatus(status.trackerState)
+      }
     }, 250)
 
     return () => window.clearInterval(intervalId)
@@ -157,7 +188,7 @@ function App() {
     setIsIngestingEvents(false)
     setIsFetchingBackendReport(false)
     setBackendReportResult(null)
-    setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'consent_required' : 'idle')
+    setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'permission_needed' : 'idle')
     window.setTimeout(() => {
       document.getElementById('mock-session-panel')?.scrollIntoView({ behavior: 'smooth' })
     }, 0)
@@ -172,17 +203,31 @@ function App() {
 
     if (trackerId === 'webgazer') {
       if (!webGazerConsentGranted || !webGazerTrackerRef.current) {
-        setTrackerStatus('consent_required')
+        setTrackerStatus('permission_needed')
+        setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('permission_needed'))
         return
       }
 
-      void webGazerTrackerRef.current.startSession({ taskPrompt: configuredDemoStudy.taskPrompt }).then(() => {
-        const events = webGazerTrackerRef.current?.getEvents() ?? []
-        setWebGazerEvents(events)
-        setVisibleEventCount(events.length)
-        setTrackerStatus('calibrating')
-        setSessionPhase('calibration')
-      })
+      void webGazerTrackerRef.current
+        .startSession({ taskPrompt: configuredDemoStudy.taskPrompt })
+        .then(() => {
+          const tracker = webGazerTrackerRef.current
+          const events = tracker?.getEvents() ?? []
+          const status = tracker?.getTrackingStatus()
+          setWebGazerEvents(events)
+          setVisibleEventCount(events.length)
+          setWebGazerTrackingStatus(
+            status ? { ...status, trackerState: 'calibrating' } : createBrowserGazeStatusSnapshot('calibrating'),
+          )
+          setTrackerStatus('calibrating')
+          setSessionPhase('calibration')
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Browser gaze could not start.'
+          setTrackerStatus('error')
+          setTrackerAvailability(message)
+          setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('error', message))
+        })
       return
     }
 
@@ -194,20 +239,30 @@ function App() {
 
   function runSyntheticCalibration() {
     if (trackerId === 'webgazer') {
-      void webGazerTrackerRef.current?.runCalibration().then(() => {
-        const events = webGazerTrackerRef.current?.getEvents() ?? []
-        const summary = webGazerTrackerRef.current?.getCalibrationSummary()
-        setWebGazerEvents(events)
-        setVisibleEventCount(events.length)
-        setWebGazerCalibrationNotice(summary?.warning ?? null)
-        setTrackerStatus('tracking')
-        setSessionPhase('active')
-      })
+      void webGazerTrackerRef.current
+        ?.runCalibration()
+        .then(() => {
+          const events = webGazerTrackerRef.current?.getEvents() ?? []
+          const summary = webGazerTrackerRef.current?.getCalibrationSummary()
+          setWebGazerEvents(events)
+          setVisibleEventCount(events.length)
+          setWebGazerCalibrationNotice(summary?.warning ?? null)
+          setWebGazerCalibrationSummary(summary ?? null)
+          setWebGazerTrackingStatus(webGazerTrackerRef.current?.getTrackingStatus() ?? null)
+          setTrackerStatus('active')
+          setSessionPhase('active')
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Browser calibration failed.'
+          setTrackerStatus('error')
+          setTrackerAvailability(message)
+          setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('error', message))
+        })
       return
     }
 
     setSessionPhase('active')
-    setTrackerStatus('tracking')
+    setTrackerStatus('active')
     setVisibleEventCount(Math.min(1 + calibrationEventCount, trackerEvents.length))
   }
 
@@ -228,8 +283,9 @@ function App() {
     setVisibleEventCount(0)
     setIngestResult(null)
     setBackendReportResult(null)
-    setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'consent_required' : 'idle')
+    setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'permission_needed' : 'idle')
     setWebGazerCalibrationNotice(null)
+    setWebGazerCalibrationSummary(null)
   }
 
   function saveConfiguredStudy(mode: 'update' | 'create') {
@@ -255,6 +311,9 @@ function App() {
       void webGazerTrackerRef.current?.stopSession().then((events) => {
         setWebGazerEvents(events)
         setTrackerStatus('stopped')
+        setWebGazerTrackingStatus(
+          webGazerTrackerRef.current?.getTrackingStatus() ?? createBrowserGazeStatusSnapshot('stopped'),
+        )
         completeSessionWithEvents(events)
       })
       return
@@ -331,16 +390,20 @@ function App() {
     setIsIngestingEvents(false)
     setIsFetchingBackendReport(false)
     setWebGazerCalibrationNotice(null)
+    setWebGazerCalibrationSummary(null)
 
     if (nextTrackerId === 'webgazer') {
       setWebGazerConsentGranted(false)
-      setTrackerStatus('consent_required')
+      setTrackerStatus('permission_needed')
       setTrackerAvailability('Waiting for consent before checking WebGazer')
+      setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('permission_needed'))
     } else {
       setTrackerStatus('idle')
       setTrackerAvailability('Synthetic tracker available')
       setWebGazerEvents([])
       setWebGazerCalibrationNotice(null)
+      setWebGazerCalibrationSummary(null)
+      setWebGazerTrackingStatus(null)
     }
   }
 
@@ -352,24 +415,32 @@ function App() {
     const tracker = new WebGazerTracker()
     webGazerTrackerRef.current = tracker
     setWebGazerConsentGranted(true)
-    setTrackerStatus('initializing')
+    setTrackerStatus('loading')
     setTrackerAvailability('Checking browser tracker')
     setWebGazerCalibrationNotice(null)
+    setWebGazerCalibrationSummary(null)
+    setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('loading'))
 
     void tracker
       .initialize()
       .then(() => {
         setTrackerStatus('ready')
         setTrackerAvailability('WebGazer global available')
+        setWebGazerTrackingStatus(tracker.getTrackingStatus())
       })
       .catch((error: unknown) => {
-        setTrackerStatus('unavailable')
+        const status = tracker.getTrackingStatus()
+        setTrackerStatus(status.trackerState)
         setTrackerAvailability(error instanceof Error ? error.message : 'WebGazer is unavailable')
+        setWebGazerTrackingStatus(status)
       })
   }
 
   return (
     <main className="app-shell">
+      {trackerId === 'webgazer' ? (
+        <GazeDebugOverlay enabled={debugOverlayEnabled} status={webGazerTrackingStatus} />
+      ) : null}
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">Synthetic demo frontend shell</p>
@@ -539,6 +610,14 @@ function App() {
               onGrantConsent={grantWebGazerConsent}
               onCancelToSynthetic={cancelToSyntheticTracker}
             />
+            {trackerId === 'webgazer' ? (
+              <BrowserGazeStatusPanel
+                status={webGazerTrackingStatus}
+                debugOverlayEnabled={debugOverlayEnabled}
+                onDebugOverlayChange={setDebugOverlayEnabled}
+                onUseSyntheticDemo={cancelToSyntheticTracker}
+              />
+            ) : null}
             <SessionControls
               phase={sessionPhase}
               trackerId={trackerId}
@@ -550,6 +629,7 @@ function App() {
               taskPrompt={configuredDemoStudy.taskPrompt}
               qualityMode={qualityMode}
               calibrationEventCount={calibrationEventCount}
+              calibrationSummary={webGazerCalibrationSummary}
               trackerNotice={webGazerCalibrationNotice}
               onQualityModeChange={updateQualityMode}
               onOpenStudy={openDemoStudy}

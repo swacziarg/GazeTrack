@@ -16,13 +16,14 @@ type TrackerModePanelProps = {
 function statusLabel(status: TrackerStatus) {
   const labels: Record<TrackerStatus, string> = {
     idle: 'Idle',
-    consent_required: 'Consent required',
-    initializing: 'Initializing',
+    permission_needed: 'Permission needed',
+    loading: 'Loading',
     ready: 'Ready',
     calibrating: 'Calibrating',
-    tracking: 'Tracking active',
+    active: 'Tracking active',
+    weak_signal: 'Weak signal',
     stopped: 'Stopped',
-    unavailable: 'Unavailable',
+    error: 'Error',
   }
   return labels[status]
 }
@@ -48,7 +49,11 @@ export function TrackerModePanel({
           <p className="eyebrow">Tracker mode</p>
           <h3>{selectedOption.label}</h3>
         </div>
-        <span className={`status-pill ${status === 'tracking' || status === 'ready' ? 'ok' : 'pending'}`}>
+        <span
+          className={`status-pill ${
+            status === 'active' || status === 'ready' ? 'ok' : status === 'error' ? 'error' : 'pending'
+          }`}
+        >
           {statusLabel(status)}
         </span>
       </div>
@@ -83,7 +88,7 @@ export function TrackerModePanel({
         </div>
         <div>
           <dt>Tracking</dt>
-          <dd>{status === 'tracking' ? 'Active' : 'Inactive'}</dd>
+          <dd>{status === 'active' || status === 'weak_signal' ? 'Active' : 'Inactive'}</dd>
         </div>
       </dl>
 

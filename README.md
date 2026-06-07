@@ -34,7 +34,7 @@ The optional `WebGazerTracker` path can be exposed locally with:
 VITE_ENABLE_WEBGAZER=true
 ```
 
-When enabled, the UI labels it as a browser gaze experiment and requires explicit consent before initialization. After consent, the adapter loads WebGazer in the browser, hides WebGazer's local camera preview/prediction points, shows a click/fixate calibration overlay, samples predictions at a throttled interval, and sends only compatible privacy-safe telemetry fields such as normalized gaze points, optional confidence/quality metadata, timestamps, calibration events, and task events.
+When enabled, the UI labels it as a browser gaze experiment and requires explicit consent before initialization. After consent, the adapter loads WebGazer in the browser, hides WebGazer's local camera preview/prediction points, shows a click/fixate calibration overlay, samples predictions at a throttled interval, and sends only compatible privacy-safe telemetry fields such as normalized gaze points, optional confidence/quality metadata, timestamps, calibration events, and task events. The browser experiment also shows a local live status panel, an optional approximate gaze-dot overlay, sample counts, weak-signal messages, and post-calibration feedback.
 
 It is not part of the default demo path and does not provide evidence of production real gaze tracking. Set `VITE_WEBGAZER_SCRIPT_URL` only if you need to point the browser to a different WebGazer script URL.
 
@@ -85,14 +85,16 @@ cd frontend
 VITE_ENABLE_WEBGAZER=true npm run dev
 ```
 
-Then open `http://localhost:5173`, click `Open demo study`, select `Browser gaze experiment`, grant consent, allow browser camera permission, start the session, and click each calibration target while looking at it. Complete the session after a few seconds of gaze samples. The backend report should show `Experimental browser gaze`, `webgazer_experimental`, the calibration quality warning when applicable, and the not-medical-grade notice.
+Then open `http://localhost:5173`, click `Open demo study`, select `Browser gaze experiment`, grant consent, allow browser camera permission, start the session, and click each calibration target while looking at it. The live status panel should show whether the tracker is loading, calibrating, active, weak signal, stopped, or in an error state. The optional debug dot is approximate and local-only. Complete the session after a few seconds of gaze samples. The backend report should show `Experimental browser gaze`, `webgazer_experimental`, the calibration quality warning when applicable, and the not-medical-grade notice.
 
 Troubleshooting:
 
-- If initialization fails, check camera permission, browser support, and network access to the WebGazer script URL.
-- If calibration quality is weak, improve lighting, face the camera, reduce glare, and rerun calibration.
-- If no gaze samples appear, keep the tab focused and allow a few seconds after camera permission.
-- Synthetic mode remains the default and does not request camera permission.
+- Camera permission: allow camera access when the browser prompts. If permission was denied, reset the site permission or choose `Use synthetic demo`.
+- Localhost/secure context: use `http://localhost:5173` during development or HTTPS for hosted testing. Camera APIs may be blocked on insecure non-local origins.
+- Lighting and face position: improve lighting, face the camera, reduce glare, and keep the tab focused.
+- Calibration quality: `good` or `usable` can continue as approximate experimental telemetry. `weak` means retry calibration or fall back to synthetic mode.
+- Noisy gaze dot: the debug dot is expected to jitter. Treat it as a rough live signal check, not an accuracy benchmark.
+- Fallback: synthetic mode remains the default, does not request camera permission, and can be selected with `Use synthetic demo`.
 
 ## Demo flow
 

@@ -82,13 +82,19 @@ initializing the adapter. After consent, the adapter loads WebGazer in the brows
 prediction markers, asks the tester to click/fixate calibration targets, samples predictions at a throttled interval,
 and sends only privacy-safe telemetry: normalized gaze points, optional confidence/quality metadata, timestamps,
 calibration events, and task events. Raw video, frames, images, screenshots, blobs, and base64 media are not sent or
-stored. Browser gaze estimates are approximate and not medical-grade eye tracking.
+stored. Browser gaze estimates are approximate and not medical-grade eye tracking. During browser gaze sessions, the UI
+shows local-only tracker state, sample counts, elapsed capture time, calibration feedback, weak-signal/fallback messages,
+and an optional approximate gaze-dot overlay.
 
 To try it locally:
 
 ```bash
 VITE_ENABLE_WEBGAZER=true npm run dev
 ```
+
+Troubleshooting: use `localhost` or HTTPS, allow camera permission, improve lighting and face position when calibration
+is weak, expect the debug dot to be noisy, and switch back to `Synthetic demo` when permission, loading, or signal quality
+is not usable.
 
 Use `localhost` or HTTPS, allow camera permission, select `Browser gaze experiment`, consent, start the session, click
 each calibration target while looking at it, then complete the session after a few seconds of samples. Set
