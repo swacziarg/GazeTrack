@@ -58,7 +58,7 @@ PYTHONPATH=. pytest tests/test_session_report_schema_contract.py
 
 ## SQLite demo persistence
 
-`POST /api/v1/sessions/{session_id}/events` validates incoming synthetic telemetry and compatible privacy-safe browser-gaze-shaped telemetry, then stores accepted events in SQLite keyed by `session_id`. Rejected media-like payloads are not stored.
+`POST /api/v1/sessions/{session_id}/events` validates incoming synthetic telemetry and compatible privacy-safe browser-gaze-shaped telemetry, then stores accepted events in SQLite keyed by `session_id`. Rejected media-like payloads, invalid coordinates, invalid confidence values, invalid timestamps, oversized payloads, and unscoped WebGazer samples are not stored.
 
 The local schema includes:
 
@@ -69,7 +69,7 @@ The local schema includes:
 - `telemetry_events`
 - `reports`
 
-The schema keeps UUID/string IDs, timestamp fields, append-only telemetry events, and JSON payloads stored as text so the shape can migrate to PostgreSQL/Supabase later.
+The schema keeps UUID/string IDs, timestamp fields, append-only telemetry events, sanitized JSON payloads stored as text, and queryable canonical telemetry columns (`event_schema_version`, `telemetry_source`, normalized point, confidence, payload byte size, AOI hit count, and `ingested_at`) so the shape can migrate to PostgreSQL/Supabase later.
 
 `GET /api/v1/studies` ensures the default synthetic demo study exists. The default study also receives one demo task and five placeholder AOIs when no tasks/AOIs exist.
 

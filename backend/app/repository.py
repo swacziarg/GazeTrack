@@ -11,6 +11,13 @@ from uuid import UUID, uuid4
 from app.core.config import settings
 from app.db import connect_database, initialize_database
 from app.models.api import EventEnvelope
+from app.services.event_validation import (
+    AcceptedTelemetryEvent,
+    EVENT_SCHEMA_VERSION,
+    extract_confidence,
+    normalize_event_point,
+    telemetry_source,
+)
 
 DEMO_STUDY_ID = UUID("00000000-0000-4000-8000-000000000001")
 
@@ -131,6 +138,14 @@ class TelemetryEventRecord:
     event_type: str
     timestamp: str
     payload: dict[str, Any]
+    event_schema_version: int
+    telemetry_source: str | None
+    normalized_x: float | None
+    normalized_y: float | None
+    confidence: float | None
+    payload_byte_size: int
+    aoi_hit_count: int
+    ingested_at: str | None
     accepted: bool
     rejection_reason: str | None
     created_at: str
@@ -507,30 +522,96 @@ class GazeTrackRepository:
             )
         return self.get_session(session_id) or record
 
-    def append_accepted_events(self, session_id: UUID, events: list[EventEnvelope]) -> int:
-        self.ensure_session(session_id)
+    def session_has_event_type(self, session_id: UUID, event_type: str) -> bool:
+        with connect_database(self.database_url) as connection:
+            row = connection.execute(
+                """
+                SELECT 1
+                FROM telemetry_events
+                WHERE session_id = ? AND event_type = ? AND accepted = 1
+                LIMIT 1
+                """,
+                (str(session_id), event_type),
+            ).fetchone()
+        return row is not None
+
+    def _event_to_accepted_telemetry(self, event: EventEnvelope) -> AcceptedTelemetryEvent:
+        point = normalize_event_point(event.payload)
+        payload_json = json.dumps(event.payload, sort_keys=True, separators=(",", ":"))
+        return AcceptedTelemetryEvent(
+            envelope=event,
+            event_schema_version=EVENT_SCHEMA_VERSION,
+            telemetry_source=telemetry_source(event.payload),
+            normalized_x=point[0] if point is not None else None,
+            normalized_y=point[1] if point is not None else None,
+            confidence=extract_confidence(event.payload),
+            payload_byte_size=len(payload_json.encode("utf-8")),
+        )
+
+    def _aoi_hit_count(self, aois: list[AoiRecord], event: AcceptedTelemetryEvent) -> int:
+        if event.normalized_x is None or event.normalized_y is None:
+            return 0
+        return sum(
+            1
+            for aoi in aois
+            if aoi.x <= event.normalized_x <= aoi.x + aoi.width
+            and aoi.y <= event.normalized_y <= aoi.y + aoi.height
+        )
+
+    def append_accepted_events(self, session_id: UUID, events: list[EventEnvelope | AcceptedTelemetryEvent]) -> int:
+        session = self.ensure_session(session_id)
         now = utcnow_iso()
-        rows = [
-            (
-                str(uuid4()),
-                str(session_id),
-                event.event_type.value,
-                event.timestamp,
-                json.dumps(event.payload, sort_keys=True),
-                1,
-                None,
-                now,
-            )
+        aois = self.list_aois_for_study(session.study_id)
+        accepted_events = [
+            event if isinstance(event, AcceptedTelemetryEvent) else self._event_to_accepted_telemetry(event)
             for event in events
         ]
+        rows = []
+        for accepted_event in accepted_events:
+            event = accepted_event.envelope
+            rows.append(
+                (
+                    str(uuid4()),
+                    str(session_id),
+                    event.event_type.value,
+                    event.timestamp,
+                    json.dumps(event.payload, sort_keys=True),
+                    accepted_event.event_schema_version,
+                    accepted_event.telemetry_source,
+                    accepted_event.normalized_x,
+                    accepted_event.normalized_y,
+                    accepted_event.confidence,
+                    accepted_event.payload_byte_size,
+                    self._aoi_hit_count(aois, accepted_event),
+                    now,
+                    1,
+                    None,
+                    now,
+                )
+            )
         if rows:
             with connect_database(self.database_url) as connection:
                 connection.executemany(
                     """
                     INSERT INTO telemetry_events (
-                        id, session_id, event_type, timestamp, payload, accepted, rejection_reason, created_at
+                        id,
+                        session_id,
+                        event_type,
+                        timestamp,
+                        payload,
+                        event_schema_version,
+                        telemetry_source,
+                        normalized_x,
+                        normalized_y,
+                        confidence,
+                        payload_byte_size,
+                        aoi_hit_count,
+                        ingested_at,
+                        accepted,
+                        rejection_reason,
+                        created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     rows,
                 )
@@ -548,7 +629,23 @@ class GazeTrackRepository:
         with connect_database(self.database_url) as connection:
             rows = connection.execute(
                 """
-                SELECT id, session_id, event_type, timestamp, payload, accepted, rejection_reason, created_at
+                SELECT
+                    id,
+                    session_id,
+                    event_type,
+                    timestamp,
+                    payload,
+                    event_schema_version,
+                    telemetry_source,
+                    normalized_x,
+                    normalized_y,
+                    confidence,
+                    payload_byte_size,
+                    aoi_hit_count,
+                    ingested_at,
+                    accepted,
+                    rejection_reason,
+                    created_at
                 FROM telemetry_events
                 WHERE session_id = ? AND accepted = 1
                 ORDER BY timestamp ASC, created_at ASC
@@ -562,6 +659,14 @@ class GazeTrackRepository:
                 event_type=row["event_type"],
                 timestamp=row["timestamp"],
                 payload=json.loads(row["payload"]),
+                event_schema_version=int(row["event_schema_version"]),
+                telemetry_source=row["telemetry_source"],
+                normalized_x=float(row["normalized_x"]) if row["normalized_x"] is not None else None,
+                normalized_y=float(row["normalized_y"]) if row["normalized_y"] is not None else None,
+                confidence=float(row["confidence"]) if row["confidence"] is not None else None,
+                payload_byte_size=int(row["payload_byte_size"]),
+                aoi_hit_count=int(row["aoi_hit_count"]),
+                ingested_at=row["ingested_at"],
                 accepted=bool(row["accepted"]),
                 rejection_reason=row["rejection_reason"],
                 created_at=row["created_at"],

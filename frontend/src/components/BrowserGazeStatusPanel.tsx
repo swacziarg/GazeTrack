@@ -2,9 +2,11 @@ import type { BrowserGazeStatusSnapshot } from '../tracking'
 
 type BrowserGazeStatusPanelProps = {
   status: BrowserGazeStatusSnapshot | null
+  canTurnOff: boolean
   debugOverlayEnabled: boolean
   onDebugOverlayChange: (enabled: boolean) => void
   onUseSyntheticDemo: () => void
+  onTurnOff: () => void
 }
 
 function formatTrackerState(status: BrowserGazeStatusSnapshot | null) {
@@ -29,9 +31,11 @@ function formatElapsed(status: BrowserGazeStatusSnapshot | null) {
 
 export function BrowserGazeStatusPanel({
   status,
+  canTurnOff,
   debugOverlayEnabled,
   onDebugOverlayChange,
   onUseSyntheticDemo,
+  onTurnOff,
 }: BrowserGazeStatusPanelProps) {
   return (
     <article className="card browser-gaze-status-panel" aria-live="polite">
@@ -78,6 +82,14 @@ export function BrowserGazeStatusPanel({
         />
         <span>Show approximate gaze dot</span>
       </label>
+
+      {canTurnOff ? (
+        <div className="button-row">
+          <button type="button" className="secondary-button" onClick={onTurnOff}>
+            Turn off browser gaze
+          </button>
+        </div>
+      ) : null}
 
       {status?.message ? (
         <section className="tracker-fallback-panel" aria-label="Browser gaze fallback message">

@@ -210,7 +210,7 @@ function App() {
       }
 
       void webGazerTrackerRef.current
-        .startSession({ taskPrompt: configuredDemoStudy.taskPrompt })
+        .startSession({ taskPrompt: configuredDemoStudy.taskPrompt, studyConfig: syntheticStudyConfig })
         .then(() => {
           const tracker = webGazerTrackerRef.current
           const events = tracker?.getEvents() ?? []
@@ -412,7 +412,30 @@ function App() {
     handleTrackerChange('synthetic')
   }
 
+  function turnOffWebGazer() {
+    const events = webGazerTrackerRef.current?.getEvents() ?? webGazerEvents
+
+    webGazerTrackerRef.current?.dispose()
+    webGazerTrackerRef.current = null
+    setWebGazerConsentGranted(false)
+    setTrackerStatus('idle')
+    setTrackerAvailability('Browser gaze is off. Consent again to restart WebGazer.')
+    setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('idle'))
+    setDebugOverlayEnabled(false)
+    setWebGazerEvents(events)
+    setVisibleEventCount(events.length)
+
+    if (sessionPhase === 'calibration' || sessionPhase === 'active') {
+      setSessionPhase('detail')
+      setIngestResult(null)
+      setBackendReportResult(null)
+      setIsIngestingEvents(false)
+      setIsFetchingBackendReport(false)
+    }
+  }
+
   function grantWebGazerConsent() {
+    webGazerTrackerRef.current?.dispose()
     const tracker = new WebGazerTracker()
     webGazerTrackerRef.current = tracker
     setWebGazerConsentGranted(true)
@@ -421,6 +444,7 @@ function App() {
     setWebGazerCalibrationNotice(null)
     setWebGazerCalibrationSummary(null)
     setWebGazerTrackingStatus(createBrowserGazeStatusSnapshot('loading'))
+    setDebugOverlayEnabled(true)
 
     void tracker
       .initialize()
@@ -620,9 +644,11 @@ function App() {
             {trackerId === 'webgazer' ? (
               <BrowserGazeStatusPanel
                 status={webGazerTrackingStatus}
+                canTurnOff={webGazerConsentGranted}
                 debugOverlayEnabled={debugOverlayEnabled}
                 onDebugOverlayChange={setDebugOverlayEnabled}
                 onUseSyntheticDemo={cancelToSyntheticTracker}
+                onTurnOff={turnOffWebGazer}
               />
             ) : null}
             <SessionControls
@@ -644,7 +670,7 @@ function App() {
               onRunCalibration={runSyntheticCalibration}
               onCompleteSession={completeMockSession}
             />
-            <EventLog events={visibleEvents} />
+            <EventLog events={visibleEvents} sourceLabel={selectedTrackerOption.label} />
           </div>
         </section>
       ) : null}

@@ -30,7 +30,11 @@ type WebGazerApi = {
   end?: () => WebGazerApi
   showVideoPreview?: (enabled: boolean) => WebGazerApi
   showPredictionPoints?: (enabled: boolean) => WebGazerApi
+  saveDataAcrossSessions?: (enabled: boolean) => WebGazerApi
   recordScreenPosition?: (x: number, y: number, eventType?: string) => WebGazerApi
+  params?: {
+    faceMeshSolutionPath?: string
+  }
 }
 
 type WindowWithWebGazer = Window & {
@@ -56,7 +60,8 @@ export type CalibrationSummary = {
 
 const DEFAULT_VIEWPORT_WIDTH = 1
 const DEFAULT_VIEWPORT_HEIGHT = 1
-const DEFAULT_SAMPLE_INTERVAL_MS = 150
+const DEFAULT_SAMPLE_INTERVAL_MS = 250
+const MAX_SESSION_GAZE_EVENTS = 240
 const TRACKER_SOURCE = 'webgazer_experimental'
 const DEFAULT_WEBGAZER_SCRIPT_URL = 'https://webgazer.cs.brown.edu/webgazer.js'
 
@@ -72,6 +77,10 @@ function getBrowserWindow(): WindowWithWebGazer | null {
 
 function getWebGazerScriptUrl() {
   return import.meta.env.VITE_WEBGAZER_SCRIPT_URL || DEFAULT_WEBGAZER_SCRIPT_URL
+}
+
+function getWebGazerFaceMeshSolutionPath() {
+  return '/webgazer-mediapipe/face_mesh'
 }
 
 function createTimestamp() {
@@ -143,9 +152,35 @@ function classifyWebGazerError(error: unknown) {
     }
   }
 
+  if (/t is not a function/i.test(message)) {
+    return {
+      status: 'error' as const,
+      message: (
+        'WebGazer failed inside its browser model. Reload the page and try again; if it repeats, clear site data or use the synthetic demo.'
+      ),
+    }
+  }
+
   return {
     status: 'error' as const,
     message: message || 'WebGazer failed to initialize.',
+  }
+}
+
+type WebGazerMethod = (...args: unknown[]) => unknown
+
+function callWebGazerMethod(webgazer: WebGazerApi, methodName: keyof WebGazerApi, ...args: unknown[]) {
+  const method = webgazer[methodName]
+  if (typeof method !== 'function') {
+    return undefined
+  }
+
+  return (method as WebGazerMethod).apply(webgazer, args)
+}
+
+function configureWebGazerRuntime(webgazer: WebGazerApi) {
+  if (webgazer.params) {
+    webgazer.params.faceMeshSolutionPath = getWebGazerFaceMeshSolutionPath()
   }
 }
 
@@ -417,6 +452,7 @@ export class WebGazerTracker implements TrackerProvider {
   private validSampleCount = 0
   private missingPredictionCount = 0
   private lowConfidenceCount = 0
+  private storedGazeEventCount = 0
   private lastErrorMessage: string | null = null
 
   constructor(options: { sampleIntervalMs?: number } = {}) {
@@ -444,8 +480,10 @@ export class WebGazerTracker implements TrackerProvider {
       }
 
       this.webgazer = webgazer
-      webgazer.showVideoPreview?.(false)
-      webgazer.showPredictionPoints?.(false)
+      configureWebGazerRuntime(webgazer)
+      callWebGazerMethod(webgazer, 'saveDataAcrossSessions', false)
+      callWebGazerMethod(webgazer, 'showVideoPreview', false)
+      callWebGazerMethod(webgazer, 'showPredictionPoints', false)
       webgazer.setGazeListener((prediction) => {
         const now = Date.now()
         this.sampleCount += 1
@@ -469,6 +507,9 @@ export class WebGazerTracker implements TrackerProvider {
         if (now - this.lastSampledAt < this.sampleIntervalMs) {
           return
         }
+        if (this.storedGazeEventCount >= MAX_SESSION_GAZE_EVENTS) {
+          return
+        }
         this.lastSampledAt = now
 
         this.events.push(
@@ -479,6 +520,7 @@ export class WebGazerTracker implements TrackerProvider {
           }),
         )
         this.eventIndex += 1
+        this.storedGazeEventCount += 1
       })
       await Promise.resolve(webgazer.begin())
       this.status = 'ready'
@@ -533,6 +575,7 @@ export class WebGazerTracker implements TrackerProvider {
     this.validSampleCount = 0
     this.missingPredictionCount = 0
     this.lowConfidenceCount = 0
+    this.storedGazeEventCount = 0
     this.events = [
       {
         id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
@@ -543,6 +586,9 @@ export class WebGazerTracker implements TrackerProvider {
           source: TRACKER_SOURCE,
           tracker_type: TRACKER_SOURCE,
           target: options?.taskPrompt ?? 'Find the team plan and start checkout',
+          task_prompt: options?.taskPrompt ?? 'Find the team plan and start checkout',
+          study_name: options?.studyConfig?.name,
+          target_url: options?.studyConfig?.targetUrl,
         },
       },
     ]
@@ -608,6 +654,7 @@ export class WebGazerTracker implements TrackerProvider {
   dispose() {
     this.webgazer?.clearGazeListener?.()
     this.webgazer?.pause?.()
+    this.webgazer?.end?.()
     this.events = []
     this.webgazer = null
     this.latestPrediction = null

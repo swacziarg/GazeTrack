@@ -2,7 +2,10 @@ import type { MockStudyEvent } from '../lib/mockEvents'
 
 type EventLogProps = {
   events: MockStudyEvent[]
+  sourceLabel: string
 }
+
+const MAX_RENDERED_EVENTS = 80
 
 function formatEventType(eventType: string) {
   return eventType.replace(/_/g, ' ')
@@ -35,12 +38,15 @@ function summarizePayload(event: MockStudyEvent) {
   return parts.join(' | ')
 }
 
-export function EventLog({ events }: EventLogProps) {
+export function EventLog({ events, sourceLabel }: EventLogProps) {
+  const renderedEvents = events.slice(-MAX_RENDERED_EVENTS)
+  const hiddenEventCount = Math.max(0, events.length - renderedEvents.length)
+
   return (
     <article className="card event-log">
       <div className="card-header">
         <div>
-          <p className="eyebrow">Synthetic demo events</p>
+          <p className="eyebrow">{sourceLabel} events</p>
           <h3>Local event log</h3>
         </div>
         <span className="status-pill pending">Telemetry only</span>
@@ -49,17 +55,24 @@ export function EventLog({ events }: EventLogProps) {
       {events.length === 0 ? (
         <p className="muted">Start the mock session to generate deterministic demo telemetry.</p>
       ) : (
-        <ol className="event-list">
-          {events.map((event) => (
-            <li key={event.id}>
-              <div>
-                <strong>{formatEventType(event.event_type)}</strong>
-                <span>{formatTime(event.timestamp)}</span>
-              </div>
-              <p>{summarizePayload(event)}</p>
-            </li>
-          ))}
-        </ol>
+        <>
+          {hiddenEventCount > 0 ? (
+            <p className="muted compact-text">
+              Showing latest {renderedEvents.length} of {events.length} events.
+            </p>
+          ) : null}
+          <ol className="event-list" aria-label={`Latest ${sourceLabel} telemetry events`}>
+            {renderedEvents.map((event) => (
+              <li key={event.id}>
+                <div>
+                  <strong>{formatEventType(event.event_type)}</strong>
+                  <span>{formatTime(event.timestamp)}</span>
+                </div>
+                <p>{summarizePayload(event)}</p>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
     </article>
   )

@@ -78,6 +78,57 @@ def test_persisted_events_survive_repository_reinstantiation() -> None:
     assert events[0].payload["confidence"] == 0.91
 
 
+def test_persisted_events_store_queryable_analytics_columns() -> None:
+    repository = GazeTrackRepository()
+    study = repository.create_study(title="Canonical telemetry study")
+    repository.create_aoi(study_id=study.id, label="Primary CTA", x=0.5, y=0.35, width=0.2, height=0.2)
+    session = repository.create_session(study.id)
+
+    repository.append_accepted_events(
+        session.id,
+        [
+            EventEnvelope(
+                event_type="gaze",
+                timestamp="2026-01-01T00:00:00Z",
+                payload={
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "x": 0.55,
+                    "y": 0.45,
+                    "confidence": 0.87,
+                },
+            )
+        ],
+    )
+
+    with connect_database() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                event_schema_version,
+                telemetry_source,
+                normalized_x,
+                normalized_y,
+                confidence,
+                payload_byte_size,
+                aoi_hit_count,
+                ingested_at
+            FROM telemetry_events
+            WHERE session_id = ?
+            """,
+            (str(session.id),),
+        ).fetchone()
+
+    assert row["event_schema_version"] == 1
+    assert row["telemetry_source"] == "webgazer_experimental"
+    assert row["normalized_x"] == 0.55
+    assert row["normalized_y"] == 0.45
+    assert row["confidence"] == 0.87
+    assert row["payload_byte_size"] > 0
+    assert row["aoi_hit_count"] == 1
+    assert row["ingested_at"] is not None
+
+
 def test_report_generation_uses_persisted_events_and_saves_report() -> None:
     fixture = load_synthetic_fixture()
     session_id = fixture["session_id"]

@@ -117,6 +117,124 @@ describe('WebGazerTracker', () => {
     expect(tracker.getEvents().filter((event) => event.event_type === 'gaze_sample_recorded')).toHaveLength(2)
   })
 
+  it('adds task and study context before storing browser gaze samples', async () => {
+    vi.stubGlobal('window', {
+      innerWidth: 1000,
+      innerHeight: 500,
+      webgazer: {
+        setGazeListener: vi.fn().mockReturnThis(),
+        begin: vi.fn(),
+        showVideoPreview: vi.fn().mockReturnThis(),
+        showPredictionPoints: vi.fn().mockReturnThis(),
+      },
+    })
+    const tracker = new WebGazerTracker()
+
+    await tracker.initialize()
+    await tracker.startSession({
+      taskPrompt: 'Find the signup CTA.',
+      studyConfig: {
+        name: 'Signup CTA study',
+        targetUrl: 'https://example.test/signup',
+        taskPrompt: 'Find the signup CTA.',
+        aois: [],
+      },
+    })
+
+    expect(tracker.getEvents()[0]).toEqual(
+      expect.objectContaining({
+        event_type: 'task_started',
+        payload: expect.objectContaining({
+          source: 'webgazer_experimental',
+          tracker_type: 'webgazer_experimental',
+          task_prompt: 'Find the signup CTA.',
+          study_name: 'Signup CTA study',
+          target_url: 'https://example.test/signup',
+        }),
+      }),
+    )
+  })
+
+  it('caps stored browser gaze samples for a session', async () => {
+    let listener: (prediction: { x: number; y: number; confidence?: number } | null) => void = () => {}
+    vi.stubGlobal('window', {
+      innerWidth: 1000,
+      innerHeight: 500,
+      webgazer: {
+        setGazeListener(callback: typeof listener) {
+          listener = callback
+          return this
+        },
+        begin: vi.fn(),
+        pause: vi.fn().mockReturnThis(),
+        clearGazeListener: vi.fn().mockReturnThis(),
+        showVideoPreview: vi.fn().mockReturnThis(),
+        showPredictionPoints: vi.fn().mockReturnThis(),
+      },
+    })
+    const tracker = new WebGazerTracker({ sampleIntervalMs: 0 })
+
+    await tracker.initialize()
+    await tracker.startSession({ viewportWidth: 1000, viewportHeight: 500 })
+    await tracker.runCalibration({ targets: [] })
+    for (let index = 0; index < 245; index += 1) {
+      listener({ x: 250, y: 125, confidence: 0.9 })
+    }
+
+    expect(tracker.getEvents().filter((event) => event.event_type === 'gaze_sample_recorded')).toHaveLength(240)
+  })
+
+  it('starts browser gaze without saving training data across sessions', async () => {
+    const saveDataAcrossSessions = vi.fn().mockReturnThis()
+    const begin = vi.fn()
+    const params = {}
+    vi.stubGlobal('window', {
+      innerWidth: 1000,
+      innerHeight: 500,
+      webgazer: {
+        setGazeListener: vi.fn().mockReturnThis(),
+        begin,
+        saveDataAcrossSessions,
+        showVideoPreview: vi.fn().mockReturnThis(),
+        showPredictionPoints: vi.fn().mockReturnThis(),
+        params,
+      },
+    })
+    const tracker = new WebGazerTracker()
+
+    await tracker.initialize()
+
+    expect(saveDataAcrossSessions).toHaveBeenCalledWith(false)
+    expect(params).toEqual(
+      expect.objectContaining({
+        faceMeshSolutionPath: '/webgazer-mediapipe/face_mesh',
+      }),
+    )
+    expect(begin).toHaveBeenCalled()
+  })
+
+  it('explains opaque WebGazer internal initialization failures', async () => {
+    vi.stubGlobal('window', {
+      innerWidth: 1000,
+      innerHeight: 500,
+      webgazer: {
+        setGazeListener: vi.fn().mockReturnThis(),
+        begin: vi.fn().mockRejectedValue(new Error('t is not a function')),
+        showVideoPreview: vi.fn().mockReturnThis(),
+        showPredictionPoints: vi.fn().mockReturnThis(),
+      },
+    })
+    const tracker = new WebGazerTracker()
+
+    await expect(tracker.initialize()).rejects.toThrow('WebGazer failed inside its browser model')
+    expect(tracker.getTrackingStatus()).toEqual(
+      expect.objectContaining({
+        trackerState: 'error',
+        message: expect.stringContaining('clear site data'),
+      }),
+    )
+  })
+
   it('reports permission-needed fallback when WebGazer begin is denied', async () => {
     vi.stubGlobal('window', {
       innerWidth: 1000,

@@ -102,6 +102,14 @@ def initialize_database(database_url: str | None = None) -> None:
                 event_type TEXT NOT NULL,
                 timestamp TEXT NOT NULL,
                 payload TEXT NOT NULL,
+                event_schema_version INTEGER NOT NULL DEFAULT 1,
+                telemetry_source TEXT,
+                normalized_x REAL,
+                normalized_y REAL,
+                confidence REAL,
+                payload_byte_size INTEGER NOT NULL DEFAULT 0,
+                aoi_hit_count INTEGER NOT NULL DEFAULT 0,
+                ingested_at TEXT,
                 accepted INTEGER NOT NULL,
                 rejection_reason TEXT,
                 created_at TEXT NOT NULL,
@@ -110,6 +118,15 @@ def initialize_database(database_url: str | None = None) -> None:
 
             CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_id
                 ON telemetry_events(session_id);
+
+            CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_timestamp
+                ON telemetry_events(session_id, timestamp);
+
+            CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_type
+                ON telemetry_events(session_id, event_type);
+
+            CREATE INDEX IF NOT EXISTS idx_telemetry_events_source
+                ON telemetry_events(telemetry_source);
 
             CREATE TABLE IF NOT EXISTS reports (
                 id TEXT PRIMARY KEY,
@@ -126,6 +143,14 @@ def initialize_database(database_url: str | None = None) -> None:
         _ensure_column(connection, "studies", "target_url", "TEXT")
         _ensure_column(connection, "studies", "updated_at", "TEXT")
         _ensure_column(connection, "aois", "semantic_type", "TEXT")
+        _ensure_column(connection, "telemetry_events", "event_schema_version", "INTEGER NOT NULL DEFAULT 1")
+        _ensure_column(connection, "telemetry_events", "telemetry_source", "TEXT")
+        _ensure_column(connection, "telemetry_events", "normalized_x", "REAL")
+        _ensure_column(connection, "telemetry_events", "normalized_y", "REAL")
+        _ensure_column(connection, "telemetry_events", "confidence", "REAL")
+        _ensure_column(connection, "telemetry_events", "payload_byte_size", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "telemetry_events", "aoi_hit_count", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "telemetry_events", "ingested_at", "TEXT")
 
 
 def _ensure_column(connection: sqlite3.Connection, table_name: str, column_name: str, column_definition: str) -> None:

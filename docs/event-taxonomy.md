@@ -29,7 +29,9 @@ event envelope. A browser gaze event should look like:
 }
 ```
 
-AOI report metrics use accepted `gaze` and `click` events with compatible coordinates. If `x` and `y` are already between 0 and 1, they are treated as normalized. If coordinates are pixel values, `viewport_width` and `viewport_height` are required so the backend can normalize them.
+AOI report metrics use accepted `gaze` and `click` events with compatible coordinates. If `x` and `y` are already between 0 and 1, they are treated as normalized. If coordinates are pixel values, `viewport_width` and `viewport_height` are required so the backend can normalize them. Events with invalid coordinates, invalid confidence values, invalid timestamps, oversized payloads, or missing required event-specific measurements are rejected before persistence.
+
+Accepted event payloads are sanitized to a known telemetry key set before storage. The SQLite `telemetry_events` row also stores queryable canonical fields derived from the payload: event schema version, telemetry source, normalized `x`/`y`, confidence, payload byte size, AOI hit count, and `ingested_at`.
 
 AOIs are normalized 0-1 rectangles. Demo reports count gaze/click events inside those rectangles and compute approximate raw-sample dwell from bounded timestamp gaps.
 
@@ -46,6 +48,6 @@ Calibration and quality events may include `confidence`, `calibration_error_px`,
 - `calibration_step`
 - `calibration_point_count`
 
-The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, emits `webgazer_experimental` telemetry only, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment.
+The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, emits `webgazer_experimental` telemetry only, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment. WebGazer gaze/click/scroll/calibration events are accepted only after an accepted `task_start` event exists for the session, and frontend sampling is capped so long experiments do not become raw stream dumps.
 
 Privacy rule: events must not contain raw media fields, webcam frame content, images, screenshots, blobs, or base64 media.

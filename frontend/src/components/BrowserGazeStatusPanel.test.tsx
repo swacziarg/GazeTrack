@@ -16,9 +16,11 @@ describe('BrowserGazeStatusPanel', () => {
           latestPoint: { x: 0.4, y: 0.3 },
           message: 'No browser gaze predictions received yet. Check camera permission, lighting, and tab focus.',
         }}
+        canTurnOff
         debugOverlayEnabled
         onDebugOverlayChange={vi.fn()}
         onUseSyntheticDemo={vi.fn()}
+        onTurnOff={vi.fn()}
       />,
     )
 
@@ -29,6 +31,22 @@ describe('BrowserGazeStatusPanel', () => {
     expect(html).toContain('1 / 4')
     expect(html).toContain('4.3s')
     expect(html).toContain('camera permission')
+    expect(html).toContain('Turn off browser gaze')
     expect(html).toContain('Use synthetic demo')
+  })
+
+  it('does not show shutdown before browser gaze is initialized', () => {
+    const html = renderToStaticMarkup(
+      <BrowserGazeStatusPanel
+        status={null}
+        canTurnOff={false}
+        debugOverlayEnabled={false}
+        onDebugOverlayChange={vi.fn()}
+        onUseSyntheticDemo={vi.fn()}
+        onTurnOff={vi.fn()}
+      />,
+    )
+
+    expect(html).not.toContain('Turn off browser gaze')
   })
 })

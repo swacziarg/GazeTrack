@@ -6,25 +6,9 @@ from pydantic import ValidationError
 
 from app.models.api import EventBatchRequest, EventEnvelope, EventIngestResponse
 from app.repository import get_repository
+from app.services.event_validation import AcceptedTelemetryEvent, validate_event_for_ingest
 
 router = APIRouter(tags=["events"])
-
-SUSPICIOUS_MEDIA_KEYS = {"video", "frame", "image", "base64", "blob", "webcam_frame"}
-
-
-def _contains_media_like_fields(data: Any) -> bool:
-    if isinstance(data, dict):
-        for key, value in data.items():
-            normalized_key = str(key).lower()
-            if any(token in normalized_key for token in SUSPICIOUS_MEDIA_KEYS):
-                return True
-            if _contains_media_like_fields(value):
-                return True
-    elif isinstance(data, list):
-        for item in data:
-            if _contains_media_like_fields(item):
-                return True
-    return False
 
 
 @router.post("/sessions/{session_id}/events", response_model=EventIngestResponse)
@@ -47,17 +31,21 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
             rejected_reasons.append(f"Invalid single event shape: {exc.errors()[0]['msg']}")
             rejected_count += 1
 
-    accepted_events: list[EventEnvelope] = []
-
-    for event in events:
-        if _contains_media_like_fields(event.payload):
-            rejected_count += 1
-            rejected_reasons.append(f"Rejected media-like payload fields in event_type={event.event_type.value}")
-            continue
-        accepted_events.append(event)
-
     repository = get_repository()
     repository.ensure_session(session_id)
+    has_task_context = repository.session_has_event_type(session_id, "task_start")
+    accepted_events: list[AcceptedTelemetryEvent] = []
+
+    for event in events:
+        result = validate_event_for_ingest(event, has_task_context=has_task_context)
+        if result.accepted_event is None:
+            rejected_count += 1
+            rejected_reasons.append(result.rejection_reason or f"Rejected event_type={event.event_type.value}.")
+            continue
+        accepted_events.append(result.accepted_event)
+        if result.accepted_event.envelope.event_type.value == "task_start":
+            has_task_context = True
+
     stored_count_for_session = (
         repository.append_accepted_events(session_id, accepted_events)
         if accepted_events
@@ -69,6 +57,6 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
         accepted_count=len(accepted_events),
         rejected_count=rejected_count,
         stored_count_for_session=stored_count_for_session,
-        note="Accepted privacy-safe telemetry is stored in local SQLite persistence.",
+        note="Accepted task-scoped, privacy-safe telemetry is stored in local SQLite persistence.",
         rejected_reasons=rejected_reasons,
     )
