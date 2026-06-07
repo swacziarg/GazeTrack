@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import ValidationError
 
 from app.models.api import EventBatchRequest, EventEnvelope, EventIngestResponse
+from app.services import session_store
 
 router = APIRouter(tags=["events"])
 
@@ -46,19 +47,24 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
             rejected_reasons.append(f"Invalid single event shape: {exc.errors()[0]['msg']}")
             rejected_count += 1
 
-    accepted_count = 0
+    accepted_events: list[EventEnvelope] = []
 
     for event in events:
         if _contains_media_like_fields(event.payload):
             rejected_count += 1
             rejected_reasons.append(f"Rejected media-like payload fields in event_type={event.event_type.value}")
             continue
-        accepted_count += 1
+        accepted_events.append(event)
+
+    stored_count_for_session = session_store.append_events(session_id, accepted_events) if accepted_events else len(
+        session_store.get_events(session_id)
+    )
 
     return EventIngestResponse(
         session_id=session_id,
-        accepted_count=accepted_count,
+        accepted_count=len(accepted_events),
         rejected_count=rejected_count,
-        note="Validated placeholder ingest only; persistence is not implemented.",
+        stored_count_for_session=stored_count_for_session,
+        note="Accepted telemetry is stored in process-local demo memory only and resets on server restart.",
         rejected_reasons=rejected_reasons,
     )

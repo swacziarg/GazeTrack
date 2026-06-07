@@ -82,6 +82,7 @@ class EventIngestResponse(BaseModel):
     session_id: UUID
     accepted_count: int
     rejected_count: int
+    stored_count_for_session: int = 0
     note: str
     rejected_reasons: list[str] = Field(default_factory=list)
 
@@ -89,6 +90,8 @@ class EventIngestResponse(BaseModel):
 class SessionCompleteResponse(BaseModel):
     session_id: UUID
     status: Literal["completed"] = "completed"
+    event_count: int = 0
+    completed: bool = True
     analytics: Literal["not_computed"] = "not_computed"
 
 
@@ -97,11 +100,20 @@ class SessionReportResponse(BaseModel):
     study_id: UUID | None = None
     report_status: Literal["placeholder"] = "placeholder"
     generated_at: str = Field(default_factory=utcnow_iso)
+    event_count: int = 0
+    event_type_counts: dict[str, int] = Field(default_factory=dict)
+    first_event_timestamp: str | None = None
+    last_event_timestamp: str | None = None
+    contains_gaze_events: bool = False
+    low_confidence_sample_rate: float | None = None
+    session_quality_score: float | None = None
+    completed: bool = False
+    insights: list[str] = Field(default_factory=list)
     metrics: dict[str, Any] = Field(default_factory=dict)
     notes: list[str] = Field(
         default_factory=lambda: [
             "Analytics are not computed yet.",
-            "Persistence is not implemented yet.",
+            "Storage is process-local demo memory and resets on server restart.",
         ]
     )
 

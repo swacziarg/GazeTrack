@@ -41,4 +41,5 @@ def test_synthetic_event_fixture_matches_backend_ingest_contract() -> None:
     body = response.json()
     assert body["accepted_count"] == len(fixture["events"])
     assert body["rejected_count"] == 0
+    assert body["stored_count_for_session"] == len(fixture["events"])
     assert body["rejected_reasons"] == []

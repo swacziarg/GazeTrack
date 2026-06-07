@@ -62,6 +62,10 @@ export function DemoReport({ report, ingestResult, isIngestingEvents }: DemoRepo
             <dt>Rejected</dt>
             <dd>{response?.rejected_count ?? 0}</dd>
           </div>
+          <div>
+            <dt>Stored</dt>
+            <dd>{response?.stored_count_for_session ?? 0}</dd>
+          </div>
         </dl>
 
         <p>
