@@ -17,6 +17,10 @@
     "aoi_metrics",
     "fixation_summary",
     "quality_summary",
+    "replay_summary",
+    "replay_events",
+    "replay_fixations",
+    "replay_aoi_overlay",
     "privacy_summary",
     "metrics",
     "notes"
@@ -110,6 +114,27 @@
     "quality_summary": {
       "$ref": "#/$defs/quality_summary"
     },
+    "replay_summary": {
+      "$ref": "#/$defs/replay_summary"
+    },
+    "replay_events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/replay_event"
+      }
+    },
+    "replay_fixations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/replay_fixation"
+      }
+    },
+    "replay_aoi_overlay": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/replay_aoi_overlay"
+      }
+    },
     "notes": {
       "type": "array",
       "items": {
@@ -177,6 +202,213 @@
         },
         "average_fixation_confidence": {
           "type": ["number", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "replay_summary": {
+      "type": "object",
+      "required": [
+        "event_count",
+        "gaze_event_count",
+        "fixation_count",
+        "click_count",
+        "scroll_count",
+        "task_event_count",
+        "duration_ms",
+        "coordinate_space"
+      ],
+      "properties": {
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gaze_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "click_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scroll_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "task_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_space": {
+          "type": "string",
+          "const": "normalized"
+        }
+      },
+      "additionalProperties": false
+    },
+    "replay_event": {
+      "type": "object",
+      "required": ["id", "type", "timestamp", "relative_ms", "aoi_ids"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "relative_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "x": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "aoi_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "label": {
+          "type": ["string", "null"]
+        },
+        "message": {
+          "type": ["string", "null"]
+        },
+        "source": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "replay_fixation": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "start_timestamp",
+        "end_timestamp",
+        "start_relative_ms",
+        "end_relative_ms",
+        "duration_ms",
+        "x",
+        "y",
+        "sample_count",
+        "aoi_ids"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "fixation"
+        },
+        "start_timestamp": {
+          "type": "string"
+        },
+        "end_timestamp": {
+          "type": "string"
+        },
+        "start_relative_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "end_relative_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "average_confidence": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "aoi_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "replay_aoi_overlay": {
+      "type": "object",
+      "required": ["id", "label", "x", "y", "width", "height", "coordinate_space"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "coordinate_space": {
+          "type": "string",
+          "const": "normalized"
         }
       },
       "additionalProperties": false

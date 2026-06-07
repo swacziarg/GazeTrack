@@ -40,6 +40,56 @@ export type BackendQualitySummary = {
   quality_reasons: string[]
 }
 
+export type BackendReplaySummary = {
+  event_count: number
+  gaze_event_count: number
+  fixation_count: number
+  click_count: number
+  scroll_count: number
+  task_event_count: number
+  duration_ms: number
+  coordinate_space: 'normalized'
+}
+
+export type BackendReplayEvent = {
+  id: string
+  type: string
+  timestamp: string
+  relative_ms: number | null
+  x?: number | null
+  y?: number | null
+  confidence?: number | null
+  aoi_ids: string[]
+  label?: string | null
+  message?: string | null
+  source?: string | null
+}
+
+export type BackendReplayFixation = {
+  id: string
+  type: 'fixation'
+  start_timestamp: string
+  end_timestamp: string
+  start_relative_ms: number | null
+  end_relative_ms: number | null
+  duration_ms: number
+  x: number
+  y: number
+  sample_count: number
+  average_confidence?: number | null
+  aoi_ids: string[]
+}
+
+export type BackendReplayAoiOverlay = {
+  id: string
+  label: string
+  x: number
+  y: number
+  width: number
+  height: number
+  coordinate_space: 'normalized'
+}
+
 export type BackendSessionReport = {
   session_id: string
   study_id: string | null
@@ -63,6 +113,10 @@ export type BackendSessionReport = {
   privacy_summary: Record<string, unknown>
   fixation_summary: BackendFixationSummary
   quality_summary: BackendQualitySummary
+  replay_summary?: BackendReplaySummary
+  replay_events?: BackendReplayEvent[]
+  replay_fixations?: BackendReplayFixation[]
+  replay_aoi_overlay?: BackendReplayAoiOverlay[]
   notes: string[]
 }
 

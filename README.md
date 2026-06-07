@@ -16,7 +16,7 @@ GazeTrack helps product teams run structured UX studies where testers complete t
 - Synthetic calibration step with five target points and generated error/confidence telemetry
 - Session recording of rich synthetic gaze/click/scroll/task events in the current demo (no raw video)
 - Tracker adapter boundary with synthetic telemetry as the default and an opt-in browser gaze experiment behind `VITE_ENABLE_WEBGAZER`
-- Report with task counts, AOI metrics, fixation summary, event counts, privacy summary, and session quality verdict
+- Report with task counts, AOI metrics, fixation summary, event counts, privacy summary, session quality verdict, and a schematic session replay
 
 ## Tech stack
 - Frontend: React + TypeScript + Vite
@@ -67,14 +67,14 @@ The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETR
 1. Backend initializes a default synthetic study with a task and demo AOIs.
 2. Frontend displays the persisted task/AOI setup, then runs a synthetic-only calibration step.
 3. Rich synthetic calibration/gaze/click/scroll/task events are ingested into SQLite.
-4. Backend report generation computes event counts, task/AOI counts, AOI gaze/click metrics, demo-grade fixations, privacy summary, and quality summary.
-5. Frontend renders the local demo report and the persisted backend report.
+4. Backend report generation computes event counts, task/AOI counts, AOI gaze/click metrics, demo-grade fixations, replay overlay data, privacy summary, and quality summary.
+5. Frontend renders the local demo report and the persisted backend report, including a normalized-coordinate AOI/gaze/fixation/click replay when persisted replay data exists.
 
 AOIs are normalized rectangles where `x` and `y` are top-left coordinates and `width`/`height` are dimensions from 0 to 1. Current AOIs are demo placeholders; screenshot uploads, DOM-derived AOIs, and webcam gaze estimation are future milestones. AOI dwell still includes the existing bounded-gap raw sample estimate, and reports now add fixation-derived dwell from a simple deterministic normalized-coordinate clustering algorithm. Fixation dwell is more meaningful than raw sample dwell, but it is still approximate and not medical-grade eye tracking or production fixation analytics.
 
 The current demo generator can run `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes. These modes exist to exercise report quality verdicts and are not real tracker output. A frontend tracker adapter now separates this synthetic generator from the optional browser gaze spike. The browser gaze experiment is feature-flagged, approximate, not medical-grade eye tracking, and sends only normalized gaze telemetry, confidence/quality metadata, timestamps, clicks, scrolls, calibration events, and task events to the backend.
 
-The current fixation detector is `simple_dispersion_v1`: accepted gaze samples are normalized to 0-1 coordinates, grouped when nearby in space and time, and promoted to a fixation only when the candidate has enough samples and duration. Calibration/session quality is a heuristic verdict (`pass`, `warn`, or `fail`) based on accepted gaze events, confidence, calibration errors when present, and whether fixations can be detected. WebGazer/browser webcam integration remains a future milestone, and the current calibration UI does not request camera permission.
+The current fixation detector is `simple_dispersion_v1`: accepted gaze samples are normalized to 0-1 coordinates, grouped when nearby in space and time, and promoted to a fixation only when the candidate has enough samples and duration. Calibration/session quality is a heuristic verdict (`pass`, `warn`, or `fail`) based on accepted gaze events, confidence, calibration errors when present, and whether fixations can be detected. Backend replay is a static schematic generated from persisted telemetry and computed fixation centroids. It does not use video, screenshots, raw webcam frames, or a production replay engine. WebGazer/browser webcam integration remains a future milestone, and the current calibration UI does not request camera permission.
 
 ## Privacy principles
 - Process webcam frames locally in browser where possible.

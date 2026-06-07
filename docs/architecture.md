@@ -43,9 +43,10 @@ AOI coordinates are normalized 0-1 rectangles. They are currently demo placehold
 3. Detect demo-grade fixation candidates from accepted gaze samples.
 4. Join gaze/click event points and fixation centroids to AOI rectangles.
 5. Compute per-session/per-AOI demo metrics and heuristic quality verdicts.
-6. Materialize report payload for dashboard rendering.
+6. Build schematic replay data from accepted telemetry, computed fixations, and normalized AOI boxes.
+7. Materialize report payload for dashboard rendering.
 
-Current local reports compute deterministic event counts, gaze presence, low-confidence gaze rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze sample counts, AOI click counts, approximate raw-sample AOI dwell, fixation-derived AOI dwell, report-level fixation summary, privacy summary, and a heuristic quality summary from stored telemetry.
+Current local reports compute deterministic event counts, gaze presence, low-confidence gaze rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze sample counts, AOI click counts, approximate raw-sample AOI dwell, fixation-derived AOI dwell, report-level fixation summary, replay summary/events/fixations/AOI overlay, privacy summary, and a heuristic quality summary from stored telemetry.
 
 The fixation detector is `simple_dispersion_v1`: accepted gaze samples with normalized coordinates are sorted by timestamp, clustered when consecutive samples are close in space and time, and promoted to a fixation only after minimum sample-count and duration thresholds. This is a deterministic demo pipeline for future browser gaze input, not medical-grade eye tracking or a claim of perfect gaze accuracy.
 
@@ -53,9 +54,12 @@ AOI dwell still includes the earlier bounded-gap raw-sample approximation from g
 
 Calibration/session quality is also heuristic. The backend summarizes calibration event count, calibration points completed when provided, average calibration error, average gaze confidence, low-confidence rate, sample completeness, and a `pass`/`warn`/`fail` verdict with reasons. The synthetic generator exposes `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` modes to exercise those verdicts without camera access.
 
+Session replay v1 is a privacy-safe schematic overlay. The backend emits ordered replay events, fixation centroids, summary counts, and normalized AOI rectangles. The frontend renders those as SVG AOI boxes, gaze samples, fixation markers, click markers, textual task/scroll/calibration markers, and a deterministic scrubber. This is not video replay, screenshot playback, or a production replay engine.
+
 ## Privacy model
 - Webcam image processing local to browser where feasible.
 - Persist telemetry only (coordinates, confidence, events, quality metadata).
+- Generate replay from persisted telemetry and computed fixations only.
 - Reject raw webcam/video/image/frame/base64/blob payloads before persistence.
 - Keep browser gaze tracking feature-flagged and consent-gated; synthetic telemetry remains the default.
 - Avoid sensitive fields unless necessary for study operation.

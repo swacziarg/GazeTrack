@@ -70,7 +70,7 @@ AOIs use normalized coordinates from 0 to 1:
 - `width`, `height`: normalized dimensions
 - an event point is inside an AOI when it falls within the inclusive rectangle bounds
 
-`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored synthetic events, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, fixation summary, heuristic quality summary, and privacy-first insights.
+`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored synthetic events, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, fixation summary, replay overlay data, heuristic quality summary, and privacy-first insights.
 
 Synthetic calibration events may include target/observed normalized points, `error_px`, `error_normalized`, `calibration_step`, `calibration_point_count`, `calibration_points_completed`, and confidence. The parser remains defensive and backwards compatible with aggregate `calibration_error_px` and `calibration_error_normalized` fields.
 
@@ -85,6 +85,15 @@ Fixations use `simple_dispersion_v1`, a demo-grade normalized-coordinate cluster
 
 Calibration/session quality is heuristic. Reports include `quality_verdict` (`pass`, `warn`, or `fail`) and `quality_reasons` based on accepted gaze presence, low-confidence rate, calibration error when present, sample completeness, and whether fixation candidates were detected.
 
+Report replay fields are generated from already persisted telemetry and computed fixations:
+
+- `replay_summary` counts gaze, fixation, click, scroll, and task events, with `duration_ms` and `coordinate_space: "normalized"`.
+- `replay_events` is an ordered privacy-safe timeline with event type, timestamp, relative time, optional normalized point, confidence, AOI hits, label/message, and source.
+- `replay_fixations` contains replay-friendly fixation centroids with start/end relative time, duration, sample count, optional confidence, and AOI hits.
+- `replay_aoi_overlay` contains normalized AOI boxes for schematic rendering.
+
+Replay is not video replay. It does not persist or return raw payloads wholesale, webcam frames, images, screenshots, blobs, or base64 media.
+
 ## Intentional limitations
 
 - No authentication/authorization yet.
@@ -93,4 +102,5 @@ Calibration/session quality is heuristic. Reports include `quality_verdict` (`pa
 - No WebGazer/browser tracker integration yet.
 - No screenshot uploads or DOM-derived AOI detection.
 - No production analytics jobs or medical-grade fixation detection.
+- No production video/session replay engine.
 - No raw webcam video/image/frame/base64/blob storage.

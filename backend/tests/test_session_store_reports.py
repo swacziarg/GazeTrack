@@ -59,6 +59,30 @@ def test_report_after_ingest_returns_matching_event_count() -> None:
     assert report["quality_summary"]["calibration_event_count"] == 6
     assert report["quality_summary"]["calibration_points_completed"] == 5
     assert report["quality_summary"]["quality_verdict"] == "pass"
+    assert report["replay_summary"]["event_count"] == len(fixture["events"])  # type: ignore[arg-type]
+    assert report["replay_summary"]["gaze_event_count"] == 8
+    assert report["replay_summary"]["fixation_count"] > 0
+    assert report["replay_summary"]["click_count"] == 1
+    assert report["replay_summary"]["scroll_count"] == 1
+    assert report["replay_summary"]["task_event_count"] == 2
+    assert report["replay_summary"]["duration_ms"] == 5000
+    assert report["replay_summary"]["coordinate_space"] == "normalized"
+    assert report["replay_aoi_overlay"]
+    assert report["replay_aoi_overlay"][0]["coordinate_space"] == "normalized"
+    assert report["replay_events"][0]["type"] == "task_start"
+    assert report["replay_events"][0]["relative_ms"] == 0
+    assert [event["relative_ms"] for event in report["replay_events"]] == sorted(
+        event["relative_ms"] for event in report["replay_events"]
+    )
+    gaze_event = next(event for event in report["replay_events"] if event["type"] == "gaze")
+    assert gaze_event["x"] == 0.608
+    assert gaze_event["y"] == 0.432
+    assert gaze_event["confidence"] == 0.9
+    assert gaze_event["aoi_ids"]
+    assert report["replay_fixations"]
+    assert report["replay_fixations"][0]["type"] == "fixation"
+    assert report["replay_fixations"][0]["duration_ms"] > 0
+    assert report["replay_fixations"][0]["sample_count"] >= 3
 
 
 def test_report_before_ingest_returns_safe_empty_report() -> None:
@@ -77,8 +101,36 @@ def test_report_before_ingest_returns_safe_empty_report() -> None:
     assert body["session_quality_score"] is None
     assert body["fixation_summary"]["fixation_count"] == 0
     assert body["quality_summary"]["quality_verdict"] == "fail"
+    assert body["replay_summary"]["event_count"] == 0
+    assert body["replay_summary"]["duration_ms"] == 0
+    assert body["replay_events"] == []
+    assert body["replay_fixations"] == []
+    assert body["replay_aoi_overlay"]
     assert "No telemetry events have been ingested for this session yet." in body["insights"]
     assert "No raw webcam media is stored by GazeTrack." in body["insights"]
+
+
+def test_report_replay_events_exclude_raw_payloads_and_media_like_fields() -> None:
+    fixture = load_synthetic_fixture()
+    session_id = fixture["session_id"]
+
+    ingest_response = client.post(f"/api/v1/sessions/{session_id}/events", json=fixture)
+    assert ingest_response.status_code == 200
+
+    report_response = client.get(f"/api/v1/sessions/{session_id}/report")
+
+    assert report_response.status_code == 200
+    report = report_response.json()
+    replay_json = json.dumps(
+        {
+            "events": report["replay_events"],
+            "fixations": report["replay_fixations"],
+            "aoi_overlay": report["replay_aoi_overlay"],
+        }
+    ).lower()
+    forbidden_fragments = ["payload", "video", "frame", "image", "base64", "blob", "webcam_frame"]
+    for fragment in forbidden_fragments:
+        assert fragment not in replay_json
 
 
 def test_unsafe_media_like_events_are_rejected_and_not_stored() -> None:

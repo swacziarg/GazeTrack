@@ -12,6 +12,7 @@ from app.models.api import (
 from app.repository import get_repository
 from app.services.aoi_metrics import compute_aoi_metrics
 from app.services.fixations import detect_fixations, summarize_fixations
+from app.services.replay import build_replay_aoi_overlay, build_replay_events, build_replay_fixations, build_replay_summary
 from app.services.session_quality import (
     event_type_counts,
     gaze_confidences,
@@ -70,6 +71,10 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
         fixations=fixations,
         task_start_timestamp=_first_task_start_timestamp(events),
     )
+    replay_events = build_replay_events(events, aois)
+    replay_fixations = build_replay_fixations(fixations, events, aois)
+    replay_aoi_overlay = build_replay_aoi_overlay(aois)
+    replay_summary = build_replay_summary(events, replay_events, replay_fixations)
     privacy_summary = {
         "raw_media_stored": False,
         "stored_payload_type": "validated JSON telemetry",
@@ -115,10 +120,15 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
             "fixation_summary": fixation_summary,
             "quality": quality_summary,
             "privacy": privacy_summary,
+            "replay_summary": replay_summary,
         },
         privacy_summary=privacy_summary,
         fixation_summary=fixation_summary,
         quality_summary=quality_summary,
+        replay_summary=replay_summary,
+        replay_events=replay_events,
+        replay_fixations=replay_fixations,
+        replay_aoi_overlay=replay_aoi_overlay,
         notes=[
             "Backend report is computed from persisted local SQLite telemetry.",
             "SQLite is the local development store and is intended to migrate to PostgreSQL/Supabase later.",

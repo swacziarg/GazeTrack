@@ -68,7 +68,8 @@ Website builders often know what users clicked, but not what users *looked at* b
 2. Task outcome/timing summary
 3. AOI metrics (dwell, TTFF, fixation count, CAF delay)
 4. Heatmap view
-5. Replay timeline export and shareable report snapshot
+5. Schematic normalized-coordinate replay with AOI boxes, gaze samples, fixation centroids, click markers, and task/scroll markers
+6. Replay timeline export and shareable report snapshot
 
 ## Future stretch features
 - Multi-page funnel studies

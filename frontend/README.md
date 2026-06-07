@@ -44,7 +44,7 @@ After ingest succeeds, the frontend also attempts to fetch a backend-generated d
 GET {VITE_API_BASE_URL}/api/v1/sessions/{session_id}/report
 ```
 
-The backend report panel is labeled as a demo report and is generated from SQLite-backed persisted demo telemetry. It is rendered separately from the local demo report.
+The backend report panel is labeled as a demo report and is generated from SQLite-backed persisted demo telemetry. It is rendered separately from the local demo report. When the report includes replay data, the panel also renders a schematic normalized-coordinate session replay with AOI boxes, gaze samples, fixation centroids, click markers, task/scroll markers, and a scrubber.
 
 ## Tracker Modes
 
@@ -74,6 +74,8 @@ After completing the mock session, the local report renders synthetic visual pre
 
 These visuals are generated from mock telemetry positions and demo AOI boxes only. They are not webcam tracking, WebGazer output, raw media processing, or production heatmap analytics.
 
+The backend session replay uses persisted telemetry and computed fixations only. It is a static SVG overlay over normalized 0-1 coordinates and does not request, store, or render webcam video, page screenshots, images, blobs, or base64 media. The scrubber filters replay markers by relative event time so future events are hidden until the selected timeline point reaches them.
+
 The synthetic generator supports `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes so the backend report can demonstrate pass/warn/fail verdicts. No synthetic mode requests camera permission or stores webcam video, frames, images, blobs, or base64 media.
 
 Set `VITE_API_BASE_URL` in a local `.env` file if the FastAPI backend is not running on the default URL:
@@ -90,4 +92,4 @@ If the backend is offline, the local demo report still renders and the backend p
 - Bundled WebGazer dependency
 - Authentication
 - Real analytics computation or production report generation
-- Real heatmaps, real gaze replay tracking, or chart visualizations
+- Real heatmaps, production gaze replay tracking, video replay, or chart visualizations

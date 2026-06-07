@@ -50,4 +50,6 @@ This is demo-grade HCI telemetry, not medical-grade fixation detection.
 
 ## Replay data format
 **Plain English:** Time-ordered stream used to replay gaze and interactions.
-**Compute/Format:** Store JSON timeline with `{t, type, payload}` events (gaze/click/scroll/task) and metadata (viewport, quality flags) for deterministic playback.
+**Compute/Format:** Current reports return a narrow replay payload, not raw event payloads. `replay_summary` gives counts, duration, and `coordinate_space: "normalized"`. `replay_events` is ordered by relative time and includes event type, timestamp, `relative_ms`, optional normalized `x`/`y`, optional confidence, AOI hits, label/message, and source. `replay_fixations` includes computed fixation centroids with start/end relative time, duration, sample count, optional confidence, and AOI hits. `replay_aoi_overlay` includes normalized AOI rectangles.
+
+Replay v1 is a schematic SVG visualization over normalized coordinates. It does not use video, screenshots, images, blobs, base64 media, or a production session replay engine.

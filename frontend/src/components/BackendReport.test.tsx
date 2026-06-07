@@ -91,4 +91,90 @@ describe('BackendReport', () => {
     expect(html).toContain('Fixation dwell')
     expect(html).toContain('160ms')
   })
+
+  it('renders SessionReplay when backend replay data exists', () => {
+    const reportWithReplay: BackendSessionReport = {
+      ...report,
+      replay_summary: {
+        event_count: 3,
+        gaze_event_count: 1,
+        fixation_count: 1,
+        click_count: 1,
+        scroll_count: 0,
+        task_event_count: 0,
+        duration_ms: 2000,
+        coordinate_space: 'normalized',
+      },
+      replay_aoi_overlay: [
+        {
+          id: '33333333-3333-4333-8333-333333333333',
+          label: 'Primary CTA',
+          x: 0.52,
+          y: 0.38,
+          width: 0.2,
+          height: 0.12,
+          coordinate_space: 'normalized',
+        },
+      ],
+      replay_events: [
+        {
+          id: 'event-0001',
+          type: 'gaze',
+          timestamp: '2026-01-15T17:30:01.000Z',
+          relative_ms: 1000,
+          x: 0.61,
+          y: 0.43,
+          confidence: 0.9,
+          aoi_ids: ['33333333-3333-4333-8333-333333333333'],
+        },
+        {
+          id: 'event-0002',
+          type: 'click',
+          timestamp: '2026-01-15T17:30:02.000Z',
+          relative_ms: 2000,
+          x: 0.62,
+          y: 0.44,
+          confidence: 0.9,
+          aoi_ids: ['33333333-3333-4333-8333-333333333333'],
+        },
+      ],
+      replay_fixations: [
+        {
+          id: 'fixation-001',
+          type: 'fixation',
+          start_timestamp: '2026-01-15T17:30:01.000Z',
+          end_timestamp: '2026-01-15T17:30:01.160Z',
+          start_relative_ms: 1000,
+          end_relative_ms: 1160,
+          duration_ms: 160,
+          x: 0.615,
+          y: 0.435,
+          sample_count: 3,
+          average_confidence: 0.86,
+          aoi_ids: ['33333333-3333-4333-8333-333333333333'],
+        },
+      ],
+    }
+
+    const html = renderToStaticMarkup(
+      <BackendReport
+        ingestResult={null}
+        isFetchingReport={false}
+        reportResult={{ ...reportResult, report: reportWithReplay }}
+      />,
+    )
+
+    expect(html).toContain('Session replay')
+    expect(html).toContain('Normalized-coordinate session replay')
+    expect(html).toContain('Primary CTA')
+    expect(html).toContain('replay-click-marker')
+  })
+
+  it('does not crash when backend replay data is missing', () => {
+    const html = renderToStaticMarkup(
+      <BackendReport ingestResult={null} isFetchingReport={false} reportResult={reportResult} />,
+    )
+
+    expect(html).toContain('Replay unavailable for this report.')
+  })
 })

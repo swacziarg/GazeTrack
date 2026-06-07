@@ -159,6 +159,56 @@ class AoiMetricResponse(BaseModel):
     average_fixation_confidence: float | None = None
 
 
+class ReplaySummaryResponse(BaseModel):
+    event_count: int = 0
+    gaze_event_count: int = 0
+    fixation_count: int = 0
+    click_count: int = 0
+    scroll_count: int = 0
+    task_event_count: int = 0
+    duration_ms: int = 0
+    coordinate_space: Literal["normalized"] = "normalized"
+
+
+class ReplayEventResponse(BaseModel):
+    id: str
+    type: str
+    timestamp: str
+    relative_ms: int | None = None
+    x: float | None = None
+    y: float | None = None
+    confidence: float | None = None
+    aoi_ids: list[UUID] = Field(default_factory=list)
+    label: str | None = None
+    message: str | None = None
+    source: str | None = None
+
+
+class ReplayFixationResponse(BaseModel):
+    id: str
+    type: Literal["fixation"] = "fixation"
+    start_timestamp: str
+    end_timestamp: str
+    start_relative_ms: int | None = None
+    end_relative_ms: int | None = None
+    duration_ms: int
+    x: float
+    y: float
+    sample_count: int
+    average_confidence: float | None = None
+    aoi_ids: list[UUID] = Field(default_factory=list)
+
+
+class ReplayAoiOverlayResponse(BaseModel):
+    id: UUID
+    label: str
+    x: float
+    y: float
+    width: float
+    height: float
+    coordinate_space: Literal["normalized"] = "normalized"
+
+
 class SessionReportResponse(BaseModel):
     session_id: UUID
     study_id: UUID | None = None
@@ -182,6 +232,10 @@ class SessionReportResponse(BaseModel):
     privacy_summary: dict[str, Any] = Field(default_factory=dict)
     fixation_summary: dict[str, Any] = Field(default_factory=dict)
     quality_summary: dict[str, Any] = Field(default_factory=dict)
+    replay_summary: ReplaySummaryResponse = Field(default_factory=ReplaySummaryResponse)
+    replay_events: list[ReplayEventResponse] = Field(default_factory=list)
+    replay_fixations: list[ReplayFixationResponse] = Field(default_factory=list)
+    replay_aoi_overlay: list[ReplayAoiOverlayResponse] = Field(default_factory=list)
     notes: list[str] = Field(
         default_factory=lambda: [
             "Analytics are simple deterministic demo metrics.",

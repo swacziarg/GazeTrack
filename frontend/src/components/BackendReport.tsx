@@ -1,5 +1,6 @@
 import type { BackendReportResult, BackendSessionReport } from '../api/reports'
 import type { EventIngestResult } from '../api/events'
+import { SessionReplay } from './SessionReplay'
 
 type BackendReportProps = {
   ingestResult: EventIngestResult | null
@@ -298,6 +299,20 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
             {renderAoiMetrics(report)}
             <p className="muted compact-text">
               Fixation dwell uses demo-grade normalized-coordinate clustering and remains approximate.
+            </p>
+          </section>
+
+          <section className="backend-report-section">
+            <h4>Session replay</h4>
+            <SessionReplay
+              aoiOverlay={report.replay_aoi_overlay}
+              events={report.replay_events}
+              fixations={report.replay_fixations}
+              summary={report.replay_summary}
+            />
+            <p className="muted compact-text">
+              Replay is a schematic normalized-coordinate overlay generated from persisted telemetry, not video or
+              screenshots.
             </p>
           </section>
 

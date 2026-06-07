@@ -85,6 +85,10 @@ must not include video, frames, images, screenshots, blobs, or base64 media.
 - `fixation_summary`
 - `privacy_summary`
 - `quality_summary`
+- `replay_summary`
+- `replay_events`
+- `replay_fixations`
+- `replay_aoi_overlay`
 - `insights`
 
 Each `aoi_metrics` item includes:
@@ -131,6 +135,38 @@ Quality verdicts are heuristic. They fail when no accepted gaze events exist or 
 
 Calibration payloads are accepted as JSON telemetry. Per-target synthetic calibration events may include `target_point`, `observed_point`, `error_px`, `error_normalized`, `calibration_step`, and `calibration_point_count`; aggregate calibration events may include `calibration_error_px`, `calibration_error_normalized`, and `calibration_points_completed`.
 
+Replay fields are generated from persisted telemetry and computed fixations only. They are intended for a schematic normalized-coordinate visualization, not video replay or screenshot playback.
+
+`replay_summary` includes:
+
+- `event_count`
+- `gaze_event_count`
+- `fixation_count`
+- `click_count`
+- `scroll_count`
+- `task_event_count`
+- `duration_ms`
+- `coordinate_space` (`normalized`)
+
+Each `replay_events` item includes a narrow privacy-safe shape:
+
+- `id`
+- `type`
+- `timestamp`
+- `relative_ms`
+- optional normalized `x`/`y`
+- optional `confidence`
+- `aoi_ids`
+- optional `label`
+- optional `message`
+- optional `source`
+
+`replay_fixations` includes computed fixation points with `id`, `type: "fixation"`, start/end timestamps, start/end relative time, `duration_ms`, normalized `x`/`y`, `sample_count`, optional `average_confidence`, and `aoi_ids`.
+
+`replay_aoi_overlay` includes normalized AOI rectangles with `id`, `label`, `x`, `y`, `width`, `height`, and `coordinate_space`.
+
+Replay responses do not include raw event payloads wholesale. They must not include webcam video, frames, images, screenshots, blobs, base64 media, or other raw media-like fields.
+
 ## Event types currently allowed
 
 - `gaze`
@@ -155,4 +191,4 @@ Event payloads containing keys that look like raw media are rejected (case-insen
 
 Accepted telemetry is stored in local SQLite by default. Rejected media-like payloads are not persisted. The current schema uses UUID/string IDs, timestamp columns, append-only telemetry rows, and JSON payloads serialized as text to keep a straightforward future migration path to PostgreSQL/Supabase.
 
-No auth, production-grade webcam tracking, bundled WebGazer dependency, screenshot uploads, production analytics jobs, medical-grade fixation detection, or raw media storage is implemented in this phase.
+No auth, production-grade webcam tracking, bundled WebGazer dependency, screenshot uploads, production analytics jobs, production replay engine, medical-grade fixation detection, or raw media storage is implemented in this phase.
