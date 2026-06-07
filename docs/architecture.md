@@ -1,7 +1,7 @@
 # Architecture Overview: GazeTrack
 
 ## System overview
-GazeTrack is a full-stack web system where browser clients capture gaze + interaction telemetry, backend APIs ingest and validate events, and analytics jobs compute quality-aware metrics for reporting.
+GazeTrack is currently a full-stack synthetic telemetry demo where the browser emits synthetic gaze-like + interaction telemetry, backend APIs ingest and validate privacy-safe events, and report helpers/services compute quality-aware demo metrics for reporting. Future browser gaze work is isolated behind an experimental feature flag.
 
 ## Frontend/backend/database boundaries
 - **Frontend (React/TS):** Study setup UI, calibration UI, telemetry capture, report rendering.
@@ -28,7 +28,7 @@ AOI coordinates are normalized 0-1 rectangles. They are currently demo placehold
 2. The default `SyntheticTracker` emits rich synthetic gaze samples clustered around known AOIs, with normalized `x`/`y`, confidence, calibration, scroll, click, and task events.
 3. The optional `WebGazerTracker` spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, and uses guarded `window.webgazer` access.
 4. Backend report helpers normalize compatible event points into 0-1 coordinates.
-5. Stored telemetry must remain coordinates, confidence/quality metadata, events, and timestamps only; no raw frames/video/images/screenshots/blobs/base64 payloads are persisted.
+5. Stored telemetry must remain coordinates, confidence/quality metadata, events, and timestamps only; no raw frames/video/images/screenshots/blobs/base64 payloads are persisted or returned in replay.
 
 ## Calibration flow
 1. Current frontend renders five calibration target dots through the selected tracker flow.
@@ -68,7 +68,7 @@ Session replay v1 is a privacy-safe schematic overlay. The backend emits ordered
 ## Deployment model
 - Local-first dev setup for frontend + backend + SQLite.
 - Future deploy path: frontend static hosting + FastAPI service + managed Postgres/Supabase.
-- Optional background worker process for periodic analytics recompute.
+- Optional future background worker process for periodic analytics recompute.
 
 ## Suggested folder structure
 ```text

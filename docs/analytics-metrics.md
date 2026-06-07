@@ -1,5 +1,7 @@
 # Analytics Metrics Definitions
 
+These definitions distinguish current `v0.1-demo` report fields from future production metrics. Current inputs are synthetic-compatible telemetry and optional experimental browser-gaze-shaped events, not validated production webcam tracking.
+
 ## Dwell time by AOI
 **Plain English:** Total time a tester spent looking at each AOI.
 **Compute:** Map gaze samples and fixation centroids to normalized AOI rectangles. Current reports keep `approximate_dwell_ms` from bounded raw gaze-sample gaps and add `fixation_dwell_ms` from detected fixation durations.
@@ -8,6 +10,7 @@
 
 ## Time to first fixation (TTFF)
 **Plain English:** How long it took from task start until the tester first clearly looked at a target AOI.
+**Current status:** Implemented in backend AOI metrics as `time_to_first_fixation_ms` when a task start and fixation inside the AOI are available.
 **Compute:** `first_fixation_timestamp_on_target_aoi - task_start_timestamp`.
 
 ## Fixation count
@@ -18,18 +21,22 @@ This is demo-grade HCI telemetry, not medical-grade fixation detection.
 
 ## Click-after-fixation delay
 **Plain English:** Delay between first fixation on target AOI and first relevant click.
+**Current status:** Defined future metric. Not returned by the `v0.1-demo` backend report and should not be listed as an implemented MVP claim.
 **Compute:** `first_click_timestamp_on_target - first_fixation_timestamp_on_target`.
 
 ## Task completion time
 **Plain English:** Total time to complete the assigned task.
+**Current status:** Future reporting metric. Task start/complete events exist, but the current backend report does not expose a dedicated task completion time field.
 **Compute:** `task_completed_timestamp - task_started_timestamp`.
 
 ## Gaze dispersion
 **Plain English:** How spread out visual attention was across the page.
+**Current status:** Future metric. The current fixation algorithm is named `simple_dispersion_v1`, but the report does not return a session-level dispersion score.
 **Compute:** Spatial variance (or RMS distance from centroid) of fixation coordinates over session or task window.
 
 ## Attention entropy
 **Plain English:** How concentrated vs. scattered attention was across AOIs.
+**Current status:** Future metric. Not returned by the `v0.1-demo` backend report.
 **Compute:** Build AOI dwell-time distribution `p_i`; entropy `H = -sum(p_i * ln(p_i))`.
 
 ## Session quality score
@@ -46,6 +53,7 @@ This is demo-grade HCI telemetry, not medical-grade fixation detection.
 
 ## Heatmap generation method
 **Plain English:** Visual density map of where users looked most.
+**Current status:** Future production feature. The frontend has synthetic visual previews only; backend reports do not return a real heatmap payload.
 **Compute:** Project gaze/fixation points to normalized page coordinates, apply Gaussian kernel density estimation, render intensity grid.
 
 ## Replay data format

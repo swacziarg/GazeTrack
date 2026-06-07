@@ -1,57 +1,55 @@
-# 8-Week MVP Roadmap
+# MVP Roadmap
 
-## Week 1
-- **Goal:** Repository/workspace foundation
-- **Deliverables:** Docs baseline, folder structure, initial schema draft
-- **Risks:** Over-scoping architecture early
-- **Definition of done:** All core planning docs and conventions committed
-- **Demo:** Walkthrough of spec, architecture, and data model
+## `v0.1-demo` completed baseline
 
-## Week 2
-- **Goal:** Backend/API skeleton
-- **Deliverables:** FastAPI app scaffolding, health endpoint, study/session CRUD stubs
-- **Risks:** Contract churn before frontend alignment
-- **Definition of done:** API skeleton runs locally with typed models
-- **Demo:** Create/list studies and sessions via API
+GazeTrack now has a credible local full-stack demo shape:
 
-## Week 3
-- **Goal:** Frontend shell + study builder UI
-- **Deliverables:** React app scaffold, study/page/task forms, AOI editor MVP
-- **Risks:** AOI UX complexity and coordinate normalization
-- **Definition of done:** User can define study config end-to-end in UI
-- **Demo:** Create a study and AOIs from browser UI
+- React/Vite/TypeScript dashboard with a synthetic study/session/report flow
+- Default synthetic tracker with multiple quality modes
+- Feature-flagged `WebGazerTracker` spike behind `VITE_ENABLE_WEBGAZER`, consent, and guarded `window.webgazer` access
+- FastAPI + SQLite persistence for studies, tasks, AOIs, sessions, accepted telemetry events, and persisted reports
+- Privacy validation that rejects media-like payload keys before persistence
+- Backend report helpers for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, quality verdicts, and replay payloads
+- Frontend local report, backend ingest/report panels, synthetic visuals, and schematic normalized-coordinate replay
+- Backend tests, frontend tests, and frontend production build covering the current demo surface
 
-## Week 4
-- **Goal:** Browser gaze capture + calibration
-- **Deliverables:** WebGazer integration, calibration sequence, confidence capture
-- **Risks:** Device/browser variability in signal quality
-- **Definition of done:** Session records calibration outputs and basic gaze samples
-- **Demo:** Live calibration and sample stream capture
+## Release definition
 
-## Week 5
-- **Goal:** Event ingestion pipeline
-- **Deliverables:** Batched ingestion endpoints, gaze/click/scroll/task persistence
-- **Risks:** Throughput, ordering, and timestamp consistency
-- **Definition of done:** End-to-end telemetry ingestion from tester flow
-- **Demo:** Run task and inspect stored telemetry rows
+`v0.1-demo` is a synthetic-first portfolio/demo release. It should be tagged only as a privacy-first synthetic telemetry demo pipeline for task-based UX testing, not as production webcam eye tracking.
 
-## Week 6
-- **Goal:** Analytics metrics engine
-- **Deliverables:** Fixation extraction, AOI dwell/TTFF/CAF metrics, quality score logic
-- **Risks:** Noisy gaze causing unstable metrics
-- **Definition of done:** Deterministic metrics computed for sample sessions
-- **Demo:** CLI/job output of computed session metrics
+The release can mention the browser gaze spike only as experimental, feature-flagged, unbundled, consent-gated, and not production-ready.
 
-## Week 7
-- **Goal:** Reporting and replay UI
-- **Deliverables:** Session report page, heatmap rendering, replay timeline player
-- **Risks:** Performance for dense sample sets
-- **Definition of done:** One-click view of quality-aware session report
-- **Demo:** Full report for at least one completed test session
+## Remaining release-confidence tests
 
-## Week 8
-- **Goal:** Polish, validation, and portfolio packaging
-- **Deliverables:** QA pass, documentation updates, deployment notes, interview narrative
-- **Risks:** Last-mile bugs and demo fragility
-- **Definition of done:** Stable local demo and polished project story
-- **Demo:** End-to-end showcase from study creation to report insights
+These are the two main blockers before calling the tag polished rather than just functional:
+
+1. Add Playwright or similar E2E happy path with the backend running.
+2. Validate actual backend report responses against `contracts/session-report.schema.json`.
+
+## Next milestones
+
+### 1. Release hardening
+
+- Add E2E happy path covering frontend demo completion, backend ingest, and backend report fetch.
+- Validate backend report responses against the JSON schema contract.
+- Expand nested media-key rejection tests if coverage is not exhaustive.
+- Add database reset/seed instructions.
+- Ensure `backend/gazetrack_demo.db` is treated as local state, not a release artifact.
+
+### 2. Product narrative polish
+
+- Tighten frontend copy around synthetic mode and the experimental browser gaze mode.
+- Add screenshots/GIF and deterministic demo instructions.
+- Keep README, product spec, backend/frontend READMEs, metrics docs, and interview story aligned on synthetic-first language.
+
+### 3. Metrics evolution
+
+- Either implement backend CAF delay with tests and contract updates or keep it out of MVP claims.
+- Keep entropy, dispersion, and production heatmap generation documented as future metrics until they are returned by the backend.
+- Keep fixation logic labeled as `simple_dispersion_v1` demo analytics until validated against real browser gaze input.
+
+### 4. Future production path
+
+- Evaluate a bundled browser gaze implementation only after consent, privacy, accuracy, and browser compatibility risks are documented.
+- Add production-quality calibration gates and quality thresholds.
+- Add auth, retention/deletion workflows, deployment hardening, export/share features, and multi-session reporting only when they are part of the implemented scope.

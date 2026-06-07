@@ -24,11 +24,20 @@ SQLite is initialized automatically on startup. By default the database is writt
 GAZETRACK_DATABASE_URL=sqlite:///./my_local_gazetrack.db uvicorn app.main:app --reload
 ```
 
+`backend/.venv/` and `backend/gazetrack_demo.db` are local development artifacts and are ignored by git.
+
 ## Test
 
 ```bash
 cd backend
 PYTHONPATH=. pytest
+```
+
+Run only the shared session report JSON Schema validation with:
+
+```bash
+cd backend
+PYTHONPATH=. pytest tests/test_session_report_schema_contract.py
 ```
 
 ## Endpoints
@@ -49,7 +58,7 @@ PYTHONPATH=. pytest
 
 ## SQLite demo persistence
 
-`POST /api/v1/sessions/{session_id}/events` validates incoming synthetic telemetry and stores accepted events in SQLite keyed by `session_id`. Rejected media-like payloads are not stored.
+`POST /api/v1/sessions/{session_id}/events` validates incoming synthetic telemetry and compatible privacy-safe browser-gaze-shaped telemetry, then stores accepted events in SQLite keyed by `session_id`. Rejected media-like payloads are not stored.
 
 The local schema includes:
 
@@ -70,7 +79,7 @@ AOIs use normalized coordinates from 0 to 1:
 - `width`, `height`: normalized dimensions
 - an event point is inside an AOI when it falls within the inclusive rectangle bounds
 
-`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored synthetic events, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, fixation summary, replay overlay data, heuristic quality summary, and privacy-first insights.
+`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored privacy-safe telemetry, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, TTFF from task start when available, fixation summary, replay overlay data, heuristic quality summary, and privacy-first insights.
 
 Synthetic calibration events may include target/observed normalized points, `error_px`, `error_normalized`, `calibration_step`, `calibration_point_count`, `calibration_points_completed`, and confidence. The parser remains defensive and backwards compatible with aggregate `calibration_error_px` and `calibration_error_normalized` fields.
 
@@ -98,9 +107,10 @@ Replay is not video replay. It does not persist or return raw payloads wholesale
 
 - No authentication/authorization yet.
 - No Supabase wiring yet.
-- No webcam tracking implementation.
-- No WebGazer/browser tracker integration yet.
+- No bundled or production WebGazer integration.
+- No production-grade webcam tracking implementation.
 - No screenshot uploads or DOM-derived AOI detection.
-- No production analytics jobs or medical-grade fixation detection.
+- No CAF delay metric in the current report.
+- No production analytics jobs, background workers, or medical-grade fixation detection.
 - No production video/session replay engine.
 - No raw webcam video/image/frame/base64/blob storage.

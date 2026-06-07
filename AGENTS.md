@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Project mission
-Build **GazeTrack** into a production-style, privacy-first, task-based webcam gaze analytics platform for website builders. Prioritize reliable telemetry modeling, quality-aware analytics, and clear reporting over flashy but low-trust demos.
+Build **GazeTrack** from a safe `v0.1-demo` synthetic telemetry pipeline into a production-style, privacy-first, task-based gaze analytics platform for website builders. For the current release, prioritize reliable telemetry modeling, quality-aware analytics, clear reporting, and honest capability boundaries over flashy but low-trust demos.
 
 ## Coding standards
 - Prefer TypeScript on frontend and typed Python on backend.
@@ -56,7 +56,7 @@ Build **GazeTrack** into a production-style, privacy-first, task-based webcam ga
 - Pydantic models for request/response validation.
 - Service layer handles business logic; API layer remains thin.
 - Database access through clearly scoped repository/query modules.
-- Background analytics jobs compute derived metrics and report artifacts.
+- Report helpers/services, and future background analytics jobs when introduced, compute derived metrics and report artifacts.
 
 ## Testing expectations
 - Unit test metric computation and quality score logic.

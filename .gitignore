@@ -3,6 +3,9 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 
+backend/.venv/
+backend/gazetrack_demo.db
+
 .env
 .env.*
 !.env.example
@@ -11,4 +14,6 @@ __pycache__/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
 frontend/*.tsbuildinfo

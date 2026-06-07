@@ -1,79 +1,95 @@
 # Product Spec: GazeTrack
 
+## Current positioning
+
+For `v0.1-demo`, GazeTrack is a privacy-first synthetic telemetry demo pipeline for task-based website UX testing. It demonstrates how a credible product/data system can model study setup, telemetry ingestion, quality-aware analytics, and reporting without storing raw webcam media.
+
+This release should not be described as production webcam eye tracking. Browser gaze estimation is experimental and future-facing.
+
 ## Problem statement
-Website builders often know what users clicked, but not what users *looked at* before acting. Existing tools underrepresent visual attention and rarely tie gaze behavior to explicit task goals. GazeTrack addresses this with privacy-first, task-based webcam gaze analytics and quality-aware reporting.
+
+Website builders often know what users clicked, but have less structured context about attention before action. GazeTrack explores a task-based telemetry model that can tie gaze-like samples, clicks, scrolls, calibration quality, and task outcomes to explicit study goals while keeping privacy constraints visible.
+
+## Current `v0.1-demo` implementation
+
+- React/Vite/TypeScript demo dashboard
+- Default synthetic tracker and synthetic five-point calibration/session flow
+- Quality modes for `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze`
+- FastAPI + SQLite persistence for studies, tasks, AOIs, tester sessions, accepted telemetry events, and report payloads
+- Manual/demo AOIs stored as normalized 0-1 rectangles
+- Event ingestion endpoint with schema validation and recursive rejection of media-like payload keys
+- Backend report helpers for event counts, AOI gaze/click hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, heuristic quality verdicts, privacy summary, and schematic replay payloads
+- Frontend local report, backend ingest/report panels, synthetic visual previews, and normalized-coordinate schematic replay
+
+## Experimental implementation
+
+- `WebGazerTracker` exists behind `VITE_ENABLE_WEBGAZER`
+- The browser gaze option is hidden by default, requires explicit consent, and guards against missing `window.webgazer`
+- WebGazer is not bundled
+- This path is not release-ready as real gaze tracking and should be described only as a browser gaze spike
+- Compatible browser gaze telemetry must remain privacy-safe: coordinates, timestamps, confidence/quality metadata, calibration/task/click/scroll events, and no raw media
+
+## Current non-goals
+
+- Production-grade webcam tracking
+- Medical-grade eye tracking or biometric identity claims
+- Raw video, image, screenshot, frame, blob, or base64 persistence
+- Real heatmaps or screenshot/page replay
+- DOM-derived AOI detection
+- CAF delay in implemented report claims
+- Authentication/authorization
+- Deployment, export, or shareable report features
+- Generic session-recording/Hotjar clone behavior
+
+## Future product requirements
+
+The long-term product can evolve toward a real browser-native gaze analytics platform, but these items are future work until implemented and validated:
+
+- Production browser gaze integration and calibration quality gates
+- Webcam permission flow for real tracker mode, with consent and local frame processing
+- Study creation/editing beyond the seeded demo flow
+- DOM-assisted or screenshot-assisted AOI authoring
+- Production fixation analytics, heatmap generation, and report exports
+- CAF delay and additional attention metrics once backend support exists
+- Multi-session study summaries and variant comparison
+- Team/auth model, retention/deletion workflows, and deployment hardening
+- Shareable report snapshots after access control and privacy review
 
 ## User personas
-1. **Indie Website Builder**: Needs fast feedback on whether visitors notice key CTAs.
-2. **UX Researcher**: Runs structured task studies and compares performance across variants.
-3. **Product Analyst**: Combines interaction telemetry with visual attention signals.
 
-## Core workflows
-- Create study with page/task setup
-- Define AOIs on target page
-- Run tester through calibration and task execution
-- Ingest gaze + interaction events with confidence metadata
-- Generate report with quality-aware metrics and replay
+1. **Indie Website Builder:** Wants quick, task-based feedback on whether a key page flow is understandable.
+2. **UX Researcher:** Wants structured study runs with explicit task context and quality indicators.
+3. **Product Analyst:** Wants event contracts and derived metrics that can grow into a trustworthy reporting pipeline.
 
-## MVP requirements
-- Study management (basic CRUD)
-- Task definition per study page
-- AOI definition and storage
-- Browser calibration flow with confidence/error capture
-- Event ingestion endpoints for gaze/click/scroll/task events
-- Session quality scoring
-- Report view with heatmap + timeline replay + key metrics
+## Current demo workflow
 
-## Non-goals
-- Medical diagnostics or clinical claims
-- Raw video collection/storage pipeline
-- Advanced enterprise admin/permission systems in MVP
-- Real-time collaborative annotation in first version
+1. Open the demo study.
+2. Review seeded task and normalized AOIs.
+3. Run synthetic calibration.
+4. Run a synthetic task session.
+5. Ingest accepted telemetry into the FastAPI backend.
+6. Review local and backend-generated demo reports.
+7. Inspect schematic normalized-coordinate replay when backend replay data exists.
 
-## Product differentiation
-- Task-based analytics, not passive recordings alone
-- Webcam gaze + interaction telemetry in one model
-- First-class session quality/confidence scoring
-- Privacy-first architecture that avoids raw video storage
+## Future workflow target
+
+1. Create a study with page/task setup.
+2. Define AOIs manually or with future page/DOM assistance.
+3. Run tester through consent, camera permission, calibration, and task execution.
+4. Ingest gaze + interaction events with confidence metadata.
+5. Generate quality-aware reports with production-validated metrics.
 
 ## UX principles
-- Clearly communicate confidence/limitations of tracking
-- Keep setup friction low (quick calibration and start)
-- Make reports interpretable by non-experts
-- Prioritize actionable metrics over novelty visuals
 
-## Study creation flow
-1. Create study (name, objective, target audience notes)
-2. Add one or more study pages (URL or built-in test page)
-3. Add task prompt(s) and success criteria
-4. Define AOIs on page image/DOM snapshot
-5. Generate tester link/session invite
+- Clearly label synthetic data, experimental tracker paths, and unsupported features.
+- Surface calibration confidence and data quality prominently.
+- Make reports interpretable by non-experts.
+- Prioritize defensible metrics over novelty visuals.
+- Keep privacy constraints visible in setup, telemetry, and report surfaces.
 
-## Tester flow
-1. Consent + webcam permission prompt
-2. Calibration sequence
-3. Quality gate/check (retry if below threshold)
-4. Task prompt shown
-5. Interaction period with event capture
-6. Task completion + optional confidence survey
+## Product differentiation target
 
-## Researcher dashboard flow
-1. Open study summary (session counts, quality distribution)
-2. Filter sessions by quality/task outcome/device
-3. Compare AOI metrics across sessions
-4. Open individual replay for deep inspection
-
-## Report flow
-1. Session-level quality summary
-2. Task outcome/timing summary
-3. AOI metrics (dwell, TTFF, fixation count, CAF delay)
-4. Heatmap view
-5. Schematic normalized-coordinate replay with AOI boxes, gaze samples, fixation centroids, click markers, and task/scroll markers
-6. Replay timeline export and shareable report snapshot
-
-## Future stretch features
-- Multi-page funnel studies
-- Variant/AB comparison and significance helpers
-- AOI auto-suggestions from DOM semantics
-- Team collaboration annotations
-- Scheduled recurring benchmark studies
+- Task-based analytics, not passive recordings alone
+- Gaze-like telemetry + interaction telemetry in one explicit event model
+- First-class session quality/confidence scoring
+- Privacy-first architecture that avoids raw media storage

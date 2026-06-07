@@ -1,47 +1,52 @@
 # Interview Story: GazeTrack
 
 ## Why I built it
-I wanted a flagship portfolio project that combines full-stack product engineering with event modeling and analytics—close to real product/data work I want after graduation. GazeTrack turns my analytics background into a shippable UX telemetry system with clear user value.
+I wanted a flagship portfolio project that combines full-stack product engineering with event modeling and analytics, close to real product/data work I want after graduation. GazeTrack turns my analytics background into a privacy-first synthetic telemetry demo pipeline for task-based UX studies.
 
 ## Technical decisions
-- Chose browser-native webcam gaze estimation (WebGazer.js style approach) for practical accessibility.
+- Made synthetic telemetry the default so the demo is safe, deterministic, and credible without webcam access.
+- Kept a browser-native gaze spike behind `VITE_ENABLE_WEBGAZER`, explicit consent, and guarded `window.webgazer` access for future exploration.
 - Split architecture into capture, ingestion, analytics, and reporting layers for maintainability.
-- Modeled append-only event tables plus derived report tables to mirror production analytics stacks.
+- Modeled append-only telemetry plus persisted report payloads to mirror production analytics stacks.
 
 ## Tradeoffs
-- Webcam gaze is noisier than dedicated hardware; quality scoring is mandatory.
+- The current release demonstrates pipeline shape with synthetic data, not production webcam gaze accuracy.
+- Browser gaze is noisier than dedicated hardware; quality scoring is mandatory before any future production tracker claim.
 - Prioritized trustworthy metrics and uncertainty communication over flashy but fragile features.
 - Deferred complex auth/permissions to keep MVP focused on core study/report loop.
 
 ## Data quality challenges
-- Calibration variability across lighting/devices.
+- Calibration variability across lighting/devices for future browser gaze work.
 - Coordinate drift with scrolling/responsive layouts.
-- Separating true fixations from jitter/noise.
+- Separating true fixations from jitter/noise once real tracker input is validated.
 - Handling missing or low-confidence samples without misleading results.
 
 ## Privacy decisions
-- Process webcam frames locally in-browser where possible.
+- Keep synthetic mode camera-free.
+- Process webcam frames locally in-browser if future browser gaze work requires camera access.
 - Store telemetry only (coordinates/events/confidence), never raw video.
+- Reject media-like payload keys before persistence.
 - Treat data minimization and transparent confidence reporting as product features.
 
 ## Validation approach
 - Validate ingestion with contract/integration tests.
 - Validate metrics on deterministic sample sessions with expected outputs.
-- Compare session quality bands against known-good/known-poor recording conditions.
-- Manually test end-to-end flow: study -> calibration -> task -> report.
+- Compare session quality bands against known-good/known-poor synthetic quality modes.
+- Add remaining release-confidence tests: E2E happy path with backend running and backend report schema validation.
 
 ## What went wrong / likely risks
 - Browser/device variability may reduce consistency.
 - Metric thresholds may need iterative tuning to avoid false confidence.
-- Heatmap/replay performance can degrade for high-volume sessions.
+- Schematic replay performance can degrade for high-volume sessions.
+- Product copy must keep experimental browser gaze separate from the current synthetic demo.
 
 ## Role alignment narrative
 - **Data engineering:** Event schema design, ingestion reliability, derived metrics pipelines.
 - **Product analytics:** Task funnel metrics, AOI attention metrics, quality-aware interpretation.
-- **Internal tools/full-stack:** Study builder, researcher dashboards, session replay/report UX.
+- **Internal tools/full-stack:** Study setup, researcher dashboard panels, schematic replay/report UX.
 
 ## Resume bullets (quantified placeholders)
-- Built a privacy-first UX telemetry platform capturing **[X]+ events/session** across gaze, click, scroll, and task streams.
-- Designed PostgreSQL schema and analytics pipeline powering **[Y] core attention metrics** and quality-aware reports.
-- Implemented browser calibration + confidence scoring, improving usable session rate by **[Z]%**.
-- Delivered end-to-end React/FastAPI product from study creation to replay/heatmap report in **[N] weeks**.
+- Built a privacy-first synthetic UX telemetry demo capturing **[X]+ events/session** across gaze-like, click, scroll, calibration, and task streams.
+- Designed SQLite-backed event/report persistence with a documented PostgreSQL/Supabase schema direction.
+- Implemented synthetic calibration, quality modes, and confidence-aware report verdicts across React/FastAPI.
+- Delivered an end-to-end React/FastAPI demo from study setup to backend-generated report and schematic replay in **[N] weeks**.

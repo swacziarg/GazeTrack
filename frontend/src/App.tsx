@@ -313,7 +313,7 @@ function App() {
         <div className="hero-copy">
           <p className="eyebrow">Synthetic demo frontend shell</p>
           <h1>GazeTrack</h1>
-          <p className="subtitle">Task-based webcam gaze analytics for website UX testing.</p>
+          <p className="subtitle">Synthetic telemetry demo pipeline for task-based website UX testing.</p>
           <p className="privacy-note">
             GazeTrack is designed to store gaze/event telemetry, not webcam video.
           </p>
@@ -525,7 +525,7 @@ function App() {
             />
             <PlaceholderPanel
               title="AOI attention breakdown"
-              description="Demo placeholder only. No chart library or computed AOI analytics are implemented yet."
+              description="Demo placeholder only. No production charting or multi-session AOI analytics are implemented yet."
             />
           </div>
         </section>

@@ -1,6 +1,6 @@
 # GazeTrack Frontend
 
-Static React + TypeScript + Vite shell for the GazeTrack MVP.
+React + TypeScript + Vite frontend for the GazeTrack `v0.1-demo` synthetic telemetry dashboard.
 
 ## Install
 
@@ -28,9 +28,28 @@ npm run test
 
 Tests currently cover the synthetic tracker, feature-flagged tracker selection, WebGazer adapter normalization, event contract adapter, backend ingest client, demo report utilities, backend report rendering, and synthetic visualization helpers.
 
+## E2E
+
+Install the Playwright browser once if needed:
+
+```bash
+npx playwright install chromium
+```
+
+Run the synthetic happy path:
+
+```bash
+npm run e2e
+```
+
+Run this after the backend install step has created `backend/.venv`. The Playwright config starts FastAPI on
+`http://127.0.0.1:8000` with `GAZETRACK_DATABASE_URL=sqlite:////private/tmp/gazetrack-e2e.db`, starts Vite on
+`http://127.0.0.1:5173`, runs the default synthetic session, and verifies successful backend ingest/report UI.
+WebGazer remains disabled.
+
 ## Backend URL
 
-The backend status card calls `GET {VITE_API_BASE_URL}/health`. Completing the synthetic demo session also attempts to POST the generated telemetry batch to:
+The backend status card calls `GET {VITE_API_BASE_URL}/health`. Completing the synthetic demo session also attempts to POST the generated synthetic telemetry batch to:
 
 ```text
 POST {VITE_API_BASE_URL}/api/v1/sessions/{session_id}/events
@@ -91,5 +110,8 @@ If the backend is offline, the local demo report still renders and the backend p
 - Production-grade webcam tracking
 - Bundled WebGazer dependency
 - Authentication
-- Real analytics computation or production report generation
-- Real heatmaps, production gaze replay tracking, video replay, or chart visualizations
+- Production-grade analytics, heatmaps, or report generation
+- CAF delay
+- DOM-derived AOI detection
+- Export/share flows
+- Production gaze replay tracking, video replay, screenshot replay, or chart visualizations

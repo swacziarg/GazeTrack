@@ -91,7 +91,7 @@ export function TrackerModePanel({
           <h4>Browser gaze experiment consent</h4>
           <p>
             Browser-based gaze estimation may request camera access. Gaze estimation is approximate and not
-            medical-grade eye tracking.
+            medical-grade eye tracking. This experimental path is not part of the default synthetic demo.
           </p>
           <p>
             Raw video is not sent to the backend. Backend ingest receives only telemetry events such as normalized gaze
@@ -109,8 +109,8 @@ export function TrackerModePanel({
       ) : null}
 
       <p className="privacy-note compact">
-        Synthetic telemetry remains the default. Browser gaze is an experimental opt-in mode and does not upload raw
-        webcam media.
+        Synthetic telemetry remains the default. Browser gaze is experimental, feature-flagged, opt-in, and does not
+        upload raw webcam media.
       </p>
     </article>
   )
