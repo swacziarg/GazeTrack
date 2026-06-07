@@ -28,12 +28,14 @@ function formatSeconds(value: number) {
 export function generateDemoReport(events: MockStudyEvent[]): DemoReportData {
   const firstEvent = events[0]
   const firstFixation = events.find(
-    (event) => event.event_type === 'gaze_sample_recorded' && event.payload.aoi === 'Hero CTA',
+    (event) => event.event_type === 'gaze_sample_recorded' && event.payload.aoi === 'Primary CTA',
   )
   const taskCompleted = events.find((event) => event.event_type === 'task_completed')
   const qualitySignals = events.filter((event) => typeof event.payload.confidence === 'number')
   const lowConfidenceSamples = qualitySignals.filter((event) => (event.payload.confidence ?? 1) < 0.6)
-  const ctaDwellMs = firstFixation?.payload.dwell_ms ?? 0
+  const ctaDwellMs = events
+    .filter((event) => event.event_type === 'gaze_sample_recorded' && event.payload.aoi === 'Primary CTA')
+    .reduce((total, event) => total + (event.payload.dwell_ms ?? 0), 0)
   const lowConfidenceSampleRate =
     qualitySignals.length === 0 ? 0 : Math.round((lowConfidenceSamples.length / qualitySignals.length) * 100)
   const timeToFirstFixationSeconds =

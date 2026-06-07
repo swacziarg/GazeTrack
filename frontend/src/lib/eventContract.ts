@@ -24,6 +24,7 @@ const MEDIA_LIKE_KEY_TOKENS = ['video', 'frame', 'image', 'base64', 'blob', 'web
 
 const EVENT_TYPE_MAP: Record<MockStudyEvent['event_type'], BackendEventType> = {
   task_started: 'task_start',
+  calibration_point_recorded: 'calibration',
   calibration_completed: 'calibration',
   gaze_sample_recorded: 'gaze',
   click_recorded: 'click',

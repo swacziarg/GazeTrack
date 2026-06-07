@@ -1,6 +1,6 @@
 # Backend
 
-Minimal FastAPI placeholder API for GazeTrack. This backend intentionally exposes stable endpoint stubs plus a process-local demo telemetry store for synthetic development flows.
+Minimal FastAPI API for GazeTrack. This backend exposes stable demo endpoints plus SQLite-backed local persistence for synthetic study, session, telemetry, and report flows.
 
 ## Install
 
@@ -18,6 +18,12 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
+SQLite is initialized automatically on startup. By default the database is written to `./gazetrack_demo.db` from the backend working directory. Override it with:
+
+```bash
+GAZETRACK_DATABASE_URL=sqlite:///./my_local_gazetrack.db uvicorn app.main:app --reload
+```
+
 ## Test
 
 ```bash
@@ -30,30 +36,61 @@ PYTHONPATH=. pytest
 - `GET /health`
 - `GET /api/v1/meta`
 - `POST /api/v1/studies`
+- `GET /api/v1/studies`
 - `GET /api/v1/studies/{study_id}`
+- `POST /api/v1/studies/{study_id}/tasks`
+- `GET /api/v1/studies/{study_id}/tasks`
+- `POST /api/v1/studies/{study_id}/aois`
+- `GET /api/v1/studies/{study_id}/aois`
 - `POST /api/v1/studies/{study_id}/sessions`
 - `POST /api/v1/sessions/{session_id}/events`
 - `POST /api/v1/sessions/{session_id}/complete`
 - `GET /api/v1/sessions/{session_id}/report`
 
-## In-memory demo storage
+## SQLite demo persistence
 
-`POST /api/v1/sessions/{session_id}/events` validates incoming synthetic telemetry and stores accepted events in process-local memory keyed by `session_id`. Rejected media-like payloads are not stored.
+`POST /api/v1/sessions/{session_id}/events` validates incoming synthetic telemetry and stores accepted events in SQLite keyed by `session_id`. Rejected media-like payloads are not stored.
 
-This storage is demo-only:
+The local schema includes:
 
-- It resets when the FastAPI server restarts.
-- It is not a database, Supabase, or production persistence layer.
-- It is not thread-safe or suitable for multi-process deployments.
-- It stores validated telemetry event envelopes only, never raw webcam video, frames, images, blobs, or base64 media payloads.
+- `studies`
+- `tasks`
+- `aois`
+- `sessions`
+- `telemetry_events`
+- `reports`
 
-`GET /api/v1/sessions/{session_id}/report` returns a backend-generated demo report from the stored synthetic events, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, a simple quality score, and privacy-first insights.
+The schema keeps UUID/string IDs, timestamp fields, append-only telemetry events, and JSON payloads stored as text so the shape can migrate to PostgreSQL/Supabase later.
+
+`GET /api/v1/studies` ensures the default synthetic demo study exists. The default study also receives one demo task and five placeholder AOIs when no tasks/AOIs exist.
+
+AOIs use normalized coordinates from 0 to 1:
+
+- `x`, `y`: top-left coordinate
+- `width`, `height`: normalized dimensions
+- an event point is inside an AOI when it falls within the inclusive rectangle bounds
+
+`GET /api/v1/sessions/{session_id}/report` returns and persists a backend-generated demo report from stored synthetic events, including event counts, event type counts, first/last event timestamps, gaze-event presence, low-confidence sample rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze/click metrics, fixation summary, heuristic quality summary, and privacy-first insights.
+
+Synthetic calibration events may include target/observed normalized points, `error_px`, `error_normalized`, `calibration_step`, `calibration_point_count`, `calibration_points_completed`, and confidence. The parser remains defensive and backwards compatible with aggregate `calibration_error_px` and `calibration_error_normalized` fields.
+
+AOI metrics include both raw sample fields and fixation-derived fields:
+
+- `gaze_sample_count`, `first_gaze_timestamp`, `approximate_dwell_ms`, and `click_count_inside_aoi` preserve the original sample/click behavior.
+- `fixation_count`, `fixation_dwell_ms`, `first_fixation_timestamp`, `time_to_first_fixation_ms`, and optional `average_fixation_confidence` are derived from detected fixation centroids inside the normalized AOI rectangle.
+
+`approximate_dwell_ms` remains a deterministic raw-sample approximation: gaze samples inside an AOI are sorted by timestamp and bounded gaps up to 500 ms are summed. ISO timestamps are supported, and parser helpers also accept numeric seconds or milliseconds for service-level compatibility. If timestamps cannot be parsed, the fallback is `gaze_sample_count * 100 ms`.
+
+Fixations use `simple_dispersion_v1`, a demo-grade normalized-coordinate clustering helper. Accepted gaze samples with usable 0-1 coordinates are sorted by timestamp, grouped when consecutive samples are within a small normalized radius and timestamp gap, and promoted to a fixation when they meet minimum sample and duration thresholds. This is not medical-grade eye tracking and does not claim perfect gaze accuracy.
+
+Calibration/session quality is heuristic. Reports include `quality_verdict` (`pass`, `warn`, or `fail`) and `quality_reasons` based on accepted gaze presence, low-confidence rate, calibration error when present, sample completeness, and whether fixation candidates were detected.
 
 ## Intentional limitations
 
 - No authentication/authorization yet.
-- No database persistence yet.
 - No Supabase wiring yet.
 - No webcam tracking implementation.
-- No production report analytics computation.
-- No raw webcam video/image/frame storage.
+- No WebGazer/browser tracker integration yet.
+- No screenshot uploads or DOM-derived AOI detection.
+- No production analytics jobs or medical-grade fixation detection.
+- No raw webcam video/image/frame/base64/blob storage.

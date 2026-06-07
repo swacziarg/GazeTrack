@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import ValidationError
 
 from app.models.api import EventBatchRequest, EventEnvelope, EventIngestResponse
-from app.services import session_store
+from app.repository import get_repository
 
 router = APIRouter(tags=["events"])
 
@@ -56,8 +56,12 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
             continue
         accepted_events.append(event)
 
-    stored_count_for_session = session_store.append_events(session_id, accepted_events) if accepted_events else len(
-        session_store.get_events(session_id)
+    repository = get_repository()
+    repository.ensure_session(session_id)
+    stored_count_for_session = (
+        repository.append_accepted_events(session_id, accepted_events)
+        if accepted_events
+        else repository.count_accepted_events(session_id)
     )
 
     return EventIngestResponse(
@@ -65,6 +69,6 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
         accepted_count=len(accepted_events),
         rejected_count=rejected_count,
         stored_count_for_session=stored_count_for_session,
-        note="Accepted telemetry is stored in process-local demo memory only and resets on server restart.",
+        note="Accepted privacy-safe telemetry is stored in local SQLite persistence.",
         rejected_reasons=rejected_reasons,
     )

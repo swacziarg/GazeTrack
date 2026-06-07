@@ -28,11 +28,12 @@ export const demoStudy: DemoStudy = {
   name: 'Demo Homepage CTA Study',
   pageLabel: 'Demo page: example pricing landing page',
   taskPrompt: 'Static demo task: find the team plan and start checkout.',
-  sessionQuality: 'Demo quality status: medium confidence, 78 / 100.',
+  sessionQuality: 'Demo quality status: selectable synthetic quality mode.',
   aois: [
-    { name: 'Hero CTA', role: 'Primary conversion region', x: 52, y: 38, width: 20, height: 12 },
-    { name: 'Pricing navigation link', role: 'Task discovery path', x: 40, y: 7, width: 18, height: 8 },
-    { name: 'Plan comparison table', role: 'Decision-support region', x: 38, y: 62, width: 30, height: 18 },
+    { name: 'Hero headline', role: 'Initial message comprehension', x: 12, y: 18, width: 48, height: 14 },
+    { name: 'Primary CTA', role: 'Primary conversion region', x: 52, y: 38, width: 20, height: 12 },
+    { name: 'Navigation', role: 'Task discovery path', x: 38, y: 5, width: 24, height: 11 },
+    { name: 'Pricing preview', role: 'Decision-support region', x: 36, y: 62, width: 34, height: 20 },
   ],
   insights: [
     'Demo study preview: CTA fixation and click sequence',

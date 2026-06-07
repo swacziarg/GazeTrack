@@ -273,6 +273,56 @@ dd {
   color: #657185;
 }
 
+.study-builder-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.study-builder-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 1fr) minmax(260px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.study-builder-grid section {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.study-builder-grid h4 {
+  color: #172033;
+  font-size: 1rem;
+}
+
+.setup-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-list li {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid #e1e8f1;
+  border-radius: 6px;
+  padding: 0.7rem;
+  background: #f8fafc;
+}
+
+.setup-list strong,
+.setup-list span {
+  overflow-wrap: anywhere;
+}
+
+.setup-list span {
+  color: #657185;
+  font-size: 0.92rem;
+}
+
 .insight-grid,
 .metric-grid,
 .placeholder-grid {
@@ -331,6 +381,24 @@ dd {
   font-weight: 700;
 }
 
+.field-control {
+  display: grid;
+  gap: 0.35rem;
+  color: #405166;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field-control select {
+  width: 100%;
+  border: 1px solid #c6d2e1;
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+}
+
 .session-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -347,6 +415,58 @@ dd {
 .session-stats dd {
   font-size: 1.35rem;
   font-weight: 800;
+}
+
+.compact-stats dd {
+  font-size: 1.05rem;
+}
+
+.calibration-panel {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid #c8e3dd;
+  border-radius: 6px;
+  padding: 0.85rem;
+  background: #f0faf8;
+}
+
+.calibration-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.calibration-copy h4 {
+  color: #172033;
+  font-size: 1rem;
+}
+
+.calibration-target-map {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid #c6d2e1;
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(45, 111, 122, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(45, 111, 122, 0.08) 1px, transparent 1px),
+    #ffffff;
+  background-size: 20px 20px;
+}
+
+.calibration-target {
+  position: absolute;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #172033;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 0.8rem;
+  font-weight: 900;
+  transform: translate(-50%, -50%);
 }
 
 .button-row {
@@ -616,6 +736,10 @@ dd {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.backend-report-stats.compact-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .backend-count-list {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -650,6 +774,56 @@ dd {
   font-size: 1rem;
 }
 
+.backend-aoi-metric-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.backend-aoi-metric {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid #e1e8f1;
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.backend-aoi-metric-heading {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.backend-aoi-metric-heading strong,
+.backend-aoi-metric dd {
+  overflow-wrap: anywhere;
+}
+
+.backend-aoi-metric-heading span {
+  color: #657185;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.backend-aoi-metric dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.backend-aoi-metric dl div {
+  min-width: 0;
+}
+
+.backend-aoi-metric dd {
+  font-weight: 800;
+}
+
+.compact-text {
+  font-size: 0.9rem;
+}
+
 .backend-insight-list {
   display: grid;
   gap: 0.5rem;
@@ -681,8 +855,10 @@ dd {
   .insight-grid,
   .placeholder-grid,
   .synthetic-visual-grid,
+  .study-builder-grid,
   .backend-report-stats,
-  .backend-count-list {
+  .backend-count-list,
+  .backend-aoi-metric dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -704,8 +880,10 @@ dd {
   .synthetic-visual-grid,
   .ingest-stats,
   .session-stats,
+  .study-builder-grid,
   .backend-report-stats,
-  .backend-count-list {
+  .backend-count-list,
+  .backend-aoi-metric dl {
     grid-template-columns: 1fr;
   }
 

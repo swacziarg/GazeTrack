@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def utcnow_iso() -> str:
@@ -40,9 +40,57 @@ class StudyResponse(BaseModel):
     name: str
     objective: str | None = None
     target_url: str | None = None
-    status: Literal["placeholder"] = "placeholder"
-    persistence: Literal["not_implemented"] = "not_implemented"
+    status: Literal["placeholder", "active"] = "active"
+    persistence: Literal["not_implemented", "sqlite"] = "sqlite"
     created_at: str = Field(default_factory=utcnow_iso)
+
+
+class TaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    prompt: str = Field(min_length=1, max_length=1000)
+    success_criteria: str | None = Field(default=None, max_length=1000)
+    target_url: str | None = None
+
+
+class TaskResponse(BaseModel):
+    task_id: UUID
+    study_id: UUID
+    title: str
+    prompt: str
+    success_criteria: str | None = None
+    target_url: str | None = None
+    created_at: str
+
+
+class AoiCreateRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=200)
+    page_url: str | None = None
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(gt=0, le=1)
+    height: float = Field(gt=0, le=1)
+    coordinate_space: Literal["normalized"] = "normalized"
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "AoiCreateRequest":
+        if self.x + self.width > 1:
+            raise ValueError("AOI x + width must be <= 1 for normalized coordinates")
+        if self.y + self.height > 1:
+            raise ValueError("AOI y + height must be <= 1 for normalized coordinates")
+        return self
+
+
+class AoiResponse(BaseModel):
+    aoi_id: UUID
+    study_id: UUID
+    label: str
+    page_url: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    coordinate_space: str = "normalized"
+    created_at: str
 
 
 class SessionCreateRequest(BaseModel):
@@ -54,7 +102,7 @@ class SessionResponse(BaseModel):
     session_id: UUID
     study_id: UUID
     status: Literal["started", "completed"]
-    persistence: Literal["not_implemented"] = "not_implemented"
+    persistence: Literal["not_implemented", "sqlite"] = "sqlite"
 
 
 class EventType(str, Enum):
@@ -92,13 +140,30 @@ class SessionCompleteResponse(BaseModel):
     status: Literal["completed"] = "completed"
     event_count: int = 0
     completed: bool = True
-    analytics: Literal["not_computed"] = "not_computed"
+    analytics: Literal["not_computed", "persisted_report_ready"] = "persisted_report_ready"
+
+
+class AoiMetricResponse(BaseModel):
+    aoi_id: UUID
+    label: str
+    page_url: str | None = None
+    coordinate_space: str = "normalized"
+    gaze_sample_count: int = 0
+    first_gaze_timestamp: str | None = None
+    approximate_dwell_ms: int = 0
+    click_count_inside_aoi: int = 0
+    fixation_count: int = 0
+    fixation_dwell_ms: int = 0
+    first_fixation_timestamp: str | None = None
+    time_to_first_fixation_ms: int | None = None
+    average_fixation_confidence: float | None = None
 
 
 class SessionReportResponse(BaseModel):
     session_id: UUID
     study_id: UUID | None = None
-    report_status: Literal["placeholder"] = "placeholder"
+    analytics_version: str = "fixation_demo_v1"
+    report_status: Literal["placeholder", "persisted"] = "persisted"
     generated_at: str = Field(default_factory=utcnow_iso)
     event_count: int = 0
     event_type_counts: dict[str, int] = Field(default_factory=dict)
@@ -107,13 +172,20 @@ class SessionReportResponse(BaseModel):
     contains_gaze_events: bool = False
     low_confidence_sample_rate: float | None = None
     session_quality_score: float | None = None
+    task_count: int = 0
+    aoi_count: int = 0
+    has_aoi_metrics: bool = False
+    aoi_metrics: list[AoiMetricResponse] = Field(default_factory=list)
     completed: bool = False
     insights: list[str] = Field(default_factory=list)
     metrics: dict[str, Any] = Field(default_factory=dict)
+    privacy_summary: dict[str, Any] = Field(default_factory=dict)
+    fixation_summary: dict[str, Any] = Field(default_factory=dict)
+    quality_summary: dict[str, Any] = Field(default_factory=dict)
     notes: list[str] = Field(
         default_factory=lambda: [
-            "Analytics are not computed yet.",
-            "Storage is process-local demo memory and resets on server restart.",
+            "Analytics are simple deterministic demo metrics.",
+            "Storage uses local SQLite by default and is not production infrastructure.",
         ]
     )
 

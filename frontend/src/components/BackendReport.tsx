@@ -23,6 +23,14 @@ function formatQualityScore(value: number | null) {
   return `${value.toFixed(1)} / 100`
 }
 
+function formatOptionalNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return 'Not available'
+  }
+
+  return String(value)
+}
+
 function getStatusLabel(report: BackendSessionReport) {
   if (report.completed) {
     return 'Stored / completed'
@@ -50,6 +58,83 @@ function renderEventTypeCounts(report: BackendSessionReport) {
   )
 }
 
+function formatDwell(value: number) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)}s`
+  }
+
+  return `${value}ms`
+}
+
+function getQualityPillClass(verdict: BackendSessionReport['quality_summary']['quality_verdict']) {
+  if (verdict === 'pass') {
+    return 'ok'
+  }
+
+  if (verdict === 'fail') {
+    return 'error'
+  }
+
+  return 'pending'
+}
+
+function renderAoiMetrics(report: BackendSessionReport) {
+  if (!report.has_aoi_metrics || report.aoi_metrics.length === 0) {
+    return <p className="muted">No persisted AOIs are available for this session&apos;s study.</p>
+  }
+
+  return (
+    <div className="backend-aoi-metric-list">
+      {report.aoi_metrics.map((metric) => (
+        <article className="backend-aoi-metric" key={metric.aoi_id}>
+          <div className="backend-aoi-metric-heading">
+            <strong>{metric.label}</strong>
+            <span>{metric.coordinate_space}</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Gaze samples</dt>
+              <dd>{metric.gaze_sample_count}</dd>
+            </div>
+            <div>
+              <dt>Dwell estimate</dt>
+              <dd>{formatDwell(metric.approximate_dwell_ms)}</dd>
+            </div>
+            <div>
+              <dt>Clicks inside</dt>
+              <dd>{metric.click_count_inside_aoi}</dd>
+            </div>
+            <div>
+              <dt>Fixations</dt>
+              <dd>{metric.fixation_count}</dd>
+            </div>
+            <div>
+              <dt>Fixation dwell</dt>
+              <dd>{formatDwell(metric.fixation_dwell_ms)}</dd>
+            </div>
+            <div>
+              <dt>First fixation</dt>
+              <dd>{metric.first_fixation_timestamp ?? 'None'}</dd>
+            </div>
+            <div>
+              <dt>TTFF</dt>
+              <dd>
+                {metric.time_to_first_fixation_ms === null
+                  ? 'Not available'
+                  : formatDwell(metric.time_to_first_fixation_ms)}
+              </dd>
+            </div>
+            <div>
+              <dt>First gaze</dt>
+              <dd>{metric.first_gaze_timestamp ?? 'None'}</dd>
+            </div>
+          </dl>
+        </article>
+      ))}
+    </div>
+  )
+}
+
 function getUnavailableMessage(ingestResult: EventIngestResult | null, reportResult: BackendReportResult | null) {
   if (reportResult && !reportResult.ok) {
     return reportResult.message
@@ -70,7 +155,7 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
       <div className="card-header">
         <div>
           <p className="eyebrow">Backend demo report</p>
-          <h3>Process-local telemetry report</h3>
+          <h3>Persisted telemetry report</h3>
         </div>
         <span className={`status-pill ${reportResult?.ok ? 'ok' : 'pending'}`}>
           {isFetchingReport ? 'Loading' : reportResult?.ok ? 'Generated' : 'Demo only'}
@@ -78,7 +163,7 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
       </div>
 
       <p className="privacy-note compact">
-        Backend demo report generated from process-local synthetic telemetry. This is not real gaze tracking or a
+        Backend demo report generated from SQLite-backed synthetic telemetry. This is not real gaze tracking or a
         production analytics job.
       </p>
 
@@ -94,6 +179,10 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
             <div>
               <dt>Session ID</dt>
               <dd className="mono-value">{report.session_id}</dd>
+            </div>
+            <div>
+              <dt>Analytics version</dt>
+              <dd>{report.analytics_version}</dd>
             </div>
             <div>
               <dt>Event count</dt>
@@ -115,11 +204,101 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
               <dt>Session quality score</dt>
               <dd>{formatQualityScore(report.session_quality_score)}</dd>
             </div>
+            <div>
+              <dt>Quality verdict</dt>
+              <dd>
+                <span className={`status-pill ${getQualityPillClass(report.quality_summary.quality_verdict)}`}>
+                  {report.quality_summary.quality_verdict}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>Tasks</dt>
+              <dd>{report.task_count}</dd>
+            </div>
+            <div>
+              <dt>AOIs</dt>
+              <dd>{report.aoi_count}</dd>
+            </div>
           </dl>
 
           <section className="backend-report-section">
             <h4>Event type counts</h4>
             {renderEventTypeCounts(report)}
+          </section>
+
+          <section className="backend-report-section">
+            <h4>Quality summary</h4>
+            <dl className="backend-report-stats compact-grid">
+              <div>
+                <dt>Calibration events</dt>
+                <dd>{report.quality_summary.calibration_event_count}</dd>
+              </div>
+              <div>
+                <dt>Calibration targets</dt>
+                <dd>{formatOptionalNumber(report.quality_summary.calibration_points_completed)}</dd>
+              </div>
+              <div>
+                <dt>Calibration error</dt>
+                <dd>
+                  {report.quality_summary.average_calibration_error_px === null
+                    ? 'Not available'
+                    : `${report.quality_summary.average_calibration_error_px}px`}
+                </dd>
+              </div>
+              <div>
+                <dt>Gaze samples</dt>
+                <dd>{report.quality_summary.gaze_sample_count}</dd>
+              </div>
+              <div>
+                <dt>Avg gaze confidence</dt>
+                <dd>{formatOptionalNumber(report.quality_summary.average_gaze_confidence)}</dd>
+              </div>
+            </dl>
+            <ul className="backend-insight-list">
+              {report.quality_summary.quality_reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="backend-report-section">
+            <h4>Fixation summary</h4>
+            <dl className="backend-report-stats compact-grid">
+              <div>
+                <dt>Fixations</dt>
+                <dd>{report.fixation_summary.fixation_count}</dd>
+              </div>
+              <div>
+                <dt>Total fixation dwell</dt>
+                <dd>{formatDwell(report.fixation_summary.total_fixation_dwell_ms)}</dd>
+              </div>
+              <div>
+                <dt>Average duration</dt>
+                <dd>
+                  {report.fixation_summary.average_fixation_duration_ms === null
+                    ? 'Not available'
+                    : formatDwell(report.fixation_summary.average_fixation_duration_ms)}
+                </dd>
+              </div>
+              <div>
+                <dt>Average confidence</dt>
+                <dd>{formatOptionalNumber(report.fixation_summary.average_fixation_confidence)}</dd>
+              </div>
+              <div>
+                <dt>Algorithm</dt>
+                <dd>{report.fixation_summary.fixation_algorithm}</dd>
+              </div>
+            </dl>
+            <p className="muted compact-text">{report.fixation_summary.fixation_algorithm_notes}</p>
+          </section>
+
+          <section className="backend-report-section">
+            <h4>AOI metrics</h4>
+            {renderAoiMetrics(report)}
+            <p className="muted compact-text">
+              Fixation dwell uses demo-grade normalized-coordinate clustering and remains approximate.
+            </p>
           </section>
 
           <section className="backend-report-section">

@@ -12,37 +12,64 @@ GazeTrack helps product teams run structured UX studies where testers complete t
 
 ## MVP scope
 - Study creation with task prompt + page URL/test page
-- AOI (area of interest) definition on page screenshots/layout
-- Browser calibration and quality/confidence capture
-- Session recording of gaze/click/scroll/task events (no raw video)
-- Report with heatmap, replay timeline, task timing, AOI metrics, and session quality score
+- AOI (area of interest) definition as normalized 0-1 page regions
+- Synthetic calibration step with five target points and generated error/confidence telemetry
+- Session recording of rich synthetic gaze/click/scroll/task events in the current demo (no raw video)
+- Report with task counts, AOI metrics, fixation summary, event counts, privacy summary, and session quality verdict
 
 ## Tech stack
 - Frontend: React + TypeScript + Vite
-- Gaze tracking: WebGazer.js (or equivalent browser-native library)
+- Gaze tracking: planned browser-native integration such as WebGazer.js; current demo uses synthetic telemetry only
 - Backend API: FastAPI (Python)
-- Database: PostgreSQL (Supabase-compatible schema)
+- Database: SQLite for local development, with a PostgreSQL/Supabase-compatible schema direction
 - Analytics jobs: Python background jobs/tasks
 
-## Local setup (placeholder)
-1. Configure `.env` from `.env.example`.
-2. Start PostgreSQL/Supabase local instance.
-3. Run backend server.
-4. Run frontend dev server.
-5. Open app and run a sample study.
+## Local setup
+1. Configure `.env` from `.env.example`. SQLite is used by default:
 
-(Concrete commands will be added as services are scaffolded.)
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Install and run the FastAPI backend:
+
+   ```bash
+   cd backend
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   PYTHONPATH=. uvicorn app.main:app --reload
+   ```
+
+3. In a second terminal, install and run the Vite frontend:
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+4. Open `http://localhost:5173`, complete the synthetic demo session, and fetch the backend report.
+
+The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETRACK_DATABASE_URL` or `DATABASE_URL` is set. No Docker, Postgres, or Supabase instance is required for the current local demo.
 
 ## Demo flow
-1. Researcher creates study and adds page + task.
-2. Researcher marks AOIs (hero CTA, pricing, nav, etc.).
-3. Tester calibrates webcam tracking in browser.
-4. Tester performs task while gaze + event telemetry is captured.
-5. Researcher reviews heatmap, replay, quality score, and task metrics.
+1. Backend initializes a default synthetic study with a task and demo AOIs.
+2. Frontend displays the persisted task/AOI setup, then runs a synthetic-only calibration step.
+3. Rich synthetic calibration/gaze/click/scroll/task events are ingested into SQLite.
+4. Backend report generation computes event counts, task/AOI counts, AOI gaze/click metrics, demo-grade fixations, privacy summary, and quality summary.
+5. Frontend renders the local demo report and the persisted backend report.
+
+AOIs are normalized rectangles where `x` and `y` are top-left coordinates and `width`/`height` are dimensions from 0 to 1. Current AOIs are demo placeholders; screenshot uploads, DOM-derived AOIs, and webcam gaze estimation are future milestones. AOI dwell still includes the existing bounded-gap raw sample estimate, and reports now add fixation-derived dwell from a simple deterministic normalized-coordinate clustering algorithm. Fixation dwell is more meaningful than raw sample dwell, but it is still approximate and not medical-grade eye tracking or production fixation analytics.
+
+The current demo generator can run `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes. These modes exist to exercise report quality verdicts and are not real tracker output.
+
+The current fixation detector is `simple_dispersion_v1`: accepted gaze samples are normalized to 0-1 coordinates, grouped when nearby in space and time, and promoted to a fixation only when the candidate has enough samples and duration. Calibration/session quality is a heuristic verdict (`pass`, `warn`, or `fail`) based on accepted gaze events, confidence, calibration errors when present, and whether fixations can be detected. WebGazer/browser webcam integration remains a future milestone, and the current calibration UI does not request camera permission.
 
 ## Privacy principles
 - Process webcam frames locally in browser where possible.
 - Store gaze/event telemetry only; do **not** store raw webcam video.
+- Do **not** store webcam images, frames, screenshots, blobs, or base64 media payloads.
 - Make calibration confidence and tracking quality explicit in reports.
 - Communicate uncertainty; avoid claims of perfect accuracy.
 - Use least-privilege data access and retention controls.

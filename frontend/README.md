@@ -26,7 +26,7 @@ npm run build
 npm run test
 ```
 
-Tests currently cover the synthetic mock event, event contract adapter, demo report utilities, and synthetic visualization helpers.
+Tests currently cover the synthetic telemetry generator, event contract adapter, backend ingest client, demo report utilities, backend report rendering, and synthetic visualization helpers.
 
 ## Backend URL
 
@@ -36,7 +36,7 @@ The backend status card calls `GET {VITE_API_BASE_URL}/health`. Completing the s
 POST {VITE_API_BASE_URL}/api/v1/sessions/{session_id}/events
 ```
 
-This ingest call uses synthetic events only and targets the backend placeholder validation route. The frontend still generates the local demo report from local state regardless of whether ingest succeeds.
+This ingest call uses synthetic events only and targets the backend telemetry validation route. The demo session includes a synthetic calibration step with five target dots, generated target/observed/error payload fields, clustered gaze samples, scroll/click events, and task start/complete events. The frontend still generates the local demo report from local state regardless of whether ingest succeeds.
 
 After ingest succeeds, the frontend also attempts to fetch a backend-generated demo report from:
 
@@ -44,7 +44,7 @@ After ingest succeeds, the frontend also attempts to fetch a backend-generated d
 GET {VITE_API_BASE_URL}/api/v1/sessions/{session_id}/report
 ```
 
-The backend report panel is labeled as a demo report and is generated from process-local demo telemetry only. It is rendered separately from the local demo report.
+The backend report panel is labeled as a demo report and is generated from SQLite-backed persisted demo telemetry. It is rendered separately from the local demo report.
 
 ## Synthetic Report Visuals
 
@@ -55,6 +55,8 @@ After completing the mock session, the local report renders synthetic visual pre
 - Demo-derived AOI attention breakdown
 
 These visuals are generated from mock telemetry positions and demo AOI boxes only. They are not webcam tracking, WebGazer output, raw media processing, or production heatmap analytics.
+
+The synthetic generator supports `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes so the backend report can demonstrate pass/warn/fail verdicts. No mode requests camera permission or stores webcam video, frames, images, blobs, or base64 media.
 
 Set `VITE_API_BASE_URL` in a local `.env` file if the FastAPI backend is not running on the default URL:
 

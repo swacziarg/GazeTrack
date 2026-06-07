@@ -52,7 +52,7 @@ export function DemoReport({ report, events, aois, ingestResult, isIngestingEven
       <section className="card ingest-status-panel" aria-live="polite">
         <div className="card-header">
           <div>
-            <p className="eyebrow">Backend placeholder ingest</p>
+            <p className="eyebrow">Backend telemetry ingest</p>
             <h3>Ingest status</h3>
           </div>
           <span className={`status-pill ${getIngestStatusClass(ingestResult, isIngestingEvents)}`}>
@@ -77,7 +77,7 @@ export function DemoReport({ report, events, aois, ingestResult, isIngestingEven
 
         <p>
           {isIngestingEvents
-            ? 'Sending synthetic events to the backend placeholder ingest endpoint.'
+            ? 'Sending synthetic events to the backend telemetry ingest endpoint.'
             : response?.note ?? 'Synthetic events have not been sent yet.'}
         </p>
         {ingestResult ? <p className="muted">POST {ingestResult.apiBaseUrl}/api/v1/sessions/:session_id/events</p> : null}

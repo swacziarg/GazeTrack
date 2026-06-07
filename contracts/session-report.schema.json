@@ -3,7 +3,24 @@
   "$id": "https://gazetrack.local/contracts/session-report.schema.json",
   "title": "SessionReport",
   "type": "object",
-  "required": ["session_id", "report_status", "generated_at", "metrics", "notes"],
+  "required": [
+    "session_id",
+    "analytics_version",
+    "report_status",
+    "generated_at",
+    "event_count",
+    "event_type_counts",
+    "contains_gaze_events",
+    "task_count",
+    "aoi_count",
+    "has_aoi_metrics",
+    "aoi_metrics",
+    "fixation_summary",
+    "quality_summary",
+    "privacy_summary",
+    "metrics",
+    "notes"
+  ],
   "properties": {
     "session_id": {
       "type": "string",
@@ -13,16 +30,85 @@
       "type": ["string", "null"],
       "format": "uuid"
     },
+    "analytics_version": {
+      "type": "string",
+      "const": "fixation_demo_v1"
+    },
     "report_status": {
       "type": "string",
-      "enum": ["placeholder"]
+      "enum": ["placeholder", "persisted"]
     },
     "generated_at": {
       "type": "string",
       "format": "date-time"
     },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_type_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "first_event_timestamp": {
+      "type": ["string", "null"]
+    },
+    "last_event_timestamp": {
+      "type": ["string", "null"]
+    },
+    "contains_gaze_events": {
+      "type": "boolean"
+    },
+    "low_confidence_sample_rate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "session_quality_score": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "aoi_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "has_aoi_metrics": {
+      "type": "boolean"
+    },
+    "aoi_metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/aoi_metric"
+      }
+    },
+    "completed": {
+      "type": "boolean"
+    },
+    "insights": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "metrics": {
       "type": "object"
+    },
+    "privacy_summary": {
+      "type": "object"
+    },
+    "fixation_summary": {
+      "$ref": "#/$defs/fixation_summary"
+    },
+    "quality_summary": {
+      "$ref": "#/$defs/quality_summary"
     },
     "notes": {
       "type": "array",
@@ -31,5 +117,177 @@
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "aoi_metric": {
+      "type": "object",
+      "required": [
+        "aoi_id",
+        "label",
+        "coordinate_space",
+        "gaze_sample_count",
+        "approximate_dwell_ms",
+        "click_count_inside_aoi",
+        "fixation_count",
+        "fixation_dwell_ms"
+      ],
+      "properties": {
+        "aoi_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "page_url": {
+          "type": ["string", "null"]
+        },
+        "coordinate_space": {
+          "type": "string"
+        },
+        "gaze_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "first_gaze_timestamp": {
+          "type": ["string", "null"]
+        },
+        "approximate_dwell_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "click_count_inside_aoi": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixation_dwell_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "first_fixation_timestamp": {
+          "type": ["string", "null"]
+        },
+        "time_to_first_fixation_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "average_fixation_confidence": {
+          "type": ["number", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "fixation_summary": {
+      "type": "object",
+      "required": [
+        "fixation_count",
+        "total_fixation_dwell_ms",
+        "average_fixation_duration_ms",
+        "fixation_algorithm",
+        "fixation_algorithm_notes"
+      ],
+      "properties": {
+        "fixation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_fixation_dwell_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "average_fixation_duration_ms": {
+          "type": ["number", "null"]
+        },
+        "average_fixation_confidence": {
+          "type": "number"
+        },
+        "fixation_algorithm": {
+          "type": "string"
+        },
+        "fixation_algorithm_notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "quality_summary": {
+      "type": "object",
+      "required": [
+        "score",
+        "low_confidence_threshold",
+        "low_confidence_sample_rate",
+        "gaze_sample_count",
+        "average_gaze_confidence",
+        "calibration_event_count",
+        "average_calibration_error_px",
+        "quality_event_count",
+        "sample_integrity_basis_event_count",
+        "sample_completeness_score",
+        "quality_verdict",
+        "quality_reasons"
+      ],
+      "properties": {
+        "score": {
+          "type": ["number", "null"]
+        },
+        "low_confidence_threshold": {
+          "type": "number"
+        },
+        "low_confidence_sample_rate": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "gaze_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "average_gaze_confidence": {
+          "type": ["number", "null"]
+        },
+        "calibration_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calibration_points_completed": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "average_calibration_error_px": {
+          "type": ["number", "null"]
+        },
+        "average_calibration_error_normalized": {
+          "type": ["number", "null"]
+        },
+        "quality_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_integrity_basis_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_completeness_score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "quality_verdict": {
+          "type": "string",
+          "enum": ["pass", "warn", "fail"]
+        },
+        "quality_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 }

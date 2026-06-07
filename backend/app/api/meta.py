@@ -11,9 +11,9 @@ def get_meta() -> MetaResponse:
         implemented_capabilities=[
             "health",
             "meta",
-            "study_placeholders",
-            "session_placeholders",
+            "sqlite_study_persistence",
+            "sqlite_session_persistence",
             "event_ingest_validation",
-            "placeholder_reports",
+            "persisted_demo_reports",
         ]
     )

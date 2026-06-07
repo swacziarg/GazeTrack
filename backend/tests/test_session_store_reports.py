@@ -25,7 +25,7 @@ def test_ingesting_shared_fixture_stores_accepted_events() -> None:
     assert body["accepted_count"] == len(fixture["events"])  # type: ignore[arg-type]
     assert body["rejected_count"] == 0
     assert body["stored_count_for_session"] == len(fixture["events"])  # type: ignore[arg-type]
-    assert "process-local demo memory" in body["note"]
+    assert "local SQLite persistence" in body["note"]
 
 
 def test_report_after_ingest_returns_matching_event_count() -> None:
@@ -40,14 +40,25 @@ def test_report_after_ingest_returns_matching_event_count() -> None:
     assert report_response.status_code == 200
     report = report_response.json()
     assert report["event_count"] == len(fixture["events"])  # type: ignore[arg-type]
-    assert report["event_type_counts"]["gaze"] == 1
+    assert report["event_type_counts"]["gaze"] == 8
     assert report["first_event_timestamp"] == "2026-01-15T17:30:00.000Z"
-    assert report["last_event_timestamp"] == "2026-01-15T17:30:22.800Z"
+    assert report["last_event_timestamp"] == "2026-01-15T17:30:05.000Z"
     assert report["contains_gaze_events"] is True
     assert report["low_confidence_sample_rate"] == 0
     assert report["session_quality_score"] > 0
-    assert "Backend demo report generated from in-memory synthetic telemetry." in report["insights"]
+    assert report["analytics_version"] == "fixation_demo_v1"
+    assert report["fixation_summary"]["fixation_count"] > 0
+    assert report["fixation_summary"]["fixation_algorithm"] == "simple_dispersion_v1"
+    assert "Backend demo report generated from persisted SQLite telemetry." in report["insights"]
     assert "No raw webcam media is stored by GazeTrack." in report["insights"]
+    assert report["metrics"]["click_count"] == 1
+    assert report["metrics"]["scroll_count"] == 1
+    assert report["metrics"]["calibration_event_count"] == 6
+    assert report["metrics"]["task_event_count"] == 2
+    assert report["privacy_summary"]["raw_media_stored"] is False
+    assert report["quality_summary"]["calibration_event_count"] == 6
+    assert report["quality_summary"]["calibration_points_completed"] == 5
+    assert report["quality_summary"]["quality_verdict"] == "pass"
 
 
 def test_report_before_ingest_returns_safe_empty_report() -> None:
@@ -64,6 +75,8 @@ def test_report_before_ingest_returns_safe_empty_report() -> None:
     assert body["contains_gaze_events"] is False
     assert body["low_confidence_sample_rate"] is None
     assert body["session_quality_score"] is None
+    assert body["fixation_summary"]["fixation_count"] == 0
+    assert body["quality_summary"]["quality_verdict"] == "fail"
     assert "No telemetry events have been ingested for this session yet." in body["insights"]
     assert "No raw webcam media is stored by GazeTrack." in body["insights"]
 

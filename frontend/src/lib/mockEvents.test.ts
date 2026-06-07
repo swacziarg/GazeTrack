@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateMockStudyEvents, type MockEventType } from './mockEvents'
+import { calibrationTargets, generateMockStudyEvents, type MockEventType } from './mockEvents'
 
 const requiredEventTypes: MockEventType[] = [
   'task_started',
@@ -15,18 +15,12 @@ const forbiddenMediaKeys = ['video', 'frame', 'image', 'base64', 'blob', 'webcam
 describe('generateMockStudyEvents', () => {
   it('returns deterministic synthetic events for the demo session', () => {
     const events = generateMockStudyEvents()
+    const repeatedEvents = generateMockStudyEvents()
 
-    expect(events.length).toBeGreaterThan(0)
-    expect(events.map((event) => event.id)).toEqual([
-      'demo-event-001',
-      'demo-event-002',
-      'demo-event-003',
-      'demo-event-004',
-      'demo-event-005',
-      'demo-event-006',
-      'demo-event-007',
-      'demo-event-008',
-    ])
+    expect(events).toEqual(repeatedEvents)
+    expect(events.length).toBeGreaterThanOrEqual(30)
+    expect(events.length).toBeLessThanOrEqual(80)
+    expect(events[0].id).toBe('demo-event-001')
   })
 
   it('includes the required event types', () => {
@@ -52,7 +46,7 @@ describe('generateMockStudyEvents', () => {
   it('includes coordinate, viewport, and confidence metadata for gaze samples', () => {
     const gazeEvents = generateMockStudyEvents().filter((event) => event.event_type === 'gaze_sample_recorded')
 
-    expect(gazeEvents.length).toBeGreaterThan(0)
+    expect(gazeEvents.length).toBeGreaterThanOrEqual(30)
 
     for (const event of gazeEvents) {
       expect(typeof event.payload.x).toBe('number')
@@ -60,7 +54,44 @@ describe('generateMockStudyEvents', () => {
       expect(typeof event.payload.viewport_width).toBe('number')
       expect(typeof event.payload.viewport_height).toBe('number')
       expect(typeof event.payload.confidence).toBe('number')
+      expect(event.payload.x).toBeGreaterThanOrEqual(0)
+      expect(event.payload.x).toBeLessThanOrEqual(1)
+      expect(event.payload.y).toBeGreaterThanOrEqual(0)
+      expect(event.payload.y).toBeLessThanOrEqual(1)
     }
+  })
+
+  it('includes synthetic calibration target, observed, error, and index fields', () => {
+    const calibrationEvents = generateMockStudyEvents().filter(
+      (event) => event.event_type === 'calibration_point_recorded',
+    )
+
+    expect(calibrationEvents).toHaveLength(calibrationTargets.length)
+    expect(calibrationEvents[0].payload).toEqual(
+      expect.objectContaining({
+        target_point: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+        observed_point: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+        error_px: expect.any(Number),
+        error_normalized: expect.any(Number),
+        calibration_step: 1,
+        calibration_point_count: calibrationTargets.length,
+      }),
+    )
+  })
+
+  it('supports quality modes for low confidence, bad calibration, and no gaze', () => {
+    const lowConfidenceGaze = generateMockStudyEvents('low_confidence').filter(
+      (event) => event.event_type === 'gaze_sample_recorded',
+    )
+    const badCalibrationSummary = generateMockStudyEvents('bad_calibration').find(
+      (event) => event.event_type === 'calibration_completed',
+    )
+    const noGazeEvents = generateMockStudyEvents('no_gaze')
+
+    expect(lowConfidenceGaze.every((event) => (event.payload.confidence ?? 1) < 0.5)).toBe(true)
+    expect(badCalibrationSummary?.payload.calibration_error_px).toBeGreaterThan(100)
+    expect(noGazeEvents.some((event) => event.event_type === 'gaze_sample_recorded')).toBe(false)
+    expect(noGazeEvents.some((event) => event.event_type === 'task_completed')).toBe(true)
   })
 
   it('does not include raw media-like fields in event payloads', () => {

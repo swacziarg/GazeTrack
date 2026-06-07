@@ -12,55 +12,212 @@
     },
     {
       "event_type": "calibration",
-      "timestamp": "2026-01-15T17:30:02.400Z",
+      "timestamp": "2026-01-15T17:30:00.500Z",
+      "payload": {
+        "label": "Synthetic calibration target 1",
+        "synthetic": true,
+        "target_point": { "x": 0.5, "y": 0.5 },
+        "observed_point": { "x": 0.51, "y": 0.49 },
+        "error_px": 18,
+        "error_normalized": 0.02,
+        "confidence": 0.9,
+        "calibration_step": 1,
+        "calibration_point_count": 5
+      }
+    },
+    {
+      "event_type": "calibration",
+      "timestamp": "2026-01-15T17:30:00.900Z",
+      "payload": {
+        "label": "Synthetic calibration target 2",
+        "synthetic": true,
+        "target_point": { "x": 0.15, "y": 0.15 },
+        "observed_point": { "x": 0.138, "y": 0.162 },
+        "error_px": 22,
+        "error_normalized": 0.024,
+        "confidence": 0.9,
+        "calibration_step": 2,
+        "calibration_point_count": 5
+      }
+    },
+    {
+      "event_type": "calibration",
+      "timestamp": "2026-01-15T17:30:01.300Z",
+      "payload": {
+        "label": "Synthetic calibration target 3",
+        "synthetic": true,
+        "target_point": { "x": 0.85, "y": 0.15 },
+        "observed_point": { "x": 0.864, "y": 0.136 },
+        "error_px": 26,
+        "error_normalized": 0.029,
+        "confidence": 0.9,
+        "calibration_step": 3,
+        "calibration_point_count": 5
+      }
+    },
+    {
+      "event_type": "calibration",
+      "timestamp": "2026-01-15T17:30:01.700Z",
+      "payload": {
+        "label": "Synthetic calibration target 4",
+        "synthetic": true,
+        "target_point": { "x": 0.15, "y": 0.85 },
+        "observed_point": { "x": 0.133, "y": 0.867 },
+        "error_px": 30,
+        "error_normalized": 0.033,
+        "confidence": 0.9,
+        "calibration_step": 4,
+        "calibration_point_count": 5
+      }
+    },
+    {
+      "event_type": "calibration",
+      "timestamp": "2026-01-15T17:30:02.100Z",
+      "payload": {
+        "label": "Synthetic calibration target 5",
+        "synthetic": true,
+        "target_point": { "x": 0.85, "y": 0.85 },
+        "observed_point": { "x": 0.869, "y": 0.831 },
+        "error_px": 34,
+        "error_normalized": 0.038,
+        "confidence": 0.9,
+        "calibration_step": 5,
+        "calibration_point_count": 5
+      }
+    },
+    {
+      "event_type": "calibration",
+      "timestamp": "2026-01-15T17:30:02.600Z",
       "payload": {
         "label": "Synthetic demo calibration completed",
         "synthetic": true,
-        "calibration_error_px": 42,
-        "confidence": 0.86
+        "calibration_error_px": 26,
+        "calibration_error_normalized": 0.029,
+        "confidence": 0.9,
+        "calibration_points_completed": 5,
+        "calibration_point_count": 5
       }
     },
     {
       "event_type": "gaze",
-      "timestamp": "2026-01-15T17:30:04.100Z",
+      "timestamp": "2026-01-15T17:30:03.400Z",
       "payload": {
-        "label": "Synthetic demo gaze sample on pricing navigation",
+        "label": "Synthetic gaze sample on Primary CTA",
         "synthetic": true,
-        "aoi": "Pricing navigation link",
-        "x": 672,
-        "y": 96,
-        "viewport_width": 1440,
-        "viewport_height": 900,
-        "confidence": 0.82
+        "aoi": "Primary CTA",
+        "x": 0.608,
+        "y": 0.432,
+        "confidence": 0.9
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.480Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.614,
+        "y": 0.444,
+        "confidence": 0.91
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.560Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.624,
+        "y": 0.437,
+        "confidence": 0.92
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.640Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.63,
+        "y": 0.446,
+        "confidence": 0.89
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.720Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.622,
+        "y": 0.449,
+        "confidence": 0.9
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.800Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.611,
+        "y": 0.442,
+        "confidence": 0.91
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.880Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.628,
+        "y": 0.433,
+        "confidence": 0.92
+      }
+    },
+    {
+      "event_type": "gaze",
+      "timestamp": "2026-01-15T17:30:03.960Z",
+      "payload": {
+        "label": "Synthetic gaze sample on Primary CTA",
+        "synthetic": true,
+        "aoi": "Primary CTA",
+        "x": 0.617,
+        "y": 0.43,
+        "confidence": 0.9
       }
     },
     {
       "event_type": "scroll",
-      "timestamp": "2026-01-15T17:30:07.300Z",
+      "timestamp": "2026-01-15T17:30:04.200Z",
       "payload": {
-        "label": "Synthetic demo scroll toward plans",
+        "label": "Synthetic demo scroll toward pricing preview",
         "synthetic": true,
-        "scroll_depth_percent": 48,
-        "confidence": 0.8
+        "scroll_depth_percent": 48
       }
     },
     {
       "event_type": "click",
-      "timestamp": "2026-01-15T17:30:17.800Z",
+      "timestamp": "2026-01-15T17:30:04.600Z",
       "payload": {
-        "label": "Synthetic demo click on checkout CTA",
+        "label": "Synthetic demo click on primary CTA",
         "synthetic": true,
-        "aoi": "Hero CTA",
-        "x": 862,
-        "y": 404,
-        "viewport_width": 1440,
-        "viewport_height": 900,
-        "confidence": 0.84
+        "aoi": "Primary CTA",
+        "x": 0.62,
+        "y": 0.44,
+        "confidence": 0.9
       }
     },
     {
       "event_type": "task_complete",
-      "timestamp": "2026-01-15T17:30:22.800Z",
+      "timestamp": "2026-01-15T17:30:05.000Z",
       "payload": {
         "label": "Synthetic demo task completed",
         "synthetic": true,

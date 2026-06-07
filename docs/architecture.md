@@ -5,43 +5,61 @@ GazeTrack is a full-stack web system where browser clients capture gaze + intera
 
 ## Frontend/backend/database boundaries
 - **Frontend (React/TS):** Study setup UI, calibration UI, telemetry capture, report rendering.
-- **Backend (FastAPI):** Auth-ready API surface, study/session/event endpoints, report orchestration.
-- **Database (PostgreSQL/Supabase):** Core entities, append-only event tables, derived metrics/report tables.
+- **Backend (FastAPI):** Auth-ready API surface, study/task/AOI/session/event endpoints, report orchestration.
+- **Database:** SQLite for current local development; schema is shaped for a later PostgreSQL/Supabase migration with core entities, task/AOI setup tables, append-only event tables, and persisted report payloads.
 
 ## Event ingestion flow
 1. Frontend opens/creates tester session.
 2. Client buffers gaze and interaction events with timestamps/confidence.
 3. Batched events sent to ingestion endpoint.
-4. Backend validates schema/session linkage and writes to event tables.
-5. Analytics job queue marks affected session/report for recomputation.
+4. Backend validates schema/session linkage and writes accepted privacy-safe events to SQLite.
+5. Report generation reads persisted events plus study tasks/AOIs and writes a report payload row.
+
+## Study setup flow
+1. A study contains task prompts and AOI rectangles.
+2. Tasks capture `title`, `prompt`, optional `success_criteria`, and optional `target_url`.
+3. AOIs capture `label`, optional `page_url`, normalized `x`, `y`, `width`, `height`, and `coordinate_space`.
+4. The default synthetic demo study is seeded with one task and five placeholder AOIs when no setup exists.
+
+AOI coordinates are normalized 0-1 rectangles. They are currently demo placeholders; screenshot uploads and DOM-based AOI detection are not part of this milestone.
 
 ## Gaze tracking flow
-1. Browser initializes WebGazer.js (or equivalent).
-2. Gaze samples captured at periodic intervals with confidence + viewport coordinates.
-3. Samples transformed into normalized page coordinates.
-4. Stored as gaze telemetry (no raw frames/video persisted).
+1. Current demo emits rich synthetic gaze samples clustered around known AOIs, with either normalized `x`/`y` or pixel coordinates plus viewport dimensions.
+2. Backend report helpers normalize compatible event points into 0-1 coordinates.
+3. Future browser tracker work can initialize WebGazer.js or an equivalent browser-native estimator.
+4. Stored telemetry must remain coordinates, confidence, events, and quality metadata only; no raw frames/video are persisted.
 
 ## Calibration flow
-1. Present calibration targets across viewport.
-2. Capture prediction error metrics per point.
-3. Compute aggregate calibration error + confidence bands.
-4. Store calibration metrics and gate session start if below threshold.
+1. Current frontend renders five synthetic calibration target dots.
+2. The demo generator emits target/observed/error telemetry per point and an aggregate calibration summary.
+3. Backend quality helpers read calibration error + confidence fields for report verdicts.
+4. Future tracker work can replace this with real browser-native calibration while keeping raw frames/video out of persistence.
 
 ## Analytics/reporting flow
-1. Derive fixations from raw gaze samples.
-2. Join fixations to AOIs and task events.
-3. Compute per-session/per-AOI metrics.
-4. Compute session quality score.
-5. Materialize report payload for dashboard rendering.
+1. Read accepted telemetry events for a session.
+2. Normalize compatible gaze/click payload coordinates into 0-1 page coordinates.
+3. Detect demo-grade fixation candidates from accepted gaze samples.
+4. Join gaze/click event points and fixation centroids to AOI rectangles.
+5. Compute per-session/per-AOI demo metrics and heuristic quality verdicts.
+6. Materialize report payload for dashboard rendering.
+
+Current local reports compute deterministic event counts, gaze presence, low-confidence gaze rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze sample counts, AOI click counts, approximate raw-sample AOI dwell, fixation-derived AOI dwell, report-level fixation summary, privacy summary, and a heuristic quality summary from stored telemetry.
+
+The fixation detector is `simple_dispersion_v1`: accepted gaze samples with normalized coordinates are sorted by timestamp, clustered when consecutive samples are close in space and time, and promoted to a fixation only after minimum sample-count and duration thresholds. This is a deterministic demo pipeline for future browser gaze input, not medical-grade eye tracking or a claim of perfect gaze accuracy.
+
+AOI dwell still includes the earlier bounded-gap raw-sample approximation from gaze timestamps inside a region. Fixation-derived dwell is a stronger attention signal than raw sample dwell, but remains approximate because the current input is synthetic-compatible telemetry rather than calibrated production webcam tracking.
+
+Calibration/session quality is also heuristic. The backend summarizes calibration event count, calibration points completed when provided, average calibration error, average gaze confidence, low-confidence rate, sample completeness, and a `pass`/`warn`/`fail` verdict with reasons. The synthetic generator exposes `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` modes to exercise those verdicts without camera access.
 
 ## Privacy model
 - Webcam image processing local to browser where feasible.
 - Persist telemetry only (coordinates, confidence, events, quality metadata).
+- Reject raw webcam/video/image/frame/base64/blob payloads before persistence.
 - Avoid sensitive fields unless necessary for study operation.
 - Plan for retention/deletion controls and auditability.
 
 ## Deployment model
-- Local-first dev setup for frontend + backend + Postgres.
+- Local-first dev setup for frontend + backend + SQLite.
 - Future deploy path: frontend static hosting + FastAPI service + managed Postgres/Supabase.
 - Optional background worker process for periodic analytics recompute.
 

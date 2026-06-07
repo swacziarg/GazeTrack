@@ -8,17 +8,12 @@ describe('event contract adapter', () => {
   it('maps frontend synthetic event types to backend placeholder event types', () => {
     const events = generateMockStudyEvents()
     const payload = toBackendEventBatchPayload(events)
+    const backendEventTypes = payload.events.map((event) => event.event_type)
 
-    expect(payload.events.map((event) => event.event_type)).toEqual([
-      'task_start',
-      'calibration',
-      'gaze',
-      'scroll',
-      'gaze',
-      'gaze',
-      'click',
-      'task_complete',
-    ])
+    expect(backendEventTypes[0]).toBe('task_start')
+    expect(backendEventTypes).toEqual(expect.arrayContaining(['calibration', 'gaze', 'scroll', 'click', 'task_complete']))
+    expect(backendEventTypes.filter((eventType) => eventType === 'calibration').length).toBeGreaterThanOrEqual(5)
+    expect(backendEventTypes.filter((eventType) => eventType === 'gaze').length).toBeGreaterThanOrEqual(30)
   })
 
   it('preserves timestamp and payload for synthetic events', () => {

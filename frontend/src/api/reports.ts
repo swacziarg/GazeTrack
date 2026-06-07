@@ -1,7 +1,50 @@
+export type BackendAoiMetric = {
+  aoi_id: string
+  label: string
+  page_url: string | null
+  coordinate_space: string
+  gaze_sample_count: number
+  first_gaze_timestamp: string | null
+  approximate_dwell_ms: number
+  click_count_inside_aoi: number
+  fixation_count: number
+  fixation_dwell_ms: number
+  first_fixation_timestamp: string | null
+  time_to_first_fixation_ms: number | null
+  average_fixation_confidence: number | null
+}
+
+export type BackendFixationSummary = {
+  fixation_count: number
+  total_fixation_dwell_ms: number
+  average_fixation_duration_ms: number | null
+  average_fixation_confidence?: number
+  fixation_algorithm: string
+  fixation_algorithm_notes: string
+}
+
+export type BackendQualitySummary = {
+  score: number | null
+  low_confidence_threshold: number
+  low_confidence_sample_rate: number | null
+  gaze_sample_count: number
+  average_gaze_confidence: number | null
+  calibration_event_count: number
+  calibration_points_completed: number | null
+  average_calibration_error_px: number | null
+  average_calibration_error_normalized: number | null
+  quality_event_count: number
+  sample_integrity_basis_event_count: number
+  sample_completeness_score: number | null
+  quality_verdict: 'pass' | 'warn' | 'fail'
+  quality_reasons: string[]
+}
+
 export type BackendSessionReport = {
   session_id: string
   study_id: string | null
-  report_status: 'placeholder'
+  analytics_version: string
+  report_status: 'placeholder' | 'persisted'
   generated_at: string
   event_count: number
   event_type_counts: Record<string, number>
@@ -10,9 +53,16 @@ export type BackendSessionReport = {
   contains_gaze_events: boolean
   low_confidence_sample_rate: number | null
   session_quality_score: number | null
+  task_count: number
+  aoi_count: number
+  has_aoi_metrics: boolean
+  aoi_metrics: BackendAoiMetric[]
   completed: boolean
   insights: string[]
   metrics: Record<string, unknown>
+  privacy_summary: Record<string, unknown>
+  fixation_summary: BackendFixationSummary
+  quality_summary: BackendQualitySummary
   notes: string[]
 }
 
@@ -70,7 +120,7 @@ export async function fetchSessionReport(sessionId: string): Promise<BackendRepo
       apiBaseUrl,
       statusCode: response.status,
       report: (await response.json()) as BackendSessionReport,
-      message: 'Backend demo report generated from process-local telemetry.',
+      message: 'Backend demo report generated from persisted telemetry.',
     }
   } catch {
     return {
