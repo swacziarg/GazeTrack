@@ -213,13 +213,60 @@ dd {
 .metric-grid,
 .placeholder-grid,
 .insight-grid,
-.study-grid {
+.study-grid,
+.demo-guide-grid {
   display: grid;
   gap: 1rem;
 }
 
 .flow-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.demo-guide-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.demo-guide-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.demo-guide-step {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  border: 1px solid #e1e8f1;
+  border-radius: 6px;
+  padding: 0.85rem;
+  background: #f8fafc;
+}
+
+.demo-guide-step h3,
+.demo-guide-report h3 {
+  color: #172033;
+  font-size: 1rem;
+}
+
+.demo-guide-step p,
+.demo-guide-report li {
+  color: #405166;
+}
+
+.demo-guide-report {
+  display: grid;
+  gap: 0.55rem;
+  border: 1px solid #c8e3dd;
+  border-radius: 6px;
+  padding: 0.85rem;
+  background: #f0faf8;
+}
+
+.demo-guide-report ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.2rem;
 }
 
 .flow-card {
@@ -1242,6 +1289,7 @@ dd {
   }
 
   .flow-grid,
+  .demo-guide-grid,
   .metric-grid,
   .insight-grid,
   .placeholder-grid,
@@ -1275,6 +1323,7 @@ dd {
   }
 
   .flow-grid,
+  .demo-guide-grid,
   .metric-grid,
   .insight-grid,
   .placeholder-grid,

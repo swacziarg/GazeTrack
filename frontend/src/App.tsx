@@ -10,6 +10,7 @@ import {
 } from './api/studies'
 import { BackendReport } from './components/BackendReport'
 import { BrowserGazeStatusPanel } from './components/BrowserGazeStatusPanel'
+import { DemoGuide } from './components/DemoGuide'
 import { DemoReport } from './components/DemoReport'
 import { EventLog } from './components/EventLog'
 import { FlowCard } from './components/FlowCard'
@@ -443,11 +444,15 @@ function App() {
       ) : null}
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">Synthetic demo frontend shell</p>
+          <p className="eyebrow">Privacy-first UX telemetry demo</p>
           <h1>GazeTrack</h1>
-          <p className="subtitle">Synthetic telemetry demo pipeline for task-based website UX testing.</p>
+          <p className="subtitle">
+            Task-based gaze analytics pipeline with deterministic synthetic telemetry by default and an opt-in
+            experimental browser gaze mode for local research.
+          </p>
           <p className="privacy-note">
-            GazeTrack is designed to store gaze/event telemetry, not webcam video.
+            Synthetic mode is the recommended demo path. GazeTrack stores privacy-safe telemetry only, not webcam video,
+            frames, screenshots, image blobs, or base64 media.
           </p>
           <button type="button" className="primary-button" onClick={openDemoStudy}>
             Open demo study
@@ -455,6 +460,8 @@ function App() {
         </div>
         <StatusCard health={backendHealth} isLoading={isCheckingHealth} />
       </section>
+
+      <DemoGuide />
 
       <section className="section-block">
         <div className="section-heading">
@@ -648,6 +655,8 @@ function App() {
             report={demoReport}
             events={trackerEvents}
             aois={configuredDemoStudy.aois}
+            telemetrySourceLabel={selectedTrackerOption.label}
+            telemetrySourceIsExperimental={trackerId === 'webgazer'}
             ingestResult={ingestResult}
             isIngestingEvents={isIngestingEvents}
           />

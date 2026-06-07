@@ -11,6 +11,8 @@ type DemoReportProps = {
   report: DemoReportData
   events: MockStudyEvent[]
   aois: AreaOfInterest[]
+  telemetrySourceLabel: string
+  telemetrySourceIsExperimental: boolean
   ingestResult: EventIngestResult | null
   isIngestingEvents: boolean
 }
@@ -39,8 +41,19 @@ function getIngestStatusClass(ingestResult: EventIngestResult | null, isIngestin
   return ingestResult.ok ? 'ok' : 'error'
 }
 
-export function DemoReport({ report, events, aois, ingestResult, isIngestingEvents }: DemoReportProps) {
+export function DemoReport({
+  report,
+  events,
+  aois,
+  telemetrySourceLabel,
+  telemetrySourceIsExperimental,
+  ingestResult,
+  isIngestingEvents,
+}: DemoReportProps) {
   const response = ingestResult?.response
+  const sourceDescription = telemetrySourceIsExperimental
+    ? 'experimental browser gaze telemetry'
+    : 'deterministic synthetic telemetry'
 
   return (
     <article className="report-panel">
@@ -77,8 +90,8 @@ export function DemoReport({ report, events, aois, ingestResult, isIngestingEven
 
         <p>
           {isIngestingEvents
-            ? 'Sending synthetic events to the backend telemetry ingest endpoint.'
-            : response?.note ?? 'Synthetic events have not been sent yet.'}
+            ? `Sending ${sourceDescription} to the backend telemetry ingest endpoint.`
+            : response?.note ?? `${telemetrySourceLabel} events have not been sent yet.`}
         </p>
         {ingestResult ? <p className="muted">POST {ingestResult.apiBaseUrl}/api/v1/sessions/:session_id/events</p> : null}
         {response && response.rejected_reasons.length > 0 ? (
@@ -106,14 +119,17 @@ export function DemoReport({ report, events, aois, ingestResult, isIngestingEven
         {report.insights.map((insight) => (
           <article className="card insight-card" key={insight}>
             <p>{insight}</p>
-            <span>Synthetic demo insight</span>
+            <span>{telemetrySourceLabel} insight</span>
           </article>
         ))}
       </div>
 
       <p className="privacy-note report-note">
-        Demo sessions use synthetic gaze/event telemetry. GazeTrack is designed to store telemetry only,
-        not webcam video.
+        {telemetrySourceIsExperimental
+          ? 'Experimental browser gaze sessions are approximate, opt-in, and not medical-grade. '
+          : 'Synthetic demo sessions use deterministic gaze/event telemetry and do not request camera permission. '}
+        GazeTrack is designed to store telemetry only, not webcam video, frames, screenshots, image blobs, or base64
+        media.
       </p>
     </article>
   )

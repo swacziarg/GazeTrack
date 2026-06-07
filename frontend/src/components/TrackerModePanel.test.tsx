@@ -20,6 +20,7 @@ describe('TrackerModePanel', () => {
     )
 
     expect(html).toContain('Synthetic demo')
+    expect(html).toContain('deterministic demo mode is camera-free')
     expect(html).not.toContain('Browser gaze experiment')
   })
 

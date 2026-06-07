@@ -69,6 +69,13 @@ export function TrackerModePanel({
         </select>
       </label>
 
+      <p className="privacy-note compact">
+        {selectedOption.description}{' '}
+        {isWebGazerSelected
+          ? 'This mode is approximate, browser-dependent, opt-in, and not medical-grade.'
+          : 'This deterministic demo mode is camera-free and recommended for reviewers.'}
+      </p>
+
       <dl className="tracker-status-grid">
         <div>
           <dt>Mode</dt>

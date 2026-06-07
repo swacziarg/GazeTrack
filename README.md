@@ -1,60 +1,30 @@
 # GazeTrack
 
-Privacy-first synthetic telemetry demo pipeline for task-based website UX testing.
+GazeTrack is a privacy-first, task-based UX analytics demo for website builders. It shows how a browser frontend, typed telemetry contracts, a FastAPI ingest layer, SQLite persistence, and backend-generated reports can work together to evaluate whether users notice and act on important page regions. The recommended demo uses deterministic synthetic telemetry; the optional browser gaze path is experimental, opt-in, approximate, and not medical-grade eye tracking.
 
-## Current status
+## What is implemented now
 
-GazeTrack is currently a safe full-stack demo that shows the shape of a product/data pipeline for task-based UX studies. The default experience uses synthetic calibration, gaze, click, scroll, and task events; persists privacy-safe telemetry in SQLite; and generates a local report plus a backend report from stored demo data.
+- React + TypeScript + Vite dashboard for study setup, demo session flow, telemetry status, and reports.
+- Configurable synthetic study setup with study name, objective, target URL/label, task prompts, and normalized AOIs.
+- Default `SyntheticTracker` with deterministic calibration, gaze, click, scroll, and task events.
+- Synthetic quality modes: `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze`.
+- Optional `WebGazerTracker` experiment hidden behind `VITE_ENABLE_WEBGAZER=true`, consent, and browser support checks.
+- FastAPI + SQLite persistence for studies, tasks, AOIs, tester sessions, accepted telemetry events, and report payloads.
+- Privacy-safe ingest validation that rejects media-like payload keys before persistence.
+- Backend reports with event counts, AOI hit metrics, approximate dwell, demo fixation detection, TTFF, quality verdicts, privacy summary, and schematic replay data.
+- In-app Demo Guide for reviewers and placeholders/instructions for future screenshots or GIFs.
 
-The repository currently has a `v0.1-demo` Git tag, verified with `git tag --list` on 2026-06-07. Check tags, test results, and release notes in the current checkout before relying on release status.
+## Synthetic mode quickstart
 
-This demo is not production webcam eye tracking. Browser gaze estimation is present only as an experimental, feature-flagged spike behind `VITE_ENABLE_WEBGAZER`, explicit consent, and guarded WebGazer script loading. The project does not claim medical-grade accuracy, biometric identity, real heatmaps, screenshot replay, DOM AOI detection, CAF delay, auth, deployment, export, or sharing.
+Synthetic mode is the default and the recommended portfolio/demo path. It does not request webcam permission.
 
-## Target users
-
-- Website builders and product designers evaluating a product/data pipeline concept for task-based UX studies
-- UX researchers reviewing how quality-aware attention telemetry could be modeled
-- Product analytics teams interested in event contracts, privacy constraints, and report generation patterns
-
-## Current `v0.1-demo` scope
-
-- React + TypeScript + Vite demo dashboard
-- Default `SyntheticTracker` with `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes
-- Synthetic five-point calibration and synthetic task session flow
-- FastAPI + SQLite persistence for studies, tasks, AOIs, sessions, accepted telemetry events, and persisted report payloads
-- Backend ingestion validation with recursive rejection of media-like payload keys
-- Report helpers/services for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, quality verdicts, and schematic replay payloads
-- Frontend local report, backend ingest/report panels, and normalized-coordinate schematic replay visuals
-
-## Experimental browser gaze spike
-
-The optional `WebGazerTracker` path can be exposed locally with:
-
-```bash
-VITE_ENABLE_WEBGAZER=true
-```
-
-When enabled, the UI labels it as a browser gaze experiment and requires explicit consent before initialization. After consent, the adapter loads WebGazer in the browser, hides WebGazer's local camera preview/prediction points, shows a click/fixate calibration overlay, samples predictions at a throttled interval, and sends only compatible privacy-safe telemetry fields such as normalized gaze points, optional confidence/quality metadata, timestamps, calibration events, and task events. The browser experiment also shows a local live status panel, an optional approximate gaze-dot overlay, sample counts, weak-signal messages, and post-calibration feedback.
-
-It is not part of the default demo path and does not provide evidence of production real gaze tracking. Set `VITE_WEBGAZER_SCRIPT_URL` only if you need to point the browser to a different WebGazer script URL.
-
-## Tech stack
-
-- Frontend: React + TypeScript + Vite
-- Tracker path: synthetic telemetry by default; optional browser gaze spike behind a feature flag
-- Backend API: FastAPI (Python)
-- Database: SQLite for local demo persistence, with a PostgreSQL/Supabase-compatible schema direction documented separately
-- Reporting: Python report helpers/services invoked by API routes
-
-## Local setup
-
-1. Configure `.env` from `.env.example`. SQLite is used by default:
+1. Configure environment:
 
    ```bash
    cp .env.example .env
    ```
 
-2. Install and run the FastAPI backend:
+2. Start the backend:
 
    ```bash
    cd backend
@@ -64,7 +34,7 @@ It is not part of the default demo path and does not provide evidence of product
    PYTHONPATH=. uvicorn app.main:app --reload
    ```
 
-3. In a second terminal, install and run the Vite frontend:
+3. Start the frontend in a second terminal:
 
    ```bash
    cd frontend
@@ -72,99 +42,122 @@ It is not part of the default demo path and does not provide evidence of product
    npm run dev
    ```
 
-4. Open `http://localhost:5173`, complete the synthetic demo session, and fetch the backend report.
+4. Open `http://localhost:5173`, click `Open demo study`, keep `Synthetic demo` selected, run calibration, complete the session, and inspect the backend report.
 
-The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETRACK_DATABASE_URL` or `DATABASE_URL` is set. This SQLite file is local state, not a release artifact. No Docker, Postgres, Supabase, webcam permission, or bundled WebGazer dependency is required for the current demo.
+SQLite demo data is stored locally in `backend/gazetrack_demo.db` unless `GAZETRACK_DATABASE_URL` or `DATABASE_URL` is set.
 
-### Try experimental browser gaze locally
+## Experimental browser gaze quickstart
 
-Use a modern browser on `localhost` or HTTPS so camera permission can be requested:
+This mode is for local experimentation only. It is approximate, browser-dependent, quality-gated, opt-in, and not medical-grade.
 
 ```bash
 cd frontend
 VITE_ENABLE_WEBGAZER=true npm run dev
 ```
 
-Then open `http://localhost:5173`, click `Open demo study`, select `Browser gaze experiment`, grant consent, allow browser camera permission, start the session, and click each calibration target while looking at it. The live status panel should show whether the tracker is loading, calibrating, active, weak signal, stopped, or in an error state. The optional debug dot is approximate and local-only. Complete the session after a few seconds of gaze samples. The backend report should show `Experimental browser gaze`, `webgazer_experimental`, the calibration quality warning when applicable, and the not-medical-grade notice.
+Then open `http://localhost:5173`, choose `Browser gaze experiment`, read the consent notice, allow browser camera permission, click each calibration target while looking at it, and complete a short session. If permission, lighting, device support, or calibration quality is poor, switch back to `Use synthetic demo`.
 
-Troubleshooting:
+Set `VITE_WEBGAZER_SCRIPT_URL` only if you need to point the browser at a different WebGazer script URL. WebGazer is not required for the default demo.
 
-- Camera permission: allow camera access when the browser prompts. If permission was denied, reset the site permission or choose `Use synthetic demo`.
-- Localhost/secure context: use `http://localhost:5173` during development or HTTPS for hosted testing. Camera APIs may be blocked on insecure non-local origins.
-- Lighting and face position: improve lighting, face the camera, reduce glare, and keep the tab focused.
-- Calibration quality: `good` or `usable` can continue as approximate experimental telemetry. `weak` means retry calibration or fall back to synthetic mode.
-- Noisy gaze dot: the debug dot is expected to jitter. Treat it as a rough live signal check, not an accuracy benchmark.
-- Fallback: synthetic mode remains the default, does not request camera permission, and can be selected with `Use synthetic demo`.
+## Privacy guarantees
 
-## Demo flow
+- Synthetic mode does not request camera permission.
+- Browser gaze mode is hidden by default, feature-flagged, and consent-gated.
+- Raw webcam video is not sent to the backend or stored.
+- Raw frames, screenshots, image blobs, base64 media, and media-like event payloads are rejected.
+- Persisted telemetry is limited to UX-analysis fields such as event type, timestamps, normalized coordinates, confidence/quality metadata, task context, clicks, scrolls, and calibration summaries.
+- Reports and replay are generated from persisted telemetry and computed metrics, not video or screenshot playback.
+- The project does not claim biometric identity, perfect gaze accuracy, medical-grade tracking, or generic session recording.
 
-1. Backend initializes a default synthetic study with one task and demo AOIs.
-2. Frontend displays the persisted task/AOI setup and a Study Builder for editing or creating a synthetic demo study.
-3. Rich synthetic calibration/gaze/click/scroll/task events are generated from the selected task prompt and AOI centers, then ingested into SQLite.
-4. Backend report generation computes event counts, task/AOI counts, AOI gaze/click metrics, demo-grade fixations, TTFF from task start, replay overlay data, privacy summary, and quality summary.
-5. Frontend renders the local demo report and the persisted backend report, including the configured study/task labels and a normalized-coordinate AOI/gaze/fixation/click replay when persisted replay data exists.
+## Architecture overview
 
-AOIs are normalized rectangles where `x` and `y` are top-left coordinates and `width`/`height` are dimensions from 0 to 1. Current AOIs are demo placeholders. Screenshot uploads, DOM-derived AOIs, production webcam gaze estimation, and CAF delay are not currently implemented; they are possible future directions.
+```text
+frontend capture
+  -> telemetry contract mapping
+  -> FastAPI ingest validation
+  -> SQLite append-only telemetry rows
+  -> backend analytics/report helpers
+  -> persisted report payload
+  -> React report/replay display
+```
 
-The current fixation detector is `simple_dispersion_v1`: accepted gaze samples are normalized to 0-1 coordinates, grouped when nearby in space and time, and promoted to a fixation only when the candidate has enough samples and duration. Calibration/session quality is a heuristic verdict (`pass`, `warn`, or `fail`) based on accepted gaze events, confidence, calibration errors when present, and whether fixations can be detected. These analytics are deterministic demo helpers, not production fixation analytics or medical-grade eye tracking.
+Key boundaries:
 
-Backend replay is a static schematic generated from persisted telemetry and computed fixation centroids. It does not use video, screenshots, raw webcam frames, images, blobs, base64 media, or a production replay engine.
+- `frontend/src/tracking/`: synthetic tracker and optional WebGazer adapter.
+- `frontend/src/components/`: study builder, session controls, tracker status, demo guide, reports, and schematic replay.
+- `backend/app/api/`: domain routes for studies, sessions, events, reports, health, and metadata.
+- `backend/app/services/`: fixation, AOI metrics, replay, and session quality helpers.
+- `docs/`: architecture, contracts, demo walkthrough, privacy model, limitations, and roadmap.
 
-## Custom synthetic study builder
+See [docs/architecture.md](docs/architecture.md) and [docs/event-report-data-flow.md](docs/event-report-data-flow.md) for the longer system view.
 
-Use the Study Builder on the frontend home page to configure a demo study before starting the mock session:
+## Test commands
 
-1. Enter a study name, objective, and target URL or demo page label.
-2. Add one or more task prompts.
-3. Define AOIs as normalized rectangles with `x`, `y`, `width`, and `height` values from 0 to 1, plus an optional semantic type such as `CTA`, `nav`, `pricing`, `hero`, or `form`.
-4. Click `Save study` to update the currently loaded persisted study, or `Save as new study` to create a separate SQLite-backed study configuration.
-5. Open/start the synthetic demo session. The synthetic tracker uses the saved task prompt and configured AOI centers for deterministic gaze/click events, and the backend report includes the custom task prompt and AOI labels.
+Backend:
 
-The builder intentionally does not upload screenshots, extract DOM regions, request camera access, or store media. It is a configuration layer for the synthetic telemetry pipeline only.
+```bash
+cd backend
+source .venv/bin/activate
+PYTHONPATH=. pytest
+```
 
-## Privacy principles
+Frontend:
 
-- Synthetic mode must not request camera permission.
-- Optional browser gaze experiments must be opt-in and consent-gated.
-- Process webcam frames locally in browser where future tracker work requires camera access.
-- Store gaze/event telemetry only; do **not** store raw webcam video.
-- Do **not** store webcam images, frames, screenshots, blobs, or base64 media payloads.
-- Make calibration confidence and tracking quality explicit in reports.
-- Communicate uncertainty; avoid claims of perfect accuracy, biometric identity, or medical use.
-- Use least-privilege data access patterns and plan retention/deletion controls before production use.
+```bash
+cd frontend
+npm test
+npm run build
+npm run e2e
+```
 
-## Local validation
+Install Playwright browsers once if needed:
 
-See [docs/v0.1-demo-release-checklist.md](docs/v0.1-demo-release-checklist.md) for local validation notes. Those notes are evidence-scoped, not a general release-readiness claim.
+```bash
+cd frontend
+npx playwright install chromium
+```
 
-Validation commands:
+Validation run for this checkout during portfolio polish: frontend unit tests `56 passed`, frontend build passed, backend tests `42 passed`, and Playwright E2E `1 passed`. Re-run the commands above after future changes before relying on status.
 
-- Backend unit/integration tests and report schema validation:
+## Current limitations
 
-  ```bash
-  cd backend
-  python -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  PYTHONPATH=. pytest
-  PYTHONPATH=. pytest tests/test_session_report_schema_contract.py
-  ```
+- Synthetic telemetry is deterministic demo data, not observed human gaze.
+- Browser gaze is an experimental spike and can be noisy across browsers, lighting, cameras, face position, and permissions.
+- AOIs are manual normalized rectangles; DOM-derived AOIs and screenshot-assisted authoring are not implemented.
+- Session replay is a schematic normalized-coordinate visualization, not video replay or screenshot playback.
+- Fixations and quality scores are deterministic demo heuristics, not validated clinical or hardware-eye-tracking metrics.
+- No auth, teams, deployment, exports, share links, retention/deletion UI, or production analytics jobs yet.
+- CAF delay is documented as future terminology but not claimed as an implemented report metric.
 
-- Frontend unit tests, build, and synthetic E2E happy path:
+## Roadmap / next milestones
 
-  ```bash
-  cd frontend
-  npm install
-  npx playwright install chromium
-  npm test
-  npm run build
-  npm run e2e
-  ```
+- Add multi-session study summaries and clearer task success metrics.
+- Add retention/deletion workflows before any production data collection.
+- Harden event schema versioning and privacy regression tests.
+- Improve AOI authoring with DOM/page assistance while keeping media persistence out of ingest.
+- Validate browser gaze quality thresholds before promoting any real-gaze capability.
+- Add report export/share flows only after auth and least-privilege access controls exist.
 
-Run these commands in the current environment before relying on a checkout's status. Run the E2E after the backend `.venv` exists and `backend/requirements.txt` has been installed. The E2E starts a local
-FastAPI backend and Vite frontend, keeps the default synthetic tracker selected, runs the synthetic session, and verifies
-successful backend ingest/report UI. It does not enable WebGazer.
+See [docs/mvp-roadmap.md](docs/mvp-roadmap.md) for more detail.
 
-## Possible future directions
+## Suggested demo script
 
-See [docs/mvp-roadmap.md](docs/mvp-roadmap.md) for the current documented state, validation evidence, non-goals, and possible future directions. Candidate directions include configurable study setup, stronger privacy regression tests, multi-session reporting, metrics evolution, browser gaze research mode, and production hardening.
+1. Open the app and point out the Demo Guide and privacy notice.
+2. Review the study objective, task prompt, and normalized AOIs.
+3. Keep `Synthetic demo` selected and explain that it is deterministic, camera-free demo data.
+4. Start the demo session, run synthetic calibration, wait for all events, and complete the session.
+5. Inspect ingest status: accepted, rejected, and stored event counts.
+6. Review the backend report: tracker mode, event counts, AOI metrics, TTFF, fixation summary, quality verdict, and privacy summary.
+7. Show the schematic replay and clarify that it is generated from telemetry, not webcam video or screenshots.
+8. Optionally restart with `VITE_ENABLE_WEBGAZER=true` to show the consent-gated browser experiment and its limitations.
+
+## Screenshot / GIF placeholders
+
+Add screenshots or short GIFs later under a future `docs/assets/` folder, for example:
+
+- `docs/assets/demo-guide.png`
+- `docs/assets/synthetic-session.gif`
+- `docs/assets/backend-report.png`
+- `docs/assets/browser-gaze-consent.png`
+
+Do not add real tester webcam imagery, raw frames, screenshots containing private data, or base64 media payload examples.
