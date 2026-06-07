@@ -41,6 +41,7 @@ def test_api_creates_and_lists_aois() -> None:
         f"/api/v1/studies/{study['study_id']}/aois",
         json={
             "label": "Primary CTA",
+            "semantic_type": "CTA",
             "page_url": "https://example.test/pricing",
             "x": 0.5,
             "y": 0.3,
@@ -52,8 +53,72 @@ def test_api_creates_and_lists_aois() -> None:
 
     assert response.status_code == 200
     assert response.json()["coordinate_space"] == "normalized"
+    assert response.json()["semantic_type"] == "CTA"
     assert list_response.status_code == 200
     assert [aoi["label"] for aoi in list_response.json()] == ["Primary CTA"]
+
+
+def test_api_creates_and_replaces_study_configuration() -> None:
+    create_response = client.post(
+        "/api/v1/studies/configurations",
+        json={
+            "name": "Checkout builder study",
+            "objective": "Measure checkout CTA discovery.",
+            "target_url": "https://example.test/checkout",
+            "tasks": [{"prompt": "Find checkout."}],
+            "aois": [
+                {
+                    "label": "Checkout CTA",
+                    "semantic_type": "CTA",
+                    "x": 0.5,
+                    "y": 0.4,
+                    "width": 0.2,
+                    "height": 0.1,
+                },
+                {
+                    "label": "Plan cards",
+                    "semantic_type": "pricing",
+                    "x": 0.2,
+                    "y": 0.6,
+                    "width": 0.4,
+                    "height": 0.2,
+                },
+            ],
+        },
+    )
+
+    assert create_response.status_code == 200
+    created = create_response.json()
+    study_id = created["study"]["study_id"]
+    assert created["study"]["target_url"] == "https://example.test/checkout"
+    assert [task["prompt"] for task in created["tasks"]] == ["Find checkout."]
+    assert [aoi["label"] for aoi in created["aois"]] == ["Checkout CTA", "Plan cards"]
+
+    replace_response = client.put(
+        f"/api/v1/studies/{study_id}/configuration",
+        json={
+            "name": "Checkout builder study updated",
+            "objective": "Measure form attention.",
+            "target_url": "https://example.test/signup",
+            "tasks": [{"prompt": "Find the signup form."}],
+            "aois": [
+                {
+                    "label": "Signup form",
+                    "semantic_type": "form",
+                    "x": 0.35,
+                    "y": 0.35,
+                    "width": 0.3,
+                    "height": 0.3,
+                }
+            ],
+        },
+    )
+
+    assert replace_response.status_code == 200
+    replaced = replace_response.json()
+    assert replaced["study"]["name"] == "Checkout builder study updated"
+    assert [task["prompt"] for task in replaced["tasks"]] == ["Find the signup form."]
+    assert [aoi["label"] for aoi in replaced["aois"]] == ["Signup form"]
 
 
 def test_default_demo_study_creates_demo_tasks_and_aois() -> None:
@@ -118,6 +183,8 @@ def test_report_generation_includes_aoi_metrics_for_gaze_and_clicks() -> None:
     assert response.status_code == 200
     report = response.json()
     assert report["task_count"] == 1
+    assert report["study_name"] == "AOI report study"
+    assert report["task_prompts"] == ["Click the CTA."]
     assert report["aoi_count"] == 1
     assert report["has_aoi_metrics"] is True
     assert report["aoi_metrics"] == [

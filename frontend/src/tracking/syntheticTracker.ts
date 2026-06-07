@@ -1,5 +1,7 @@
 import type {
   NormalizedPoint,
+  SyntheticAoiConfig,
+  SyntheticStudyConfig,
   SyntheticTelemetryMode,
   TelemetryEvent,
   TelemetryEventPayload,
@@ -12,6 +14,7 @@ import type {
 export type {
   NormalizedPoint,
   SyntheticTelemetryMode,
+  SyntheticStudyConfig,
   TelemetryEvent as MockStudyEvent,
   TelemetryEventPayload as MockEventPayload,
   TelemetryEventType as MockEventType,
@@ -54,6 +57,19 @@ function clampNormalized(value: number) {
   return Math.max(0, Math.min(1, value))
 }
 
+const defaultSyntheticStudyConfig: SyntheticStudyConfig = {
+  name: 'Demo Homepage CTA Study',
+  objective: 'Understand whether visitors find the team plan CTA on the pricing landing page.',
+  targetUrl: 'https://example.test/pricing',
+  taskPrompt: 'Find the team plan and start checkout.',
+  aois: [
+    { label: 'Hero headline', semanticType: 'hero', x: 0.12, y: 0.18, width: 0.48, height: 0.14 },
+    { label: 'Primary CTA', semanticType: 'CTA', x: 0.52, y: 0.38, width: 0.2, height: 0.12 },
+    { label: 'Navigation', semanticType: 'nav', x: 0.38, y: 0.05, width: 0.24, height: 0.11 },
+    { label: 'Pricing preview', semanticType: 'pricing', x: 0.36, y: 0.62, width: 0.34, height: 0.2 },
+  ],
+}
+
 function modeConfidence(mode: SyntheticTelemetryMode, index: number) {
   if (mode === 'low_confidence') {
     return 0.34 + (index % 3) * 0.03
@@ -86,6 +102,31 @@ function createEvent(
     timestamp: createTimestamp(offsetMs),
     payload,
   }
+}
+
+function aoiCenter(aoi: SyntheticAoiConfig): NormalizedPoint {
+  return {
+    x: roundCoordinate(clampNormalized(aoi.x + aoi.width / 2)),
+    y: roundCoordinate(clampNormalized(aoi.y + aoi.height / 2)),
+  }
+}
+
+function findAoi(aois: SyntheticAoiConfig[], semanticToken: string, labelToken?: string) {
+  const normalizedSemantic = semanticToken.toLowerCase()
+  const normalizedLabel = labelToken?.toLowerCase() ?? normalizedSemantic
+
+  return aois.find((aoi) => aoi.semanticType?.toLowerCase() === normalizedSemantic)
+    ?? aois.find((aoi) => aoi.label.toLowerCase().includes(normalizedLabel))
+}
+
+function resolveSyntheticPath(studyConfig: SyntheticStudyConfig) {
+  const aois = studyConfig.aois.length > 0 ? studyConfig.aois : defaultSyntheticStudyConfig.aois
+  const navigation = findAoi(aois, 'nav', 'navigation') ?? aois[0]
+  const hero = findAoi(aois, 'hero') ?? aois.find((aoi) => aoi !== navigation) ?? aois[0]
+  const pricing = findAoi(aois, 'pricing') ?? aois.find((aoi) => aoi !== navigation && aoi !== hero) ?? hero
+  const target = findAoi(aois, 'CTA', 'cta') ?? aois.find((aoi) => aoi !== navigation && aoi !== hero) ?? aois[0]
+
+  return { navigation, hero, pricing, target }
 }
 
 function createCalibrationEvents(mode: SyntheticTelemetryMode, startingIndex: number) {
@@ -189,6 +230,14 @@ function appendCluster(
 }
 
 export function generateMockStudyEvents(mode: SyntheticTelemetryMode = 'healthy'): TelemetryEvent[] {
+  return generateSyntheticStudyEvents(defaultSyntheticStudyConfig, mode)
+}
+
+export function generateSyntheticStudyEvents(
+  studyConfig: SyntheticStudyConfig = defaultSyntheticStudyConfig,
+  mode: SyntheticTelemetryMode = 'healthy',
+): TelemetryEvent[] {
+  const path = resolveSyntheticPath(studyConfig)
   let eventIndex = 1
   const events: TelemetryEvent[] = [
     createEvent(eventIndex, 'task_started', 0, {
@@ -196,7 +245,10 @@ export function generateMockStudyEvents(mode: SyntheticTelemetryMode = 'healthy'
       source: 'synthetic',
       synthetic: true,
       mode,
-      target: 'Find the team plan and start checkout',
+      target: studyConfig.taskPrompt,
+      task_prompt: studyConfig.taskPrompt,
+      study_name: studyConfig.name,
+      target_url: studyConfig.targetUrl,
     }),
   ]
   eventIndex += 1
@@ -206,8 +258,8 @@ export function generateMockStudyEvents(mode: SyntheticTelemetryMode = 'healthy'
   eventIndex = calibration.nextEventIndex
 
   if (mode !== 'no_gaze') {
-    eventIndex = appendCluster(events, eventIndex, 3400, { x: 0.5, y: 0.1 }, 10, 'Navigation', mode)
-    eventIndex = appendCluster(events, eventIndex, 4500, { x: 0.36, y: 0.25 }, 10, 'Hero headline', mode)
+    eventIndex = appendCluster(events, eventIndex, 3400, aoiCenter(path.navigation), 10, path.navigation.label, mode)
+    eventIndex = appendCluster(events, eventIndex, 4500, aoiCenter(path.hero), 10, path.hero.label, mode)
 
     events.push(
       createEvent(eventIndex, 'scroll_recorded', 5600, {
@@ -221,18 +273,18 @@ export function generateMockStudyEvents(mode: SyntheticTelemetryMode = 'healthy'
     )
     eventIndex += 1
 
-    eventIndex = appendCluster(events, eventIndex, 6200, { x: 0.53, y: 0.72 }, 10, 'Pricing preview', mode)
-    eventIndex = appendCluster(events, eventIndex, 7600, { x: 0.62, y: 0.44 }, 10, 'Primary CTA', mode)
+    eventIndex = appendCluster(events, eventIndex, 6200, aoiCenter(path.pricing), 10, path.pricing.label, mode)
+    eventIndex = appendCluster(events, eventIndex, 7600, aoiCenter(path.target), 10, path.target.label, mode)
 
     events.push(
       createEvent(eventIndex, 'click_recorded', 8800, {
-        label: 'Synthetic demo click on primary CTA',
+        label: `Synthetic demo click on ${path.target.label}`,
         source: 'synthetic',
         synthetic: true,
         mode,
-        aoi: 'Primary CTA',
-        x: 0.62,
-        y: 0.44,
+        aoi: path.target.label,
+        x: aoiCenter(path.target).x,
+        y: aoiCenter(path.target).y,
         viewport_width: VIEWPORT_WIDTH,
         viewport_height: VIEWPORT_HEIGHT,
         confidence: mode === 'low_confidence' ? 0.42 : 0.88,
@@ -240,7 +292,7 @@ export function generateMockStudyEvents(mode: SyntheticTelemetryMode = 'healthy'
     )
     eventIndex += 1
 
-    eventIndex = appendCluster(events, eventIndex, 9300, { x: 0.54, y: 0.72 }, 8, 'Pricing preview', mode)
+    eventIndex = appendCluster(events, eventIndex, 9300, aoiCenter(path.pricing), 8, path.pricing.label, mode)
   } else {
     events.push(
       createEvent(eventIndex, 'scroll_recorded', 5600, {
@@ -277,11 +329,13 @@ export class SyntheticTracker implements TrackerProvider {
   readonly id = 'synthetic'
   readonly label = 'Synthetic demo'
   private mode: SyntheticTelemetryMode
+  private studyConfig: SyntheticStudyConfig
   private events: TelemetryEvent[]
 
-  constructor(options: { mode?: SyntheticTelemetryMode } = {}) {
+  constructor(options: { mode?: SyntheticTelemetryMode; studyConfig?: SyntheticStudyConfig } = {}) {
     this.mode = options.mode ?? 'healthy'
-    this.events = generateMockStudyEvents(this.mode)
+    this.studyConfig = options.studyConfig ?? defaultSyntheticStudyConfig
+    this.events = generateSyntheticStudyEvents(this.studyConfig, this.mode)
   }
 
   isAvailable() {
@@ -289,7 +343,7 @@ export class SyntheticTracker implements TrackerProvider {
   }
 
   async initialize() {
-    this.events = generateMockStudyEvents(this.mode)
+    this.events = generateSyntheticStudyEvents(this.studyConfig, this.mode)
   }
 
   async runCalibration(_options?: TrackerCalibrationOptions) {
@@ -300,7 +354,8 @@ export class SyntheticTracker implements TrackerProvider {
 
   async startSession(options?: TrackerSessionOptions) {
     this.mode = options?.mode ?? this.mode
-    this.events = generateMockStudyEvents(this.mode)
+    this.studyConfig = options?.studyConfig ?? this.studyConfig
+    this.events = generateSyntheticStudyEvents(this.studyConfig, this.mode)
   }
 
   async stopSession() {

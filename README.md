@@ -79,16 +79,28 @@ The backend stores local demo data in `backend/gazetrack_demo.db` unless `GAZETR
 ## Demo flow
 
 1. Backend initializes a default synthetic study with one task and demo AOIs.
-2. Frontend displays the persisted task/AOI setup, then runs a synthetic-only calibration step.
-3. Rich synthetic calibration/gaze/click/scroll/task events are ingested into SQLite.
+2. Frontend displays the persisted task/AOI setup and a Study Builder for editing or creating a synthetic demo study.
+3. Rich synthetic calibration/gaze/click/scroll/task events are generated from the selected task prompt and AOI centers, then ingested into SQLite.
 4. Backend report generation computes event counts, task/AOI counts, AOI gaze/click metrics, demo-grade fixations, TTFF from task start, replay overlay data, privacy summary, and quality summary.
-5. Frontend renders the local demo report and the persisted backend report, including a normalized-coordinate AOI/gaze/fixation/click replay when persisted replay data exists.
+5. Frontend renders the local demo report and the persisted backend report, including the configured study/task labels and a normalized-coordinate AOI/gaze/fixation/click replay when persisted replay data exists.
 
 AOIs are normalized rectangles where `x` and `y` are top-left coordinates and `width`/`height` are dimensions from 0 to 1. Current AOIs are demo placeholders. Screenshot uploads, DOM-derived AOIs, production webcam gaze estimation, and CAF delay are not currently implemented; they are possible future directions.
 
 The current fixation detector is `simple_dispersion_v1`: accepted gaze samples are normalized to 0-1 coordinates, grouped when nearby in space and time, and promoted to a fixation only when the candidate has enough samples and duration. Calibration/session quality is a heuristic verdict (`pass`, `warn`, or `fail`) based on accepted gaze events, confidence, calibration errors when present, and whether fixations can be detected. These analytics are deterministic demo helpers, not production fixation analytics or medical-grade eye tracking.
 
 Backend replay is a static schematic generated from persisted telemetry and computed fixation centroids. It does not use video, screenshots, raw webcam frames, images, blobs, base64 media, or a production replay engine.
+
+## Custom synthetic study builder
+
+Use the Study Builder on the frontend home page to configure a demo study before starting the mock session:
+
+1. Enter a study name, objective, and target URL or demo page label.
+2. Add one or more task prompts.
+3. Define AOIs as normalized rectangles with `x`, `y`, `width`, and `height` values from 0 to 1, plus an optional semantic type such as `CTA`, `nav`, `pricing`, `hero`, or `form`.
+4. Click `Save study` to update the currently loaded persisted study, or `Save as new study` to create a separate SQLite-backed study configuration.
+5. Open/start the synthetic demo session. The synthetic tracker uses the saved task prompt and configured AOI centers for deterministic gaze/click events, and the backend report includes the custom task prompt and AOI labels.
+
+The builder intentionally does not upload screenshots, extract DOM regions, request camera access, or store media. It is a configuration layer for the synthetic telemetry pipeline only.
 
 ## Privacy principles
 

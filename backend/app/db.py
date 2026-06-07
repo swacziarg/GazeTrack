@@ -47,6 +47,8 @@ def initialize_database(database_url: str | None = None) -> None:
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 description TEXT,
+                target_url TEXT,
+                updated_at TEXT,
                 created_at TEXT NOT NULL
             );
 
@@ -80,6 +82,7 @@ def initialize_database(database_url: str | None = None) -> None:
                 id TEXT PRIMARY KEY,
                 study_id TEXT NOT NULL,
                 label TEXT NOT NULL,
+                semantic_type TEXT,
                 page_url TEXT,
                 x REAL NOT NULL,
                 y REAL NOT NULL,
@@ -120,6 +123,15 @@ def initialize_database(database_url: str | None = None) -> None:
                 ON reports(session_id);
             """
         )
+        _ensure_column(connection, "studies", "target_url", "TEXT")
+        _ensure_column(connection, "studies", "updated_at", "TEXT")
+        _ensure_column(connection, "aois", "semantic_type", "TEXT")
+
+
+def _ensure_column(connection: sqlite3.Connection, table_name: str, column_name: str, column_definition: str) -> None:
+    existing_columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    if column_name not in existing_columns:
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
 
 
 def reset_database(database_url: str | None = None) -> None:

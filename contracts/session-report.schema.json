@@ -34,6 +34,15 @@
       "type": ["string", "null"],
       "format": "uuid"
     },
+    "study_name": {
+      "type": ["string", "null"]
+    },
+    "study_objective": {
+      "type": ["string", "null"]
+    },
+    "target_url": {
+      "type": ["string", "null"]
+    },
     "analytics_version": {
       "type": "string",
       "const": "fixation_demo_v1"
@@ -79,6 +88,12 @@
     "task_count": {
       "type": "integer",
       "minimum": 0
+    },
+    "task_prompts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "aoi_count": {
       "type": "integer",

@@ -6,6 +6,9 @@ const sessionId = '11111111-1111-4111-8111-111111111111'
 const reportFixture: BackendSessionReport = {
   session_id: sessionId,
   study_id: null,
+  study_name: 'Checkout study',
+  study_objective: 'Measure checkout discovery',
+  target_url: 'https://example.test/checkout',
   analytics_version: 'fixation_demo_v1',
   report_status: 'persisted',
   generated_at: '2026-01-15T17:31:00.000Z',
@@ -21,6 +24,7 @@ const reportFixture: BackendSessionReport = {
   low_confidence_sample_rate: 0.333,
   session_quality_score: 76.4,
   task_count: 1,
+  task_prompts: ['Find checkout.'],
   aoi_count: 1,
   has_aoi_metrics: true,
   aoi_metrics: [

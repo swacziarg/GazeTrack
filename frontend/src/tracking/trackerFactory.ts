@@ -1,5 +1,5 @@
 import { SyntheticTracker } from './syntheticTracker'
-import type { SyntheticTelemetryMode, TrackerId, TrackerProvider } from './types'
+import type { SyntheticStudyConfig, SyntheticTelemetryMode, TrackerId, TrackerProvider } from './types'
 import { WebGazerTracker } from './webgazerTracker'
 
 export type TrackerOption = {
@@ -36,11 +36,11 @@ export function getTrackerOptions(env: EnvLike = import.meta.env): TrackerOption
 
 export function createTrackerProvider(
   trackerId: TrackerId = 'synthetic',
-  options: { syntheticMode?: SyntheticTelemetryMode } = {},
+  options: { syntheticMode?: SyntheticTelemetryMode; syntheticStudyConfig?: SyntheticStudyConfig } = {},
 ): TrackerProvider {
   if (trackerId === 'webgazer') {
     return new WebGazerTracker()
   }
 
-  return new SyntheticTracker({ mode: options.syntheticMode })
+  return new SyntheticTracker({ mode: options.syntheticMode, studyConfig: options.syntheticStudyConfig })
 }

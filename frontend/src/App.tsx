@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ingestSessionEvents, type EventIngestResult } from './api/events'
 import { fetchBackendHealth, type BackendHealth } from './api/health'
 import { fetchSessionReport, type BackendReportResult } from './api/reports'
-import { fetchStudySetup, type StudySetupResult } from './api/studies'
+import {
+  createStudySession,
+  fetchStudySetup,
+  saveStudyConfiguration,
+  type StudySetupResult,
+} from './api/studies'
 import { BackendReport } from './components/BackendReport'
 import { DemoReport } from './components/DemoReport'
 import { EventLog } from './components/EventLog'
@@ -10,10 +15,17 @@ import { FlowCard } from './components/FlowCard'
 import { PlaceholderPanel } from './components/PlaceholderPanel'
 import { SessionControls, type SessionPhase } from './components/SessionControls'
 import { StatusCard } from './components/StatusCard'
+import { StudyBuilder } from './components/StudyBuilder'
 import { TrackerModePanel } from './components/TrackerModePanel'
-import { demoStudy, flowSteps } from './data/demoStudy'
+import { defaultStudyBuilderConfig, flowSteps, type StudyBuilderConfig } from './data/demoStudy'
 import { countCalibrationEvents, type MockStudyEvent, type SyntheticTelemetryMode } from './lib/mockEvents'
 import { generateDemoReport } from './lib/mockReport'
+import {
+  backendSetupToBuilderConfig,
+  toDemoStudy,
+  toStudyConfigurationPayload,
+  toSyntheticStudyConfig,
+} from './lib/studyConfig'
 import {
   WebGazerTracker,
   createTrackerProvider,
@@ -46,7 +58,10 @@ function App() {
   const [isFetchingBackendReport, setIsFetchingBackendReport] = useState(false)
   const [backendReportResult, setBackendReportResult] = useState<BackendReportResult | null>(null)
   const [studySetupResult, setStudySetupResult] = useState<StudySetupResult | null>(null)
+  const [studySaveResult, setStudySaveResult] = useState<StudySetupResult | null>(null)
   const [isFetchingStudySetup, setIsFetchingStudySetup] = useState(true)
+  const [studyBuilderConfig, setStudyBuilderConfig] = useState<StudyBuilderConfig>(defaultStudyBuilderConfig)
+  const [isSavingStudy, setIsSavingStudy] = useState(false)
   const [trackerId, setTrackerId] = useState<TrackerId>('synthetic')
   const [trackerStatus, setTrackerStatus] = useState<TrackerStatus>('idle')
   const [trackerAvailability, setTrackerAvailability] = useState('Synthetic tracker available')
@@ -54,9 +69,11 @@ function App() {
   const [webGazerEvents, setWebGazerEvents] = useState<MockStudyEvent[]>([])
   const webGazerTrackerRef = useRef<WebGazerTracker | null>(null)
   const trackerOptions = useMemo(() => getTrackerOptions(), [])
+  const configuredDemoStudy = useMemo(() => toDemoStudy(studyBuilderConfig), [studyBuilderConfig])
+  const syntheticStudyConfig = useMemo(() => toSyntheticStudyConfig(studyBuilderConfig), [studyBuilderConfig])
   const syntheticTracker = useMemo(
-    () => createTrackerProvider('synthetic', { syntheticMode: qualityMode }),
-    [qualityMode],
+    () => createTrackerProvider('synthetic', { syntheticMode: qualityMode, syntheticStudyConfig }),
+    [qualityMode, syntheticStudyConfig],
   )
   const syntheticEvents = useMemo(() => syntheticTracker.getEvents(), [syntheticTracker])
   const trackerEvents = trackerId === 'synthetic' ? syntheticEvents : webGazerEvents
@@ -83,6 +100,9 @@ function App() {
       if (isMounted) {
         setBackendHealth(healthResult)
         setStudySetupResult(studySetup)
+        if (studySetup.ok && studySetup.study) {
+          setStudyBuilderConfig(backendSetupToBuilderConfig(studySetup.study, studySetup.tasks, studySetup.aois))
+        }
         setIsCheckingHealth(false)
         setIsFetchingStudySetup(false)
       }
@@ -153,7 +173,7 @@ function App() {
         return
       }
 
-      void webGazerTrackerRef.current.startSession({ taskPrompt: demoStudy.taskPrompt }).then(() => {
+      void webGazerTrackerRef.current.startSession({ taskPrompt: configuredDemoStudy.taskPrompt }).then(() => {
         const events = webGazerTrackerRef.current?.getEvents() ?? []
         setWebGazerEvents(events)
         setVisibleEventCount(events.length)
@@ -163,7 +183,7 @@ function App() {
       return
     }
 
-    void syntheticTracker.startSession({ mode: qualityMode })
+    void syntheticTracker.startSession({ mode: qualityMode, studyConfig: syntheticStudyConfig })
     setTrackerStatus('ready')
     setSessionPhase('calibration')
     setVisibleEventCount(1)
@@ -197,6 +217,33 @@ function App() {
     setTrackerStatus('idle')
   }
 
+  function handleStudyBuilderChange(nextConfig: StudyBuilderConfig) {
+    setStudyBuilderConfig(nextConfig)
+    setSessionPhase((currentPhase) => (currentPhase === 'preview' ? currentPhase : 'detail'))
+    setVisibleEventCount(0)
+    setIngestResult(null)
+    setBackendReportResult(null)
+    setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'consent_required' : 'idle')
+  }
+
+  function saveConfiguredStudy(mode: 'update' | 'create') {
+    setIsSavingStudy(true)
+    void saveStudyConfiguration(
+      toStudyConfigurationPayload(studyBuilderConfig),
+      mode === 'update' ? studySetupResult?.study?.study_id : null,
+    )
+      .then((result) => {
+        setStudySaveResult(result)
+        if (result.ok && result.study) {
+          setStudySetupResult(result)
+          setStudyBuilderConfig(backendSetupToBuilderConfig(result.study, result.tasks, result.aois))
+        }
+      })
+      .finally(() => {
+        setIsSavingStudy(false)
+      })
+  }
+
   function completeMockSession() {
     if (trackerId === 'webgazer') {
       void webGazerTrackerRef.current?.stopSession().then((events) => {
@@ -222,14 +269,19 @@ function App() {
     setIsIngestingEvents(true)
 
     void (async () => {
-      const result = await ingestSessionEvents(demoSessionId, events)
+      const persistedStudyId = studySetupResult?.ok ? studySetupResult.study?.study_id : null
+      const sessionResult = persistedStudyId ? await createStudySession(persistedStudyId) : null
+      const sessionId = sessionResult?.sessionId ?? demoSessionId
+      setDemoSessionId(sessionId)
+
+      const result = await ingestSessionEvents(sessionId, events)
       setIngestResult(result)
       setIsIngestingEvents(false)
 
       if (result.ok) {
         setIsFetchingBackendReport(true)
         try {
-          const reportResult = await fetchSessionReport(demoSessionId)
+          const reportResult = await fetchSessionReport(sessionId)
           setBackendReportResult(reportResult)
         } finally {
           setIsFetchingBackendReport(false)
@@ -345,21 +397,21 @@ function App() {
         <div className="study-grid">
           <article className="card study-summary">
             <div className="card-header">
-              <h3>{demoStudy.name}</h3>
+              <h3>{configuredDemoStudy.name}</h3>
               <span className="status-pill pending">Demo</span>
             </div>
             <dl>
               <div>
                 <dt>Page</dt>
-                <dd>{demoStudy.pageLabel}</dd>
+                <dd>{configuredDemoStudy.pageLabel}</dd>
               </div>
               <div>
                 <dt>Task prompt</dt>
-                <dd>{demoStudy.taskPrompt}</dd>
+                <dd>{configuredDemoStudy.taskPrompt}</dd>
               </div>
               <div>
                 <dt>Mock session quality</dt>
-                <dd>{demoStudy.sessionQuality}</dd>
+                <dd>{configuredDemoStudy.sessionQuality}</dd>
               </div>
             </dl>
             <button type="button" className="primary-button" onClick={openDemoStudy}>
@@ -373,7 +425,7 @@ function App() {
               <span className="status-pill pending">Demo</span>
             </div>
             <ul className="aoi-list">
-              {demoStudy.aois.map((aoi) => (
+              {configuredDemoStudy.aois.map((aoi) => (
                 <li key={aoi.name}>
                   <strong>{aoi.name}</strong>
                   <span>{aoi.role}</span>
@@ -382,6 +434,15 @@ function App() {
             </ul>
           </article>
         </div>
+
+        <StudyBuilder
+          value={studyBuilderConfig}
+          persistedStudyId={studySetupResult?.study?.study_id}
+          saveResult={studySaveResult ?? studySetupResult}
+          isSaving={isSavingStudy}
+          onChange={handleStudyBuilderChange}
+          onSave={saveConfiguredStudy}
+        />
 
         <article className="card study-builder-panel">
           <div className="card-header">
@@ -399,8 +460,8 @@ function App() {
           </p>
           <div className="study-builder-grid">
             <section>
-              <h4>{studySetupResult?.study?.name ?? demoStudy.name}</h4>
-              <p className="muted">{studySetupResult?.study?.objective ?? demoStudy.taskPrompt}</p>
+              <h4>{studySetupResult?.study?.name ?? configuredDemoStudy.name}</h4>
+              <p className="muted">{studySetupResult?.study?.objective ?? configuredDemoStudy.taskPrompt}</p>
               {!studySetupResult?.ok && !isFetchingStudySetup ? (
                 <p className="backend-unavailable compact">{studySetupResult?.message ?? 'Using local demo setup.'}</p>
               ) : null}
@@ -442,7 +503,7 @@ function App() {
         </article>
 
         <div className="insight-grid">
-          {demoStudy.insights.map((insight) => (
+          {configuredDemoStudy.insights.map((insight) => (
             <article className="card insight-card" key={insight}>
               <p>{insight}</p>
               <span>Synthetic demo data</span>
@@ -477,7 +538,7 @@ function App() {
               eventCount={visibleEventCount}
               totalEventCount={displayedTotalEventCount}
               elapsedSeconds={elapsedSeconds}
-              taskPrompt={demoStudy.taskPrompt}
+              taskPrompt={configuredDemoStudy.taskPrompt}
               qualityMode={qualityMode}
               calibrationEventCount={calibrationEventCount}
               onQualityModeChange={updateQualityMode}
@@ -496,7 +557,7 @@ function App() {
           <DemoReport
             report={demoReport}
             events={trackerEvents}
-            aois={demoStudy.aois}
+            aois={configuredDemoStudy.aois}
             ingestResult={ingestResult}
             isIngestingEvents={isIngestingEvents}
           />

@@ -16,6 +16,23 @@ export type NormalizedPoint = {
   y: number
 }
 
+export type SyntheticAoiConfig = {
+  label: string
+  semanticType?: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export type SyntheticStudyConfig = {
+  name: string
+  objective?: string
+  targetUrl?: string
+  taskPrompt: string
+  aois: SyntheticAoiConfig[]
+}
+
 export type TelemetryEventPayload = {
   label: string
   source?: TrackerId
@@ -40,6 +57,9 @@ export type TelemetryEventPayload = {
   dwell_ms?: number
   scroll_depth_percent?: number
   target?: string
+  task_prompt?: string
+  study_name?: string
+  target_url?: string
   completed?: boolean
 }
 
@@ -59,6 +79,7 @@ export type TrackerCalibrationOptions = {
 export type TrackerSessionOptions = {
   mode?: SyntheticTelemetryMode
   taskPrompt?: string
+  studyConfig?: SyntheticStudyConfig
   viewportWidth?: number
   viewportHeight?: number
 }

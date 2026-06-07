@@ -93,6 +93,9 @@ export type BackendReplayAoiOverlay = {
 export type BackendSessionReport = {
   session_id: string
   study_id: string | null
+  study_name: string | null
+  study_objective: string | null
+  target_url: string | null
   analytics_version: string
   report_status: 'placeholder' | 'persisted'
   generated_at: string
@@ -104,6 +107,7 @@ export type BackendSessionReport = {
   low_confidence_sample_rate: number | null
   session_quality_score: number | null
   task_count: number
+  task_prompts: string[]
   aoi_count: number
   has_aoi_metrics: boolean
   aoi_metrics: BackendAoiMetric[]

@@ -6,6 +6,9 @@ import { BackendReport } from './BackendReport'
 const report: BackendSessionReport = {
   session_id: '11111111-1111-4111-8111-111111111111',
   study_id: '00000000-0000-4000-8000-000000000001',
+  study_name: 'Checkout study',
+  study_objective: 'Measure checkout discovery',
+  target_url: 'https://example.test/checkout',
   analytics_version: 'fixation_demo_v1',
   report_status: 'persisted',
   generated_at: '2026-01-15T17:31:00.000Z',
@@ -17,6 +20,7 @@ const report: BackendSessionReport = {
   low_confidence_sample_rate: 0.333,
   session_quality_score: 76.4,
   task_count: 1,
+  task_prompts: ['Find checkout.'],
   aoi_count: 1,
   has_aoi_metrics: true,
   aoi_metrics: [

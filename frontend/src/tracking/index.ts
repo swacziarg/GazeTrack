@@ -1,8 +1,16 @@
-export { SyntheticTracker, calibrationTargets, countCalibrationEvents, generateMockStudyEvents } from './syntheticTracker'
+export {
+  SyntheticTracker,
+  calibrationTargets,
+  countCalibrationEvents,
+  generateMockStudyEvents,
+  generateSyntheticStudyEvents,
+} from './syntheticTracker'
 export { WebGazerTracker, predictionToGazeEvent } from './webgazerTracker'
 export { createTrackerProvider, getTrackerOptions, isWebGazerFeatureEnabled, type TrackerOption } from './trackerFactory'
 export type {
   NormalizedPoint,
+  SyntheticAoiConfig,
+  SyntheticStudyConfig,
   SyntheticTelemetryMode,
   TelemetryEvent,
   TelemetryEventPayload,

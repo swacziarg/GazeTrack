@@ -6,6 +6,7 @@ export type BackendStudy = {
   status: 'placeholder' | 'active'
   persistence: 'not_implemented' | 'sqlite'
   created_at: string
+  updated_at?: string | null
 }
 
 export type StudyTask = {
@@ -22,6 +23,7 @@ export type StudyAoi = {
   aoi_id: string
   study_id: string
   label: string
+  semantic_type: string | null
   page_url: string | null
   x: number
   y: number
@@ -29,6 +31,34 @@ export type StudyAoi = {
   height: number
   coordinate_space: 'normalized'
   created_at: string
+}
+
+export type StudyConfigurationPayload = {
+  name: string
+  objective: string | null
+  target_url: string | null
+  tasks: Array<{
+    title: string
+    prompt: string
+    success_criteria?: string | null
+    target_url: string | null
+  }>
+  aois: Array<{
+    label: string
+    semantic_type: string | null
+    page_url: string | null
+    x: number
+    y: number
+    width: number
+    height: number
+    coordinate_space: 'normalized'
+  }>
+}
+
+export type StudyConfigurationResponse = {
+  study: BackendStudy
+  tasks: StudyTask[]
+  aois: StudyAoi[]
 }
 
 export type StudySetupResult = {
@@ -39,6 +69,18 @@ export type StudySetupResult = {
   study: BackendStudy | null
   tasks: StudyTask[]
   aois: StudyAoi[]
+  message: string
+}
+
+export type StudySaveResult = StudySetupResult
+
+export type StudySessionCreateResult = {
+  ok: boolean
+  backendAvailable: boolean
+  apiBaseUrl: string
+  statusCode?: number
+  sessionId: string | null
+  studyId: string | null
   message: string
 }
 
@@ -62,6 +104,126 @@ async function fetchJson<T>(url: string): Promise<{ ok: true; status: number; bo
   }
 
   return { ok: true, status: response.status, body: (await response.json()) as T }
+}
+
+async function sendJson<T>(
+  url: string,
+  method: 'POST' | 'PUT',
+  body: unknown,
+): Promise<{ ok: true; status: number; body: T } | { ok: false; status: number; message: string }> {
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, message: `Backend responded with HTTP ${response.status}.` }
+  }
+
+  return { ok: true, status: response.status, body: (await response.json()) as T }
+}
+
+function setupResultFromConfiguration(
+  apiBaseUrl: string,
+  statusCode: number,
+  configuration: StudyConfigurationResponse,
+): StudySetupResult {
+  return {
+    ok: true,
+    backendAvailable: true,
+    apiBaseUrl,
+    statusCode,
+    study: configuration.study,
+    tasks: configuration.tasks,
+    aois: configuration.aois,
+    message: 'Persisted study setup saved to the backend.',
+  }
+}
+
+export async function saveStudyConfiguration(
+  payload: StudyConfigurationPayload,
+  existingStudyId?: string | null,
+): Promise<StudySaveResult> {
+  const apiBaseUrl = getApiBaseUrl()
+  const url = existingStudyId
+    ? `${apiBaseUrl}/api/v1/studies/${encodeURIComponent(existingStudyId)}/configuration`
+    : `${apiBaseUrl}/api/v1/studies/configurations`
+  const method = existingStudyId ? 'PUT' : 'POST'
+
+  try {
+    const result = await sendJson<StudyConfigurationResponse>(url, method, payload)
+    if (!result.ok) {
+      return {
+        ok: false,
+        backendAvailable: true,
+        apiBaseUrl,
+        statusCode: result.status,
+        study: null,
+        tasks: [],
+        aois: [],
+        message: result.message,
+      }
+    }
+
+    return setupResultFromConfiguration(apiBaseUrl, result.status, result.body)
+  } catch {
+    return {
+      ok: false,
+      backendAvailable: false,
+      apiBaseUrl,
+      study: null,
+      tasks: [],
+      aois: [],
+      message: 'Backend unavailable — study setup is only local until it can be saved.',
+    }
+  }
+}
+
+export async function createStudySession(studyId: string): Promise<StudySessionCreateResult> {
+  const apiBaseUrl = getApiBaseUrl()
+
+  try {
+    const result = await sendJson<{ session_id: string; study_id: string }>(
+      `${apiBaseUrl}/api/v1/studies/${encodeURIComponent(studyId)}/sessions`,
+      'POST',
+      {},
+    )
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        backendAvailable: true,
+        apiBaseUrl,
+        statusCode: result.status,
+        sessionId: null,
+        studyId: null,
+        message: result.message,
+      }
+    }
+
+    return {
+      ok: true,
+      backendAvailable: true,
+      apiBaseUrl,
+      statusCode: result.status,
+      sessionId: result.body.session_id,
+      studyId: result.body.study_id,
+      message: 'Backend session created for the configured study.',
+    }
+  } catch {
+    return {
+      ok: false,
+      backendAvailable: false,
+      apiBaseUrl,
+      sessionId: null,
+      studyId: null,
+      message: 'Backend unavailable — using a local fallback session ID.',
+    }
+  }
 }
 
 export async function fetchStudySetup(): Promise<StudySetupResult> {

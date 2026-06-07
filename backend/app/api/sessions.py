@@ -63,6 +63,7 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
     fixations = detect_fixations(events)
     fixation_summary = summarize_fixations(fixations)
     quality_summary = compute_quality_summary(events, fixations)
+    study = repository.get_study(session.study_id)
     tasks = repository.list_tasks_for_study(session.study_id)
     aois = repository.list_aois_for_study(session.study_id)
     aoi_metrics = compute_aoi_metrics(
@@ -93,6 +94,9 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
     report = SessionReportResponse(
         session_id=session_id,
         study_id=session.study_id,
+        study_name=study.title if study else None,
+        study_objective=study.description if study else None,
+        target_url=study.target_url if study else None,
         event_count=event_count,
         event_type_counts=event_counts,
         first_event_timestamp=first_event_timestamp,
@@ -101,6 +105,7 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
         low_confidence_sample_rate=low_confidence_rate,
         session_quality_score=quality_summary["score"],
         task_count=len(tasks),
+        task_prompts=[task.prompt for task in tasks],
         aoi_count=len(aois),
         has_aoi_metrics=bool(aoi_metrics),
         aoi_metrics=aoi_metrics,
@@ -114,6 +119,7 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
             "calibration_event_count": event_counts.get("calibration", 0),
             "task_event_count": _task_event_count(event_counts),
             "task_count": len(tasks),
+            "task_prompts": [task.prompt for task in tasks],
             "aoi_count": len(aois),
             "has_aoi_metrics": bool(aoi_metrics),
             "aoi_metrics": [metric.model_dump(mode="json") for metric in aoi_metrics],

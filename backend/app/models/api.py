@@ -43,6 +43,7 @@ class StudyResponse(BaseModel):
     status: Literal["placeholder", "active"] = "active"
     persistence: Literal["not_implemented", "sqlite"] = "sqlite"
     created_at: str = Field(default_factory=utcnow_iso)
+    updated_at: str | None = None
 
 
 class TaskCreateRequest(BaseModel):
@@ -64,6 +65,7 @@ class TaskResponse(BaseModel):
 
 class AoiCreateRequest(BaseModel):
     label: str = Field(min_length=1, max_length=200)
+    semantic_type: str | None = Field(default=None, max_length=64)
     page_url: str | None = None
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
@@ -84,6 +86,7 @@ class AoiResponse(BaseModel):
     aoi_id: UUID
     study_id: UUID
     label: str
+    semantic_type: str | None = None
     page_url: str | None = None
     x: float
     y: float
@@ -91,6 +94,27 @@ class AoiResponse(BaseModel):
     height: float
     coordinate_space: str = "normalized"
     created_at: str
+
+
+class StudyTaskConfigRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    prompt: str = Field(min_length=1, max_length=1000)
+    success_criteria: str | None = Field(default=None, max_length=1000)
+    target_url: str | None = None
+
+
+class StudyConfigurationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    objective: str | None = Field(default=None, max_length=1000)
+    target_url: str | None = None
+    tasks: list[StudyTaskConfigRequest] = Field(min_length=1)
+    aois: list[AoiCreateRequest] = Field(min_length=1)
+
+
+class StudyConfigurationResponse(BaseModel):
+    study: StudyResponse
+    tasks: list[TaskResponse]
+    aois: list[AoiResponse]
 
 
 class SessionCreateRequest(BaseModel):
@@ -212,6 +236,9 @@ class ReplayAoiOverlayResponse(BaseModel):
 class SessionReportResponse(BaseModel):
     session_id: UUID
     study_id: UUID | None = None
+    study_name: str | None = None
+    study_objective: str | None = None
+    target_url: str | None = None
     analytics_version: str = "fixation_demo_v1"
     report_status: Literal["placeholder", "persisted"] = "persisted"
     generated_at: str = Field(default_factory=utcnow_iso)
@@ -223,6 +250,7 @@ class SessionReportResponse(BaseModel):
     low_confidence_sample_rate: float | None = None
     session_quality_score: float | None = None
     task_count: int = 0
+    task_prompts: list[str] = Field(default_factory=list)
     aoi_count: int = 0
     has_aoi_metrics: bool = False
     aoi_metrics: list[AoiMetricResponse] = Field(default_factory=list)

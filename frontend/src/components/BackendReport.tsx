@@ -150,6 +150,7 @@ function getUnavailableMessage(ingestResult: EventIngestResult | null, reportRes
 
 export function BackendReport({ ingestResult, isFetchingReport, reportResult }: BackendReportProps) {
   const report = reportResult?.report
+  const taskPrompts = report?.task_prompts ?? []
 
   return (
     <article className="card backend-report-panel" aria-live="polite">
@@ -184,6 +185,14 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
             <div>
               <dt>Analytics version</dt>
               <dd>{report.analytics_version}</dd>
+            </div>
+            <div>
+              <dt>Study</dt>
+              <dd>{report.study_name ?? 'Not available'}</dd>
+            </div>
+            <div>
+              <dt>Target</dt>
+              <dd>{report.target_url ?? 'Not available'}</dd>
             </div>
             <div>
               <dt>Event count</dt>
@@ -222,6 +231,17 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
               <dd>{report.aoi_count}</dd>
             </div>
           </dl>
+
+          {taskPrompts.length > 0 ? (
+            <section className="backend-report-section">
+              <h4>Task prompts</h4>
+              <ul className="backend-insight-list">
+                {taskPrompts.map((prompt) => (
+                  <li key={prompt}>{prompt}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className="backend-report-section">
             <h4>Event type counts</h4>

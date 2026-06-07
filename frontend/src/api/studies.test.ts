@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchStudySetup } from './studies'
+import { createStudySession, fetchStudySetup, saveStudyConfiguration } from './studies'
 
 const studyId = '00000000-0000-4000-8000-000000000001'
 
@@ -49,6 +49,7 @@ describe('fetchStudySetup', () => {
             aoi_id: '33333333-3333-4333-8333-333333333333',
             study_id: studyId,
             label: 'Primary CTA',
+            semantic_type: 'CTA',
             page_url: null,
             x: 0.52,
             y: 0.38,
@@ -97,5 +98,75 @@ describe('fetchStudySetup', () => {
         aois: [],
       }),
     )
+  })
+
+  it('saves a study configuration with normalized AOIs', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        study: {
+          study_id: studyId,
+          name: 'Checkout study',
+          objective: 'Measure checkout discovery',
+          target_url: 'https://example.test/checkout',
+          status: 'active',
+          persistence: 'sqlite',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+        tasks: [],
+        aois: [],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await saveStudyConfiguration({
+      name: 'Checkout study',
+      objective: 'Measure checkout discovery',
+      target_url: 'https://example.test/checkout',
+      tasks: [{ title: 'Task 1', prompt: 'Find checkout.', target_url: 'https://example.test/checkout' }],
+      aois: [
+        {
+          label: 'Checkout CTA',
+          semantic_type: 'CTA',
+          page_url: 'https://example.test/checkout',
+          x: 0.5,
+          y: 0.4,
+          width: 0.2,
+          height: 0.1,
+          coordinate_space: 'normalized',
+        },
+      ],
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/api/v1/studies/configurations',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"label":"Checkout CTA"'),
+      }),
+    )
+    expect(result.ok).toBe(true)
+    expect(result.study?.name).toBe('Checkout study')
+  })
+
+  it('creates a backend session for a configured study', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        session_id: '44444444-4444-4444-8444-444444444444',
+        study_id: studyId,
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await createStudySession(studyId)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8000/api/v1/studies/${studyId}/sessions`,
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(result.sessionId).toBe('44444444-4444-4444-8444-444444444444')
   })
 })

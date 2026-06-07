@@ -26,6 +26,7 @@ DEMO_TASKS = [
 DEMO_AOIS = [
     {
         "label": "Hero headline",
+        "semantic_type": "hero",
         "page_url": "https://example.test/pricing",
         "x": 0.12,
         "y": 0.18,
@@ -34,6 +35,7 @@ DEMO_AOIS = [
     },
     {
         "label": "Primary CTA",
+        "semantic_type": "CTA",
         "page_url": "https://example.test/pricing",
         "x": 0.52,
         "y": 0.38,
@@ -42,6 +44,7 @@ DEMO_AOIS = [
     },
     {
         "label": "Navigation",
+        "semantic_type": "nav",
         "page_url": "https://example.test/pricing",
         "x": 0.38,
         "y": 0.05,
@@ -50,6 +53,7 @@ DEMO_AOIS = [
     },
     {
         "label": "Pricing preview",
+        "semantic_type": "pricing",
         "page_url": "https://example.test/pricing",
         "x": 0.36,
         "y": 0.62,
@@ -58,6 +62,7 @@ DEMO_AOIS = [
     },
     {
         "label": "Footer",
+        "semantic_type": "footer",
         "page_url": "https://example.test/pricing",
         "x": 0.0,
         "y": 0.88,
@@ -76,7 +81,9 @@ class StudyRecord:
     id: UUID
     title: str
     description: str | None
+    target_url: str | None
     created_at: str
+    updated_at: str | None
 
 
 @dataclass(frozen=True)
@@ -114,6 +121,7 @@ class AoiRecord:
     height: float
     coordinate_space: str
     created_at: str
+    semantic_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +148,7 @@ class GazeTrackRepository:
         self,
         title: str,
         description: str | None = None,
+        target_url: str | None = None,
         study_id: UUID | None = None,
     ) -> StudyRecord:
         now = utcnow_iso()
@@ -147,15 +156,24 @@ class GazeTrackRepository:
         with connect_database(self.database_url) as connection:
             connection.execute(
                 """
-                INSERT INTO studies (id, title, description, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO studies (id, title, description, target_url, updated_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
-                    description = excluded.description
+                    description = excluded.description,
+                    target_url = excluded.target_url,
+                    updated_at = excluded.updated_at
                 """,
-                (str(record_id), title, description, now),
+                (str(record_id), title, description, target_url, now, now),
             )
-        return StudyRecord(id=record_id, title=title, description=description, created_at=now)
+        return StudyRecord(
+            id=record_id,
+            title=title,
+            description=description,
+            target_url=target_url,
+            created_at=now,
+            updated_at=now,
+        )
 
     def ensure_default_study(self) -> StudyRecord:
         existing = self.get_study(DEMO_STUDY_ID)
@@ -163,6 +181,7 @@ class GazeTrackRepository:
             existing = self.create_study(
                 title="Synthetic demo study",
                 description="Default local study for synthetic telemetry sessions.",
+                target_url="https://example.test/pricing",
                 study_id=DEMO_STUDY_ID,
             )
         self.ensure_default_study_content(existing.id)
@@ -179,7 +198,7 @@ class GazeTrackRepository:
     def get_study(self, study_id: UUID) -> StudyRecord | None:
         with connect_database(self.database_url) as connection:
             row = connection.execute(
-                "SELECT id, title, description, created_at FROM studies WHERE id = ?",
+                "SELECT id, title, description, target_url, created_at, updated_at FROM studies WHERE id = ?",
                 (str(study_id),),
             ).fetchone()
         if row is None:
@@ -188,23 +207,87 @@ class GazeTrackRepository:
             id=UUID(row["id"]),
             title=row["title"],
             description=row["description"],
+            target_url=row["target_url"],
             created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     def list_studies(self) -> list[StudyRecord]:
         with connect_database(self.database_url) as connection:
             rows = connection.execute(
-                "SELECT id, title, description, created_at FROM studies ORDER BY created_at ASC"
+                "SELECT id, title, description, target_url, created_at, updated_at FROM studies ORDER BY created_at ASC"
             ).fetchall()
         return [
             StudyRecord(
                 id=UUID(row["id"]),
                 title=row["title"],
                 description=row["description"],
+                target_url=row["target_url"],
                 created_at=row["created_at"],
+                updated_at=row["updated_at"],
             )
             for row in rows
         ]
+
+    def replace_study_configuration(
+        self,
+        study_id: UUID,
+        title: str,
+        description: str | None,
+        target_url: str | None,
+        tasks: list[dict[str, str | None]],
+        aois: list[dict[str, str | float | None]],
+    ) -> tuple[StudyRecord, list[TaskRecord], list[AoiRecord]]:
+        existing = self.get_study(study_id)
+        if existing is None:
+            self.create_study(title=title, description=description, target_url=target_url, study_id=study_id)
+
+        now = utcnow_iso()
+        with connect_database(self.database_url) as connection:
+            connection.execute(
+                """
+                UPDATE studies
+                SET title = ?, description = ?, target_url = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (title, description, target_url, now, str(study_id)),
+            )
+            connection.execute("DELETE FROM tasks WHERE study_id = ?", (str(study_id),))
+            connection.execute("DELETE FROM aois WHERE study_id = ?", (str(study_id),))
+
+        created_tasks = [
+            self.create_task(
+                study_id=study_id,
+                title=str(task.get("title") or f"Task {index + 1}"),
+                prompt=str(task["prompt"]),
+                success_criteria=task.get("success_criteria"),
+                target_url=task.get("target_url") or target_url,
+            )
+            for index, task in enumerate(tasks)
+        ]
+        created_aois = [
+            self.create_aoi(
+                study_id=study_id,
+                label=str(aoi["label"]),
+                semantic_type=aoi.get("semantic_type") if isinstance(aoi.get("semantic_type"), str) else None,
+                page_url=aoi.get("page_url") if isinstance(aoi.get("page_url"), str) else target_url,
+                x=float(aoi["x"]),
+                y=float(aoi["y"]),
+                width=float(aoi["width"]),
+                height=float(aoi["height"]),
+                coordinate_space=str(aoi.get("coordinate_space") or "normalized"),
+            )
+            for aoi in aois
+        ]
+        study = self.get_study(study_id) or StudyRecord(
+            id=study_id,
+            title=title,
+            description=description,
+            target_url=target_url,
+            created_at=now,
+            updated_at=now,
+        )
+        return study, created_tasks, created_aois
 
     def create_task(
         self,
@@ -270,6 +353,7 @@ class GazeTrackRepository:
         y: float,
         width: float,
         height: float,
+        semantic_type: str | None = None,
         page_url: str | None = None,
         coordinate_space: str = "normalized",
         aoi_id: UUID | None = None,
@@ -283,14 +367,15 @@ class GazeTrackRepository:
             connection.execute(
                 """
                 INSERT INTO aois (
-                    id, study_id, label, page_url, x, y, width, height, coordinate_space, created_at
+                    id, study_id, label, semantic_type, page_url, x, y, width, height, coordinate_space, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(record_id),
                     str(study_id),
                     label,
+                    semantic_type,
                     page_url,
                     x,
                     y,
@@ -304,6 +389,7 @@ class GazeTrackRepository:
             id=record_id,
             study_id=study_id,
             label=label,
+            semantic_type=semantic_type,
             page_url=page_url,
             x=x,
             y=y,
@@ -317,7 +403,7 @@ class GazeTrackRepository:
         with connect_database(self.database_url) as connection:
             rows = connection.execute(
                 """
-                SELECT id, study_id, label, page_url, x, y, width, height, coordinate_space, created_at
+                SELECT id, study_id, label, semantic_type, page_url, x, y, width, height, coordinate_space, created_at
                 FROM aois
                 WHERE study_id = ?
                 ORDER BY created_at ASC
@@ -329,6 +415,7 @@ class GazeTrackRepository:
                 id=UUID(row["id"]),
                 study_id=UUID(row["study_id"]),
                 label=row["label"],
+                semantic_type=row["semantic_type"],
                 page_url=row["page_url"],
                 x=float(row["x"]),
                 y=float(row["y"]),

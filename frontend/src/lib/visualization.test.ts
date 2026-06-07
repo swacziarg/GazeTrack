@@ -14,7 +14,7 @@ describe('synthetic visualization helpers', () => {
       expect.objectContaining({
         id: 'demo-event-008',
         xPercent: expect.closeTo(48.8, 2),
-        yPercent: expect.closeTo(9.2, 2),
+        yPercent: expect.closeTo(9.7, 2),
         confidence: expect.any(Number),
       }),
     )
