@@ -245,7 +245,13 @@ function App() {
 
       {sessionPhase === 'completed' ? (
         <section id="demo-report-panel" className="section-block">
-          <DemoReport report={demoReport} ingestResult={ingestResult} isIngestingEvents={isIngestingEvents} />
+          <DemoReport
+            report={demoReport}
+            events={mockEvents}
+            aois={demoStudy.aois}
+            ingestResult={ingestResult}
+            isIngestingEvents={isIngestingEvents}
+          />
           <BackendReport
             ingestResult={ingestResult}
             isFetchingReport={isFetchingBackendReport}
@@ -254,26 +260,28 @@ function App() {
         </section>
       ) : null}
 
-      <section className="section-block">
-        <div className="section-heading">
-          <p className="eyebrow">Synthetic demo data</p>
-          <h2>Visualization placeholders</h2>
-        </div>
-        <div className="placeholder-grid">
-          <PlaceholderPanel
-            title="Heatmap preview"
-            description="Demo placeholder only. No real heatmap rendering is implemented yet."
-          />
-          <PlaceholderPanel
-            title="Gaze replay preview"
-            description="Demo placeholder only. No timeline playback or gaze rendering is implemented yet."
-          />
-          <PlaceholderPanel
-            title="AOI attention breakdown"
-            description="Demo placeholder only. No chart library or computed AOI analytics are implemented yet."
-          />
-        </div>
-      </section>
+      {sessionPhase !== 'completed' ? (
+        <section className="section-block">
+          <div className="section-heading">
+            <p className="eyebrow">Synthetic demo data</p>
+            <h2>Visualization placeholders</h2>
+          </div>
+          <div className="placeholder-grid">
+            <PlaceholderPanel
+              title="Heatmap preview"
+              description="Demo placeholder only. No real heatmap rendering is implemented yet."
+            />
+            <PlaceholderPanel
+              title="Gaze replay preview"
+              description="Demo placeholder only. No timeline playback or gaze rendering is implemented yet."
+            />
+            <PlaceholderPanel
+              title="AOI attention breakdown"
+              description="Demo placeholder only. No chart library or computed AOI analytics are implemented yet."
+            />
+          </div>
+        </section>
+      ) : null}
     </main>
   )
 }

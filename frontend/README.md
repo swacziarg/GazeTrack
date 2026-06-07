@@ -26,7 +26,7 @@ npm run build
 npm run test
 ```
 
-Tests currently cover the synthetic mock event, event contract adapter, and demo report utilities.
+Tests currently cover the synthetic mock event, event contract adapter, demo report utilities, and synthetic visualization helpers.
 
 ## Backend URL
 
@@ -46,6 +46,16 @@ GET {VITE_API_BASE_URL}/api/v1/sessions/{session_id}/report
 
 The backend report panel is labeled as a demo report and is generated from process-local demo telemetry only. It is rendered separately from the local demo report.
 
+## Synthetic Report Visuals
+
+After completing the mock session, the local report renders synthetic visual previews:
+
+- Synthetic demo heatmap preview
+- Synthetic demo gaze path
+- Demo-derived AOI attention breakdown
+
+These visuals are generated from mock telemetry positions and demo AOI boxes only. They are not webcam tracking, WebGazer output, raw media processing, or production heatmap analytics.
+
 Set `VITE_API_BASE_URL` in a local `.env` file if the FastAPI backend is not running on the default URL:
 
 ```bash
@@ -60,4 +70,4 @@ If the backend is offline, the local demo report still renders and the backend p
 - WebGazer integration
 - Authentication
 - Real analytics computation or production report generation
-- Real heatmaps, gaze replay rendering, or chart visualizations
+- Real heatmaps, real gaze replay tracking, or chart visualizations

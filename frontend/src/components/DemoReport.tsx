@@ -1,9 +1,16 @@
 import { MetricCard } from './MetricCard'
 import type { EventIngestResult } from '../api/events'
+import type { AreaOfInterest } from '../data/demoStudy'
+import { AoiBreakdown } from './AoiBreakdown'
+import { GazePathPreview } from './GazePathPreview'
+import { SyntheticHeatmapPreview } from './SyntheticHeatmapPreview'
 import type { DemoReportData } from '../lib/mockReport'
+import type { MockStudyEvent } from '../lib/mockEvents'
 
 type DemoReportProps = {
   report: DemoReportData
+  events: MockStudyEvent[]
+  aois: AreaOfInterest[]
   ingestResult: EventIngestResult | null
   isIngestingEvents: boolean
 }
@@ -32,7 +39,7 @@ function getIngestStatusClass(ingestResult: EventIngestResult | null, isIngestin
   return ingestResult.ok ? 'ok' : 'error'
 }
 
-export function DemoReport({ report, ingestResult, isIngestingEvents }: DemoReportProps) {
+export function DemoReport({ report, events, aois, ingestResult, isIngestingEvents }: DemoReportProps) {
   const response = ingestResult?.response
 
   return (
@@ -87,6 +94,12 @@ export function DemoReport({ report, ingestResult, isIngestingEvents }: DemoRepo
         {report.metrics.map((metric) => (
           <MetricCard key={metric.label} label={metric.label} value={metric.value} note={metric.note} />
         ))}
+      </div>
+
+      <div className="synthetic-visual-grid">
+        <SyntheticHeatmapPreview events={events} aois={aois} />
+        <GazePathPreview events={events} aois={aois} />
+        <AoiBreakdown events={events} aois={aois} />
       </div>
 
       <div className="insight-grid">
