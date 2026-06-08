@@ -113,6 +113,45 @@ def test_real_site_session_report_matches_shared_json_schema() -> None:
             "capture_token": capture_token,
             "events": [
                 {
+                    "event_type": "page_view",
+                    "timestamp": "2026-01-01T00:00:00.000Z",
+                    "payload": {
+                        "source": "real_site_capture",
+                        "tracker_type": "real_site_capture",
+                        "page_url": "https://example.com/pricing",
+                        "page_path": "/pricing",
+                        "document_width": 1200,
+                        "document_height": 2400,
+                        "viewport_width": 1200,
+                        "viewport_height": 800,
+                        "coordinate_space": "document_normalized",
+                        "layout_snapshot": {
+                            "snapshot_type": "safe_dom_layout_v1",
+                            "page_url": "https://example.com/pricing",
+                            "page_path": "/pricing",
+                            "viewport_width": 1200,
+                            "viewport_height": 800,
+                            "document_width": 1200,
+                            "document_height": 2400,
+                            "scroll_x": 0,
+                            "scroll_y": 0,
+                            "coordinate_space": "document_normalized",
+                            "landmarks": [
+                                {
+                                    "id": "primary_cta",
+                                    "label": "Primary CTA",
+                                    "semantic_type": "CTA",
+                                    "x": 0.1,
+                                    "y": 0.2,
+                                    "width": 0.2,
+                                    "height": 0.1,
+                                    "is_aoi": True,
+                                }
+                            ],
+                        },
+                    },
+                },
+                {
                     "event_type": "task_start",
                     "timestamp": "2026-01-01T00:00:00.000Z",
                     "payload": {
@@ -141,6 +180,15 @@ def test_real_site_session_report_matches_shared_json_schema() -> None:
     report_response = client.get(f"/api/v1/sessions/{session_id}/report")
     assert report_response.status_code == 200
     report = report_response.json()
+    report_view_response = client.get(f"/api/v1/sessions/{session_id}/report-view")
+    assert report_view_response.status_code == 200
+    assert "text/html" in report_view_response.headers["content-type"]
+    assert "GazeTrack report" in report_view_response.text
+    assert "Real checkout study" in report_view_response.text
+    assert "Heatmap" in report_view_response.text
+    assert "Replay" in report_view_response.text
+    assert "replay-data" in report_view_response.text
+    assert "No raw webcam video" in report_view_response.text
     validation_errors = sorted(
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(report),
         key=lambda error: list(error.path),
@@ -152,4 +200,6 @@ def test_real_site_session_report_matches_shared_json_schema() -> None:
     )
     assert report["tracker_type"] == "real_site_capture"
     assert report["replay_summary"]["coordinate_space"] == "document_normalized"
+    assert report["page_layouts"][0]["snapshot_type"] == "safe_dom_layout_v1"
+    assert report["page_layouts"][0]["landmarks"][0]["label"] == "Primary CTA"
     assert not contains_media_like_fields(report)

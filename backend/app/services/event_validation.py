@@ -10,7 +10,7 @@ from typing import Any
 from app.models.api import EventEnvelope
 
 SUSPICIOUS_MEDIA_KEYS = {"video", "frame", "image", "base64", "blob", "webcam_frame", "screenshot"}
-MAX_PAYLOAD_BYTES = 4096
+MAX_PAYLOAD_BYTES = 12288
 EVENT_SCHEMA_VERSION = 1
 WEBGAZER_EXPERIMENTAL_SOURCE = "webgazer_experimental"
 REAL_SITE_CAPTURE_SOURCE = "real_site_capture"
@@ -62,6 +62,9 @@ SAFE_PAYLOAD_KEYS = {
     "target_url",
     "page_url",
     "page_path",
+    "previous_page_url",
+    "previous_page_path",
+    "route_change",
     "document_width",
     "document_height",
     "scroll_x",
@@ -69,6 +72,8 @@ SAFE_PAYLOAD_KEYS = {
     "aoi_role_key",
     "coordinate_space",
     "completed",
+    "eye_tracking_disabled",
+    "layout_snapshot",
 }
 
 POINT_KEYS = {"point", "target_point", "observed_point"}
@@ -91,6 +96,28 @@ DRIFT_NUMERIC_KEYS = {
     "calibration_baseline_age_ms",
 }
 DRIFT_BOOL_KEYS = {"eye_visibility_lost", "face_lost", "low_light", "sample_rate_low"}
+LAYOUT_SNAPSHOT_STRING_KEYS = {"snapshot_type", "page_url", "page_path", "coordinate_space"}
+LAYOUT_SNAPSHOT_NUMERIC_KEYS = {
+    "viewport_width",
+    "viewport_height",
+    "document_width",
+    "document_height",
+    "scroll_x",
+    "scroll_y",
+}
+LAYOUT_LANDMARK_STRING_KEYS = {
+    "id",
+    "label",
+    "semantic_type",
+    "tag",
+    "text",
+    "background_color",
+    "text_color",
+    "border_color",
+    "font_size",
+    "font_weight",
+}
+LAYOUT_LANDMARK_NUMERIC_KEYS = {"x", "y", "width", "height"}
 
 
 @dataclass(frozen=True)
@@ -238,6 +265,54 @@ def _sanitize_drift_metrics(value: object) -> dict[str, Any] | None:
     return sanitized or None
 
 
+def _sanitize_layout_landmark(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    sanitized: dict[str, Any] = {}
+    for key in LAYOUT_LANDMARK_STRING_KEYS:
+        raw_value = value.get(key)
+        if isinstance(raw_value, str) and raw_value.strip():
+            sanitized[key] = raw_value.strip()[:120]
+    for key in LAYOUT_LANDMARK_NUMERIC_KEYS:
+        raw_value = value.get(key)
+        if _is_number(raw_value):
+            numeric_value = float(raw_value)
+            if 0 <= numeric_value <= 1:
+                sanitized[key] = _round_coordinate(numeric_value)
+    if isinstance(value.get("is_aoi"), bool):
+        sanitized["is_aoi"] = value["is_aoi"]
+    required = {"id", "label", "x", "y", "width", "height"}
+    return sanitized if required.issubset(sanitized.keys()) else None
+
+
+def _sanitize_layout_snapshot(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    sanitized: dict[str, Any] = {}
+    for key in LAYOUT_SNAPSHOT_STRING_KEYS:
+        raw_value = value.get(key)
+        if isinstance(raw_value, str) and raw_value.strip():
+            sanitized[key] = raw_value.strip()[:1000]
+    for key in LAYOUT_SNAPSHOT_NUMERIC_KEYS:
+        raw_value = value.get(key)
+        if _is_number(raw_value):
+            sanitized[key] = _round_metric(float(raw_value))
+    raw_landmarks = value.get("landmarks")
+    if isinstance(raw_landmarks, list):
+        landmarks = [
+            landmark
+            for item in raw_landmarks[:96]
+            if (landmark := _sanitize_layout_landmark(item)) is not None
+        ]
+        sanitized["landmarks"] = landmarks
+    if sanitized.get("snapshot_type") != "safe_dom_layout_v1":
+        return None
+    if sanitized.get("coordinate_space") != "document_normalized":
+        return None
+    required = {"page_url", "page_path", "document_width", "document_height", "viewport_width", "viewport_height"}
+    return sanitized if required.issubset(sanitized.keys()) else None
+
+
 def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     sanitized: dict[str, Any] = {}
     for key, value in payload.items():
@@ -259,7 +334,7 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
             elif _is_number(value):
                 sanitized[key] = _round_metric(float(value))
             continue
-        if key in {"synthetic", "completed"}:
+        if key in {"synthetic", "completed", "route_change", "eye_tracking_disabled"}:
             if isinstance(value, bool):
                 sanitized[key] = value
             continue
@@ -288,6 +363,11 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
             drift = _sanitize_drift_metrics(value)
             if drift is not None:
                 sanitized[key] = drift
+            continue
+        if key == "layout_snapshot":
+            snapshot = _sanitize_layout_snapshot(value)
+            if snapshot is not None:
+                sanitized[key] = snapshot
             continue
     return sanitized
 

@@ -314,6 +314,11 @@ class ReplayEventResponse(BaseModel):
     aoi_ids: list[UUID] = Field(default_factory=list)
     label: str | None = None
     message: str | None = None
+    page_url: str | None = None
+    page_path: str | None = None
+    scroll_y: float | None = None
+    viewport_height: float | None = None
+    document_height: float | None = None
     source: str | None = None
 
 
@@ -340,6 +345,39 @@ class ReplayAoiOverlayResponse(BaseModel):
     width: float
     height: float
     coordinate_space: Literal["normalized", "document_normalized"] = "normalized"
+
+
+class PageLayoutLandmarkResponse(BaseModel):
+    id: str
+    label: str
+    semantic_type: str | None = None
+    tag: str | None = None
+    text: str | None = None
+    background_color: str | None = None
+    text_color: str | None = None
+    border_color: str | None = None
+    font_size: str | None = None
+    font_weight: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    is_aoi: bool = False
+
+
+class PageLayoutResponse(BaseModel):
+    snapshot_type: Literal["safe_dom_layout_v1"] = "safe_dom_layout_v1"
+    page_url: str
+    page_path: str | None = None
+    viewport_width: float
+    viewport_height: float
+    document_width: float
+    document_height: float
+    scroll_x: float = 0
+    scroll_y: float = 0
+    coordinate_space: Literal["document_normalized"] = "document_normalized"
+    captured_at: str | None = None
+    landmarks: list[PageLayoutLandmarkResponse] = Field(default_factory=list)
 
 
 class SessionReportResponse(BaseModel):
@@ -389,6 +427,7 @@ class SessionReportResponse(BaseModel):
     replay_events: list[ReplayEventResponse] = Field(default_factory=list)
     replay_fixations: list[ReplayFixationResponse] = Field(default_factory=list)
     replay_aoi_overlay: list[ReplayAoiOverlayResponse] = Field(default_factory=list)
+    page_layouts: list[PageLayoutResponse] = Field(default_factory=list)
     notes: list[str] = Field(
         default_factory=lambda: [
             "Analytics are simple deterministic demo metrics.",

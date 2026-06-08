@@ -31,6 +31,7 @@
     "replay_events",
     "replay_fixations",
     "replay_aoi_overlay",
+    "page_layouts",
     "privacy_summary",
     "metrics",
     "notes"
@@ -222,6 +223,12 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/replay_aoi_overlay"
+      }
+    },
+    "page_layouts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/page_layout"
       }
     },
     "notes": {
@@ -528,6 +535,24 @@
         "message": {
           "type": ["string", "null"]
         },
+        "page_url": {
+          "type": ["string", "null"]
+        },
+        "page_path": {
+          "type": ["string", "null"]
+        },
+        "scroll_y": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "viewport_height": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "document_height": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
         "source": {
           "type": ["string", "null"]
         }
@@ -638,6 +663,134 @@
         "coordinate_space": {
           "type": "string",
           "enum": ["normalized", "document_normalized"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "page_layout_landmark": {
+      "type": "object",
+      "required": ["id", "label", "x", "y", "width", "height", "is_aoi"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "semantic_type": {
+          "type": ["string", "null"]
+        },
+        "tag": {
+          "type": ["string", "null"]
+        },
+        "text": {
+          "type": ["string", "null"]
+        },
+        "background_color": {
+          "type": ["string", "null"]
+        },
+        "text_color": {
+          "type": ["string", "null"]
+        },
+        "border_color": {
+          "type": ["string", "null"]
+        },
+        "font_size": {
+          "type": ["string", "null"]
+        },
+        "font_weight": {
+          "type": ["string", "null"]
+        },
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "is_aoi": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "page_layout": {
+      "type": "object",
+      "required": [
+        "snapshot_type",
+        "page_url",
+        "page_path",
+        "viewport_width",
+        "viewport_height",
+        "document_width",
+        "document_height",
+        "scroll_x",
+        "scroll_y",
+        "coordinate_space",
+        "captured_at",
+        "landmarks"
+      ],
+      "properties": {
+        "snapshot_type": {
+          "type": "string",
+          "const": "safe_dom_layout_v1"
+        },
+        "page_url": {
+          "type": "string"
+        },
+        "page_path": {
+          "type": ["string", "null"]
+        },
+        "viewport_width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "viewport_height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "document_width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "document_height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "scroll_x": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scroll_y": {
+          "type": "number",
+          "minimum": 0
+        },
+        "coordinate_space": {
+          "type": "string",
+          "const": "document_normalized"
+        },
+        "captured_at": {
+          "type": ["string", "null"]
+        },
+        "landmarks": {
+          "type": "array",
+          "maxItems": 96,
+          "items": {
+            "$ref": "#/$defs/page_layout_landmark"
+          }
         }
       },
       "additionalProperties": false

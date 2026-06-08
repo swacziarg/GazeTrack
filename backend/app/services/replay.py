@@ -63,8 +63,12 @@ def _session_duration_ms(events: list[EventEnvelope], session_start: datetime | 
     return max(relative_values) if relative_values else 0
 
 
-def _aoi_ids_for_point(x: float, y: float, aois: list[AoiRecord]) -> list[str]:
-    return [str(aoi.id) for aoi in aois if is_point_inside_aoi(x, y, aoi)]
+def _aoi_ids_for_point(x: float, y: float, aois: list[AoiRecord], page_url: str | None = None) -> list[str]:
+    return [
+        str(aoi.id)
+        for aoi in aois
+        if (not page_url or not aoi.page_url or aoi.page_url == page_url) and is_point_inside_aoi(x, y, aoi)
+    ]
 
 
 def _optional_text(value: object) -> str | None:
@@ -111,6 +115,56 @@ def build_replay_aoi_overlay(aois: list[AoiRecord]) -> list[dict[str, Any]]:
     ]
 
 
+def build_page_layouts(events: list[EventEnvelope]) -> list[dict[str, Any]]:
+    layouts_by_url: dict[str, dict[str, Any]] = {}
+    for event in events:
+        snapshot = event.payload.get("layout_snapshot")
+        if not isinstance(snapshot, dict):
+            continue
+        page_url = snapshot.get("page_url")
+        if not isinstance(page_url, str) or not page_url:
+            continue
+        layout = {
+            "snapshot_type": "safe_dom_layout_v1",
+            "page_url": page_url,
+            "page_path": snapshot.get("page_path") if isinstance(snapshot.get("page_path"), str) else None,
+            "viewport_width": float(snapshot.get("viewport_width") or event.payload.get("viewport_width") or 1),
+            "viewport_height": float(snapshot.get("viewport_height") or event.payload.get("viewport_height") or 1),
+            "document_width": float(snapshot.get("document_width") or event.payload.get("document_width") or 1),
+            "document_height": float(snapshot.get("document_height") or event.payload.get("document_height") or 1),
+            "scroll_x": float(snapshot.get("scroll_x") or event.payload.get("scroll_x") or 0),
+            "scroll_y": float(snapshot.get("scroll_y") or event.payload.get("scroll_y") or 0),
+            "coordinate_space": "document_normalized",
+            "captured_at": event.timestamp,
+            "landmarks": [
+                {
+                    "id": str(landmark.get("id")),
+                    "label": str(landmark.get("label")),
+                    "semantic_type": landmark.get("semantic_type") if isinstance(landmark.get("semantic_type"), str) else None,
+                    "tag": landmark.get("tag") if isinstance(landmark.get("tag"), str) else None,
+                    "text": landmark.get("text") if isinstance(landmark.get("text"), str) else None,
+                    "background_color": landmark.get("background_color") if isinstance(landmark.get("background_color"), str) else None,
+                    "text_color": landmark.get("text_color") if isinstance(landmark.get("text_color"), str) else None,
+                    "border_color": landmark.get("border_color") if isinstance(landmark.get("border_color"), str) else None,
+                    "font_size": landmark.get("font_size") if isinstance(landmark.get("font_size"), str) else None,
+                    "font_weight": landmark.get("font_weight") if isinstance(landmark.get("font_weight"), str) else None,
+                    "x": float(landmark.get("x")),
+                    "y": float(landmark.get("y")),
+                    "width": float(landmark.get("width")),
+                    "height": float(landmark.get("height")),
+                    "is_aoi": bool(landmark.get("is_aoi", False)),
+                }
+                for landmark in snapshot.get("landmarks", [])
+                if isinstance(landmark, dict)
+                and all(isinstance(landmark.get(key), int | float) for key in ("x", "y", "width", "height"))
+                and isinstance(landmark.get("id"), str)
+                and isinstance(landmark.get("label"), str)
+            ][:96],
+        }
+        layouts_by_url[page_url] = layout
+    return list(layouts_by_url.values())
+
+
 def build_replay_events(events: list[EventEnvelope], aois: list[AoiRecord]) -> list[dict[str, Any]]:
     session_start = _session_start(events)
     replay_events: list[dict[str, Any]] = []
@@ -129,9 +183,15 @@ def build_replay_events(events: list[EventEnvelope], aois: list[AoiRecord]) -> l
 
         point = normalize_event_point(event.payload)
         if point is not None:
+            event_page_url = event.payload.get("page_url")
             payload["x"] = round(point[0], 4)
             payload["y"] = round(point[1], 4)
-            payload["aoi_ids"] = _aoi_ids_for_point(point[0], point[1], aois)
+            payload["aoi_ids"] = _aoi_ids_for_point(
+                point[0],
+                point[1],
+                aois,
+                event_page_url if isinstance(event_page_url, str) else None,
+            )
 
         confidence = extract_confidence(event.payload)
         if confidence is not None:
@@ -141,6 +201,18 @@ def build_replay_events(events: list[EventEnvelope], aois: list[AoiRecord]) -> l
         if message is not None:
             payload["label"] = message
             payload["message"] = message
+
+        page_url = _optional_text(event.payload.get("page_url"))
+        if page_url is not None:
+            payload["page_url"] = page_url
+        page_path = _optional_text(event.payload.get("page_path"))
+        if page_path is not None:
+            payload["page_path"] = page_path
+
+        for numeric_key in ("scroll_y", "viewport_height", "document_height"):
+            numeric_value = event.payload.get(numeric_key)
+            if isinstance(numeric_value, int | float):
+                payload[numeric_key] = round(float(numeric_value), 3)
 
         source = _optional_text(event.payload.get("source"))
         if source is not None:

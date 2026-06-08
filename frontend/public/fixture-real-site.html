@@ -62,6 +62,20 @@
         background: #172033;
         color: #ffffff;
       }
+
+      .how-it-works {
+        min-height: 760px;
+        background: #f8fafc;
+      }
+
+      nav button {
+        border: 0;
+        background: transparent;
+        color: #172033;
+        cursor: pointer;
+        font: inherit;
+        padding: 0;
+      }
     </style>
   </head>
   <body>
@@ -69,11 +83,12 @@
       <strong>Northstar</strong>
       <nav>
         <a>Product</a>
+        <button type="button" data-fixture-route="how-it-works">How it works</button>
         <a>Pricing</a>
         <a>Docs</a>
       </nav>
     </header>
-    <main>
+    <main data-fixture-main>
       <section class="hero">
         <h1 data-gazetrack-aoi="hero_headline">Find the plan that keeps your launch moving</h1>
         <p>Compare starter and team packages, then start checkout for the team plan.</p>
@@ -94,13 +109,32 @@
         captureToken: params.get('captureToken'),
         enableWebGazer: params.get('enableWebGazer') === 'true',
         webgazerScriptUrl: params.get('webgazerScriptUrl') || undefined,
+        webgazerFaceMeshSolutionPath: params.get('webgazerFaceMeshSolutionPath') || undefined,
         calibrationPasses: Number(params.get('calibrationPasses') || 1),
         requireCameraReadiness: params.get('requireCameraReadiness') !== 'false',
       }
       if (params.get('stubWebGazer') === 'true') {
         window.__GazeTrackWebGazerCalls = []
+        window.__GazeTrackWebGazerTrackStopped = false
+        const webgazerVideoElement = {
+          srcObject: {
+            getTracks() {
+              return [
+                {
+                  stop() {
+                    window.__GazeTrackWebGazerTrackStopped = true
+                  },
+                },
+              ]
+            },
+          },
+          pause() {
+            window.__GazeTrackWebGazerCalls.push(['videoPause'])
+          },
+        }
         window.webgazer = {
           _listener: null,
+          params: {},
           saveDataAcrossSessions(value) {
             window.__GazeTrackWebGazerCalls.push(['saveDataAcrossSessions', value])
             return this
@@ -122,6 +156,23 @@
             window.__GazeTrackWebGazerCalls.push(['begin'])
             return Promise.resolve()
           },
+          clearGazeListener() {
+            this._listener = null
+            window.__GazeTrackWebGazerCalls.push(['clearGazeListener'])
+            return this
+          },
+          pause() {
+            window.__GazeTrackWebGazerCalls.push(['pause'])
+            return this
+          },
+          end() {
+            window.__GazeTrackWebGazerCalls.push(['end'])
+            return this
+          },
+          getVideoElement() {
+            window.__GazeTrackWebGazerCalls.push(['getVideoElement'])
+            return webgazerVideoElement
+          },
           recordScreenPosition(x, y, eventType) {
             window.__GazeTrackWebGazerCalls.push(['recordScreenPosition', x, y, eventType])
             if (this._listener) {
@@ -136,6 +187,25 @@
           },
         }
       }
+    </script>
+    <script>
+      const main = document.querySelector('[data-fixture-main]')
+      document.querySelector('[data-fixture-route="how-it-works"]').addEventListener('click', () => {
+        history.pushState({}, '', `/fixture-real-site.html/how-it-works${window.location.search}`)
+        main.innerHTML = `
+          <section class="how-it-works" data-gazetrack-aoi="how_it_works_section">
+            <h1 data-gazetrack-aoi="hero_headline">How Northstar keeps launch decisions clear</h1>
+            <p>Review milestones, compare plan tradeoffs, and keep the checkout action available after learning how the product works.</p>
+            <button class="cta" data-gazetrack-aoi="primary_cta" type="button">Start team checkout</button>
+          </section>
+          <section class="pricing" data-gazetrack-aoi="pricing_preview">
+            <article><h2>Step 1</h2><p>Pick a workflow.</p></article>
+            <article><h2>Step 2</h2><p>Compare team fit.</p></article>
+            <article><h2>Step 3</h2><p>Start checkout.</p></article>
+          </section>
+        `
+      })
+      window.addEventListener('popstate', () => window.location.reload())
     </script>
     <script src="/gazetrack-capture.js" async></script>
   </body>

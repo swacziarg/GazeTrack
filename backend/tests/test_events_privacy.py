@@ -44,6 +44,83 @@ def test_event_ingest_rejects_media_like_payload() -> None:
     assert body["rejected_count"] >= 1
 
 
+def test_event_ingest_accepts_safe_layout_snapshot_without_media() -> None:
+    session_id = uuid4()
+    payload = {
+        "event_type": "page_view",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload": {
+            "page_url": "https://example.com/pricing",
+            "page_path": "/pricing",
+            "document_width": 1200,
+            "document_height": 2400,
+            "viewport_width": 1200,
+            "viewport_height": 800,
+            "coordinate_space": "document_normalized",
+            "layout_snapshot": {
+                "snapshot_type": "safe_dom_layout_v1",
+                "page_url": "https://example.com/pricing",
+                "page_path": "/pricing",
+                "viewport_width": 1200,
+                "viewport_height": 800,
+                "document_width": 1200,
+                "document_height": 2400,
+                "scroll_x": 0,
+                "scroll_y": 0,
+                "coordinate_space": "document_normalized",
+                "landmarks": [
+                    {
+                        "id": "primary_cta",
+                        "label": "Primary CTA",
+                        "semantic_type": "CTA",
+                        "x": 0.1,
+                        "y": 0.2,
+                        "width": 0.2,
+                        "height": 0.1,
+                        "is_aoi": True,
+                    }
+                ],
+            },
+        },
+    }
+
+    response = client.post(f"/api/v1/sessions/{session_id}/events", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["accepted_count"] == 1
+
+
+def test_event_ingest_rejects_media_like_fields_inside_layout_snapshot() -> None:
+    session_id = uuid4()
+    payload = {
+        "event_type": "page_view",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload": {
+            "source": "real_site_capture",
+            "tracker_type": "real_site_capture",
+            "page_url": "https://example.com/pricing",
+            "page_path": "/pricing",
+            "layout_snapshot": {
+                "snapshot_type": "safe_dom_layout_v1",
+                "page_url": "https://example.com/pricing",
+                "page_path": "/pricing",
+                "viewport_width": 1200,
+                "viewport_height": 800,
+                "document_width": 1200,
+                "document_height": 2400,
+                "coordinate_space": "document_normalized",
+                "screenshot_blob": "not allowed",
+            },
+        },
+    }
+
+    response = client.post(f"/api/v1/sessions/{session_id}/events", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["accepted_count"] == 0
+    assert response.json()["rejected_count"] == 1
+
+
 def test_event_ingest_accepts_webgazer_normalized_gaze_event() -> None:
     session_id = uuid4()
     payload = {

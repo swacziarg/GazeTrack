@@ -97,11 +97,12 @@ Calibration/session quality is heuristic. Reports include `quality_verdict` (`pa
 Report replay fields are generated from already persisted telemetry and computed fixations:
 
 - `replay_summary` counts gaze, fixation, click, scroll, and task events, with `duration_ms` and `coordinate_space: "normalized"`.
-- `replay_events` is an ordered privacy-safe timeline with event type, timestamp, relative time, optional normalized point, confidence, AOI hits, label/message, and source.
+- `replay_events` is an ordered privacy-safe timeline with event type, timestamp, relative time, optional normalized point, confidence, AOI hits, label/message, page, source, and viewport scroll metadata when captured.
 - `replay_fixations` contains replay-friendly fixation centroids with start/end relative time, duration, sample count, optional confidence, and AOI hits.
 - `replay_aoi_overlay` contains normalized AOI boxes for schematic rendering.
+- `page_layouts` contains safe DOM layout metadata for real-site reports: page URL/path, viewport/document dimensions, scroll offsets, AOI rectangles, safe text snippets, basic visual style metadata, and semantic element boxes.
 
-Replay is not video replay. It does not persist or return raw payloads wholesale, webcam frames, images, screenshots, blobs, or base64 media.
+Replay is not video replay. It does not persist or return raw payloads wholesale, webcam frames, images, screenshots, blobs, base64 media, face embeddings, or face landmarks from webcam processing.
 
 ## Intentional limitations
 

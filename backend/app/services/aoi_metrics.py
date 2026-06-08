@@ -47,6 +47,13 @@ def is_point_inside_aoi(x: float, y: float, aoi: AoiRecord) -> bool:
     return aoi.x <= x <= aoi.x + aoi.width and aoi.y <= y <= aoi.y + aoi.height
 
 
+def event_matches_aoi_page(event: EventEnvelope, aoi: AoiRecord) -> bool:
+    event_page_url = event.payload.get("page_url")
+    if isinstance(event_page_url, str) and aoi.page_url:
+        return event_page_url == aoi.page_url
+    return True
+
+
 def parse_event_timestamp(timestamp: object) -> datetime | None:
     if isinstance(timestamp, int | float):
         try:
@@ -142,6 +149,8 @@ def compute_aoi_metrics(
         aoi_fixation_confidences: list[float] = []
 
         for event in gaze_events:
+            if not event_matches_aoi_page(event, aoi):
+                continue
             point = normalize_event_point(event.payload)
             if point is None:
                 continue
@@ -149,6 +158,8 @@ def compute_aoi_metrics(
                 gaze_timestamps.append(event.timestamp)
 
         for event in click_events:
+            if not event_matches_aoi_page(event, aoi):
+                continue
             point = normalize_event_point(event.payload)
             if point is None:
                 continue

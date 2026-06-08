@@ -601,7 +601,15 @@ class GazeTrackRepository:
             )
 
         with connect_database(self.database_url) as connection:
-            connection.execute("DELETE FROM aoi_snapshots WHERE session_id = ?", (str(session_id),))
+            page_urls = sorted({row[8] for row in rows if row[8]})
+            if page_urls:
+                placeholders = ",".join("?" for _ in page_urls)
+                connection.execute(
+                    f"DELETE FROM aoi_snapshots WHERE session_id = ? AND page_url IN ({placeholders})",
+                    (str(session_id), *page_urls),
+                )
+            else:
+                connection.execute("DELETE FROM aoi_snapshots WHERE session_id = ?", (str(session_id),))
             if rows:
                 connection.executemany(
                     """

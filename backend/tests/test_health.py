@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
+import httpx
 
-from app.main import app
+from app.main import app, WEBGAZER_MEDIAPIPE_BASE_URL
 
 client = TestClient(app)
 
@@ -23,3 +24,38 @@ def test_local_frontend_cors_preflight_is_allowed() -> None:
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5175"
+
+
+def test_shotzweb_localhost_cors_preflight_is_allowed() -> None:
+    response = client.options(
+        "/webgazer-mediapipe/face_mesh/face_mesh.binarypb",
+        headers={
+            "Origin": "http://127.0.0.1:3001",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3001"
+
+
+def test_webgazer_mediapipe_proxy_fetches_from_fixed_upstream(monkeypatch) -> None:
+    requested_urls: list[str] = []
+
+    def fake_get(url: str, **_kwargs: object) -> httpx.Response:
+        requested_urls.append(url)
+        return httpx.Response(200, content=b"mesh", headers={"content-type": "application/octet-stream"})
+
+    monkeypatch.setattr("app.main.httpx.get", fake_get)
+
+    response = client.get("/webgazer-mediapipe/face_mesh/face_mesh.binarypb")
+
+    assert response.status_code == 200
+    assert response.content == b"mesh"
+    assert requested_urls == [f"{WEBGAZER_MEDIAPIPE_BASE_URL}/face_mesh/face_mesh.binarypb"]
+
+
+def test_webgazer_mediapipe_proxy_rejects_path_traversal() -> None:
+    response = client.get("/webgazer-mediapipe/face_mesh/../secret")
+
+    assert response.status_code == 404

@@ -141,6 +141,11 @@ uses full-viewport calibration targets, then records task telemetry. It sends on
 when available, quality metadata, calibration summaries, clicks, scrolls, and task events as `real_site_capture`.
 WebGazer estimates are approximate, browser-dependent, and not medical-grade.
 
+During WebGazer-enabled tasks, the tester can turn off eye tracking/camera after setup. This clears the WebGazer listener,
+pauses/ends WebGazer when available, stops local camera streams, removes the gaze dot, and continues the task with
+interaction-only telemetry until the tester finishes. Finishing the task also shuts down WebGazer and known WebGazer
+camera streams automatically.
+
 ## Synthetic Report Visuals
 
 After completing the mock session, the local report renders synthetic visual previews:
@@ -151,7 +156,12 @@ After completing the mock session, the local report renders synthetic visual pre
 
 These visuals are generated from mock telemetry positions and demo AOI boxes only. They are not webcam tracking, WebGazer output, raw media processing, or production heatmap analytics.
 
-The backend session replay uses persisted telemetry and computed fixations only. It is a static SVG overlay over normalized 0-1 coordinates and does not request, store, or render webcam video, page screenshots, images, blobs, or base64 media. The scrubber filters replay markers by relative event time so future events are hidden until the selected timeline point reaches them.
+The backend session replay uses persisted telemetry, computed fixations, AOI boxes, and safe DOM layout metadata only.
+Real-site reports reconstruct page context from document dimensions, safe text snippets, visual style metadata, and
+semantic element rectangles, not screenshots. Replay renders a bounded viewport and auto-scrolls through the reconstructed
+page as playback reaches events captured below the fold. It does not request, store, or render webcam video, page
+screenshots, images, blobs, or base64 media. The scrubber filters
+replay markers by relative event time so future events are hidden until the selected timeline point reaches them.
 
 The synthetic generator supports `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze` quality modes so the backend report can demonstrate pass/warn/fail verdicts. No synthetic mode requests camera permission or stores webcam video, frames, images, blobs, or base64 media.
 

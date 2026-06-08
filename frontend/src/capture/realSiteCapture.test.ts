@@ -3,6 +3,7 @@ import {
   createClickEvent,
   createCalibrationCompleteEvent,
   createPageViewEvent,
+  createSafeLayoutSnapshot,
   documentSizeFromDom,
   expandCalibrationTargets,
   normalizeDocumentPoint,
@@ -146,6 +147,12 @@ describe('real-site capture helpers', () => {
       tracker_type: 'real_site_capture',
       page_path: '/pricing',
       coordinate_space: 'document_normalized',
+      layout_snapshot: {
+        snapshot_type: 'safe_dom_layout_v1',
+        page_url: 'https://example.com/pricing',
+        document_width: 1200,
+        document_height: 2400,
+      },
     })
     expect(click.payload).toMatchObject({
       source: 'real_site_capture',
@@ -155,6 +162,42 @@ describe('real-site capture helpers', () => {
       document_height: 2400,
     })
     expect(JSON.stringify(click)).not.toMatch(/video|screenshot|frame|blob|base64/i)
+  })
+
+  it('creates privacy-safe DOM layout snapshots without media payloads', () => {
+    const snapshot = createSafeLayoutSnapshot(
+      'https://example.com/pricing',
+      { width: 1200, height: 2400 },
+      [
+        {
+          id: 'primary_cta',
+          label: 'Primary CTA',
+          semantic_type: 'CTA',
+          tag: 'button',
+          text: 'Start checkout',
+          background_color: 'rgb(23, 32, 51)',
+          text_color: 'rgb(255, 255, 255)',
+          x: 0.1,
+          y: 0.2,
+          width: 0.2,
+          height: 0.1,
+          is_aoi: true,
+        },
+      ],
+      0,
+      320,
+      1200,
+      800,
+    )
+
+    expect(snapshot).toMatchObject({
+      snapshot_type: 'safe_dom_layout_v1',
+      page_path: '/pricing',
+      scroll_y: 320,
+      coordinate_space: 'document_normalized',
+      landmarks: [{ label: 'Primary CTA', text: 'Start checkout', is_aoi: true }],
+    })
+    expect(JSON.stringify(snapshot)).not.toMatch(/video|screenshot|frame|blob|base64|landmark_image/i)
   })
 
   it('derives document size from DOM dimensions', () => {
