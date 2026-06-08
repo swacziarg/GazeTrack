@@ -91,63 +91,129 @@ def _safe_style_value(value: str | None, fallback: str = "") -> str:
     return "".join(character for character in value[:80] if character in allowed) or fallback
 
 
-def _layout_canvas_html(report: SessionReportResponse, mode: str) -> str:
-    page_layouts = report.page_layouts
-    if not page_layouts:
-        fallback_content = _heatmap_points_html(report) if mode == "heatmap" else '<div id="replay-dot" class="replay-dot"></div>'
-        return (
-            '<div class="page-canvas" data-page-url="" style="aspect-ratio:16/9">'
-            '<div class="viz-grid"></div>'
-            f"{_aoi_overlay_html(report)}"
-            f"{fallback_content}"
-            "</div>"
+def _report_iframe_url(page_url: str) -> str:
+    separator = "&" if "?" in page_url else "?"
+    return f"{page_url}{separator}gazetrack_report_view=1"
+
+
+def _landmark_font_size(value: str | None, tag: str) -> str:
+    if not value or not value.endswith("px"):
+        return "14px" if tag in {"h1", "h2"} else "12px"
+    try:
+        size = float(value.removesuffix("px"))
+    except ValueError:
+        return "14px" if tag in {"h1", "h2"} else "12px"
+    cap = 24 if tag == "h1" else 18 if tag in {"h2", "h3", "h4"} else 14
+    floor = 12 if tag in {"h1", "h2", "h3", "h4"} else 10
+    return f"{max(floor, min(cap, size)):.0f}px"
+
+
+def _page_controls_html(report: SessionReportResponse, target: str) -> str:
+    pages = _report_pages(report)
+    if len(pages) <= 1:
+        return ""
+    buttons = []
+    for index, page in enumerate(pages):
+        label = str(page.get("page_path") or f"Page {index + 1}")
+        buttons.append(
+            f'<button type="button" class="page-switch{" is-active" if index == 0 else ""}" '
+            f'data-viz-target="{escape(target)}" data-page-url="{escape(str(page["page_url"]))}">'
+            f"{escape(label)}</button>"
+        )
+    return f'<div class="page-switcher" aria-label="{escape(target)} page selector">{"".join(buttons)}</div>'
+
+
+def _report_pages(report: SessionReportResponse) -> list[dict[str, object]]:
+    pages_by_url: dict[str, dict[str, object]] = {}
+    order: list[str] = []
+
+    def upsert_page(
+        page_url: str | None,
+        page_path: str | None,
+        viewport_width: float | None,
+        viewport_height: float | None,
+        document_width: float | None,
+        document_height: float | None,
+    ) -> None:
+        if not page_url:
+            return
+        if page_url not in pages_by_url:
+            order.append(page_url)
+            pages_by_url[page_url] = {
+                "page_url": page_url,
+                "page_path": page_path or page_url,
+                "viewport_width": max(float(viewport_width or 1440), 1.0),
+                "viewport_height": max(float(viewport_height or 900), 1.0),
+                "document_width": max(float(document_width or viewport_width or 1440), 1.0),
+                "document_height": max(float(document_height or viewport_height or 900), 1.0),
+            }
+            return
+
+        page = pages_by_url[page_url]
+        page["page_path"] = page.get("page_path") or page_path or page_url
+        page["viewport_width"] = max(float(page["viewport_width"]), float(viewport_width or 0), 1.0)
+        page["viewport_height"] = max(float(page["viewport_height"]), float(viewport_height or 0), 1.0)
+        page["document_width"] = max(float(page["document_width"]), float(document_width or 0), float(page["viewport_width"]), 1.0)
+        page["document_height"] = max(float(page["document_height"]), float(document_height or 0), float(page["viewport_height"]), 1.0)
+
+    for layout in report.page_layouts:
+        upsert_page(
+            layout.page_url,
+            layout.page_path,
+            layout.viewport_width,
+            layout.viewport_height,
+            layout.document_width,
+            layout.document_height,
         )
 
-    canvases: list[str] = []
-    for index, layout in enumerate(page_layouts):
-        viewport_width = max(float(layout.viewport_width), 1.0)
-        viewport_height = max(float(layout.viewport_height), 1.0)
-        document_height = max(float(layout.document_height), viewport_height)
-        page_height_pct = max(100.0, (document_height / viewport_height) * 100)
-        landmark_parts: list[str] = []
-        for landmark in layout.landmarks:
-            classes = ["layout-box"]
-            tag = (landmark.tag or "").lower()
-            if landmark.is_aoi:
-                classes.append("layout-aoi")
-            if tag in {"h1", "h2", "h3", "h4", "p", "a", "button", "label", "li", "input", "textarea", "select"}:
-                classes.append("layout-text")
-            background = _safe_style_value(landmark.background_color, "rgba(255,255,255,.55)")
-            color = _safe_style_value(landmark.text_color, "#374151")
-            border = _safe_style_value(landmark.border_color, "rgba(107,114,128,.35)")
-            font_size = _safe_style_value(landmark.font_size, "12px")
-            font_weight = _safe_style_value(landmark.font_weight, "500")
-            text = landmark.text or landmark.label
-            landmark_parts.append(
-                f'<div class="{" ".join(classes)}" '
-                f'style="left:{_percent(landmark.x)}%;top:{_percent(landmark.y)}%;'
-                f'width:{_percent(landmark.width)}%;height:{_percent(landmark.height)}%;'
-                f'background:{background};border-color:{border};color:{color};'
-                f'font-size:{font_size};font-weight:{font_weight}">'
-                f"<span>{escape(text)}</span></div>"
-            )
-        landmarks = "".join(landmark_parts)
-        points = _heatmap_points_html(report, layout.page_url) if mode == "heatmap" else ""
-        replay_dot = '<div id="replay-dot" class="replay-dot"></div>' if mode == "replay" and index == 0 else ""
-        frame_classes = "screen-frame" if mode == "replay" else "screen-frame heatmap-frame"
-        if mode == "replay" and index > 0:
-            frame_classes += " is-hidden"
-        canvases.append(
-            f'<div class="{frame_classes}" data-page-url="{escape(layout.page_url)}" '
-            f'data-document-height="{layout.document_height}" data-viewport-height="{layout.viewport_height}" '
-            f'style="aspect-ratio:{viewport_width:.0f}/{viewport_height:.0f};">'
-            '<div class="browser-bar"><span></span><span></span><span></span>'
-            f'<strong>{escape(layout.page_path or layout.page_url)}</strong></div>'
-            f'<div class="page-canvas" style="height:{page_height_pct:.2f}%">'
-            '<div class="viz-grid"></div>'
-            f"{landmarks}{points}{replay_dot}</div></div>"
+    for event in report.replay_events:
+        upsert_page(
+            event.page_url,
+            event.page_path,
+            event.viewport_width,
+            event.viewport_height,
+            event.document_width,
+            event.document_height,
         )
-    return "".join(canvases)
+
+    return [pages_by_url[page_url] for page_url in order]
+
+
+def _layout_canvas_html(report: SessionReportResponse, mode: str) -> str:
+    pages = _report_pages(report)
+    if not pages:
+        overlay = _heatmap_points_html(report) if mode == "heatmap" else '<div id="replay-dot" class="replay-dot"></div>'
+        return f'<div class="live-site-frame empty-live-frame">{overlay}</div>'
+
+    frames: list[str] = []
+    for index, page in enumerate(pages):
+        page_url = str(page["page_url"])
+        page_path = str(page.get("page_path") or page_url)
+        viewport_width = max(float(page.get("viewport_width") or 1440), 1.0)
+        viewport_height = max(float(page.get("viewport_height") or 900), 1.0)
+        document_width = max(float(page.get("document_width") or viewport_width), viewport_width)
+        document_height = max(float(page.get("document_height") or viewport_height), viewport_height)
+        iframe_url = _report_iframe_url(page_url)
+        points = ""
+        replay_dot = '<div id="replay-dot" class="replay-dot"></div>' if mode == "replay" and index == 0 else ""
+        frame_classes = f"live-site-frame {mode}-frame"
+        if index > 0:
+            frame_classes += " is-hidden"
+        frames.append(
+            f'<div class="{frame_classes}" data-page-url="{escape(page_url)}" '
+            f'data-viewport-width="{viewport_width}" data-viewport-height="{viewport_height}" '
+            f'data-document-width="{document_width}" data-document-height="{document_height}">'
+            '<div class="browser-bar"><span></span><span></span><span></span>'
+            f'<strong>{escape(page_path)}</strong></div>'
+            f'<div class="site-viewport" style="aspect-ratio:{viewport_width:.0f}/{viewport_height:.0f};">'
+            f'<iframe src="{escape(iframe_url, quote=True)}" loading="lazy" referrerpolicy="no-referrer" '
+            'sandbox="allow-scripts allow-same-origin allow-forms allow-popups" title="Captured website context"></iframe>'
+            f'<div class="telemetry-overlay">{points}{replay_dot}</div>'
+            '<div class="iframe-fallback">If this site blocks embedding, open the captured URL from the browser bar above.</div>'
+            "</div>"
+            "</div>"
+        )
+    return "".join(frames)
 
 
 def _heatmap_points_html(report: SessionReportResponse, page_url: str | None = None) -> str:
@@ -161,7 +227,8 @@ def _heatmap_points_html(report: SessionReportResponse, page_url: str | None = N
         return ""
     return "".join(
         (
-            f'<span class="heat-point" style="left:{_percent(float(event.x))}%;top:{_percent(float(event.y))}%;'
+            f'<span class="heat-point" style="left:{_percent(float(event.viewport_x if event.viewport_x is not None else event.x))}%;'
+            f'top:{_percent(float(event.viewport_y if event.viewport_y is not None else event.y))}%;'
             f'opacity:{0.24 + min(0.45, float(event.confidence or 0.5) * 0.35):.2f}"></span>'
         )
         for event in points[:240]
@@ -202,6 +269,16 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
     raw_json_url = f"/api/v1/sessions/{report.session_id}/report"
     heatmap_canvases = _layout_canvas_html(report, "heatmap")
     replay_canvases = _layout_canvas_html(report, "replay")
+    heatmap_page_controls = _page_controls_html(report, "heatmap")
+    heatmap_scroll_controls = (
+        '<div class="heatmap-scroll-controls">'
+        '<label for="heatmap-scroll-range">Page scroll</label>'
+        '<input id="heatmap-scroll-range" type="range" min="0" max="0" value="0">'
+        '<span id="heatmap-scroll-label" class="muted">0px</span>'
+        '</div>'
+        if _report_pages(report)
+        else ""
+    )
     replay_payload = _replay_payload_json(report)
 
     return f"""<!doctype html>
@@ -221,6 +298,7 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
     .muted {{ color: #6b7280; }}
     .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }}
     .card {{ background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 18px; box-shadow: 0 12px 34px rgba(17,24,39,.08); margin-bottom: 16px; }}
+    .viz-card {{ width: calc(100vw - 40px); margin-left: 50%; transform: translateX(-50%); box-sizing: border-box; }}
     .metric {{ border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fcfcfd; }}
     .metric dt {{ color: #6b7280; font-size: 12px; margin-bottom: 4px; }}
     .metric dd {{ margin: 0; font-weight: 700; font-size: 18px; }}
@@ -231,22 +309,21 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
     a.button {{ display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: #111827; color: white; padding: 9px 12px; text-decoration: none; font-weight: 700; white-space: nowrap; }}
     .notice {{ background: #fffbeb; border-color: #fbbf24; }}
     .viz-shell {{ position: relative; display: grid; gap: 16px; border: 1px solid #d1d5db; border-radius: 8px; background: #e5e7eb; padding: 14px; }}
-    .screen-frame {{ position: relative; width: min(100%, 960px); max-height: min(680px, 72vh); margin: 0 auto; overflow: hidden; border: 1px solid #9ca3af; border-radius: 8px; background: #ffffff; box-shadow: 0 18px 44px rgba(17,24,39,.16); }}
-    .screen-frame.is-hidden {{ display: none; }}
-    .heatmap-frame {{ overflow: auto; }}
-    .browser-bar {{ position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; background: #f9fafb; border-bottom: 1px solid #d1d5db; color: #4b5563; font-size: 11px; }}
+    .live-site-frame {{ position: relative; width: 100%; margin: 0 auto; overflow: hidden; border: 1px solid #9ca3af; border-radius: 8px; background: #ffffff; box-shadow: 0 18px 44px rgba(17,24,39,.16); }}
+    .live-site-frame.is-hidden {{ display: none; }}
+    .site-viewport {{ position: relative; width: 100%; overflow: hidden; background: #fff; }}
+    .live-site-frame iframe {{ position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; z-index: 1; }}
+    .telemetry-overlay {{ position: absolute; inset: 0; z-index: 3; pointer-events: none; }}
+    .iframe-fallback {{ position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 2; padding: 8px 10px; border-radius: 6px; background: rgba(255,255,255,.88); color: #6b7280; font-size: 12px; text-align: center; pointer-events: none; }}
+    .empty-live-frame {{ min-height: 420px; }}
+    .page-switcher {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }}
+    .page-switch {{ border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 7px 10px; font-weight: 700; cursor: pointer; }}
+    .page-switch.is-active {{ border-color: #111827; background: #111827; color: #fff; }}
+    .heatmap-scroll-controls {{ display: grid; grid-template-columns: auto minmax(180px, 1fr) auto; gap: 10px; align-items: center; margin: 0 0 12px; color: #374151; font-weight: 700; }}
+    .heatmap-scroll-controls input {{ width: 100%; }}
+    .browser-bar {{ display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; background: #f9fafb; border-bottom: 1px solid #d1d5db; color: #4b5563; font-size: 11px; }}
     .browser-bar span {{ width: 8px; height: 8px; border-radius: 999px; background: #d1d5db; flex: 0 0 auto; }}
     .browser-bar strong {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }}
-    .page-canvas {{ position: relative; min-height: 100%; background: linear-gradient(180deg, #ffffff, #eef2f7); transform-origin: top left; transition: transform .18s ease; }}
-    .viz-grid {{ position: absolute; inset: 0; background-image: linear-gradient(rgba(17,24,39,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(17,24,39,.06) 1px, transparent 1px); background-size: 10% 10%; }}
-    .layout-box {{ position: absolute; border: 1px solid rgba(107,114,128,.38); background: rgba(255,255,255,.42); border-radius: 3px; overflow: hidden; }}
-    .layout-box span {{ position: absolute; left: 4px; top: 4px; right: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; font: inherit; background: rgba(255,255,255,.62); border-radius: 3px; padding: 1px 3px; }}
-    .layout-text {{ display: flex; align-items: flex-start; }}
-    .layout-text span {{ background: transparent; padding: 0; line-height: 1.2; white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }}
-    .layout-aoi {{ border-color: rgba(15,118,110,.75); background: rgba(20,184,166,.08); }}
-    .layout-aoi span {{ color: #0f766e; }}
-    .aoi-box {{ position: absolute; border: 1px solid rgba(15,118,110,.75); background: rgba(20,184,166,.08); border-radius: 4px; }}
-    .aoi-box span {{ position: absolute; left: 4px; top: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f766e; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.82); border-radius: 4px; padding: 2px 4px; }}
     .heat-point {{ position: absolute; width: 78px; height: 78px; margin: -39px 0 0 -39px; border-radius: 999px; background: radial-gradient(circle, rgba(239,68,68,.72) 0%, rgba(245,158,11,.38) 38%, rgba(20,184,166,0) 72%); mix-blend-mode: multiply; pointer-events: none; }}
     .replay-dot {{ position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 999px; background: #ef4444; border: 2px solid white; box-shadow: 0 0 0 8px rgba(239,68,68,.2), 0 0 20px rgba(239,68,68,.65); transform: translate(-100px, -100px); }}
     .replay-trail {{ position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 999px; background: rgba(239,68,68,.42); }}
@@ -291,18 +368,20 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
       <p class="muted">{escape(report.quality_interpretation.explanation)}</p>
     </section>
 
-    <section class="card">
+    <section class="card viz-card">
       <h2>Heatmap</h2>
-      <p class="muted">Schematic heatmap from accepted normalized gaze samples. It is not a screenshot and does not include raw media.</p>
+      <p class="muted">Heatmap drawn over the captured website URL in a live iframe. No screenshot or image copy is stored.</p>
+      {heatmap_page_controls}
+      {heatmap_scroll_controls}
       <div class="viz-shell" aria-label="Gaze heatmap">
         {heatmap_canvases}
       </div>
       <div class="legend"><span>Red/yellow: denser approximate gaze samples</span><span>Teal boxes: AOIs captured from the page</span></div>
     </section>
 
-    <section class="card">
+    <section class="card viz-card">
       <h2>Replay</h2>
-      <p class="muted">Task replay uses privacy-safe telemetry points and AOI boxes only.</p>
+      <p class="muted">Replay follows the captured timeline and loads each captured page URL as the task changes routes. No video or screenshots are stored.</p>
       <div id="replay-stage" class="viz-shell" aria-label="Session replay">
         {replay_canvases}
       </div>
@@ -348,17 +427,182 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
       const toggle = document.getElementById('replay-toggle');
       const range = document.getElementById('replay-range');
       const time = document.getElementById('replay-time');
+      const heatmapRange = document.getElementById('heatmap-scroll-range');
+      const heatmapScrollLabel = document.getElementById('heatmap-scroll-label');
       const events = (data.events || []).filter((event) =>
         typeof event.x === 'number' ||
         typeof event.y === 'number' ||
         typeof event.scroll_y === 'number' ||
         typeof event.page_url === 'string'
       );
+      const heatmapEvents = events.filter((event) =>
+        event.type === 'gaze' &&
+        typeof event.x === 'number' &&
+        typeof event.y === 'number'
+      );
       const duration = Math.max(1, Number(data.durationMs || 0));
       let playing = false;
       let startedAt = 0;
       let raf = 0;
       let trailCount = 0;
+
+      function frameForMessageSource(source) {{
+        return Array.from(document.querySelectorAll('.live-site-frame')).find((frame) => {{
+          const iframe = frame.querySelector('iframe');
+          return iframe?.contentWindow === source;
+        }});
+      }}
+
+      function postFrameScrollMessage(frame, iframe, scrollX, scrollY) {{
+        try {{
+          iframe.contentWindow?.postMessage(
+            {{ source: 'gazetrack_report', type: 'scroll_to', scroll_x: scrollX, scroll_y: scrollY }},
+            '*',
+          );
+          frame.dataset.scrollMessageSentAt = String(Date.now());
+        }} catch (error) {{}}
+      }}
+
+      function scrollFrameTo(frame, scrollX, scrollY) {{
+        if (!frame) return;
+        const boundedX = Math.max(0, Number(scrollX || 0));
+        const boundedY = Math.max(0, Number(scrollY || 0));
+        frame.dataset.scrollX = String(Math.round(boundedX));
+        frame.dataset.scrollY = String(Math.round(boundedY));
+        const iframe = frame.querySelector('iframe');
+        if (!iframe || !iframe.contentWindow) return;
+        try {{
+          iframe.contentWindow.scrollTo(boundedX, boundedY);
+          const doc = iframe.contentDocument;
+          if (doc?.documentElement) doc.documentElement.scrollTop = boundedY;
+          if (doc?.body) doc.body.scrollTop = boundedY;
+        }} catch (error) {{
+          frame.dataset.scrollBlocked = 'true';
+        }}
+        postFrameScrollMessage(frame, iframe, boundedX, boundedY);
+        window.setTimeout(() => postFrameScrollMessage(frame, iframe, boundedX, boundedY), 80);
+        window.setTimeout(() => postFrameScrollMessage(frame, iframe, boundedX, boundedY), 180);
+        window.setTimeout(() => postFrameScrollMessage(frame, iframe, boundedX, boundedY), 360);
+      }}
+
+      window.addEventListener('message', (event) => {{
+        const message = event.data || {{}};
+        if (!message || message.source !== 'gazetrack_report_frame') return;
+        const frame = frameForMessageSource(event.source);
+        if (!frame) return;
+        if (message.type === 'ready') {{
+          frame.dataset.reportReady = 'true';
+          scrollFrameTo(frame, Number(frame.dataset.scrollX || 0), Number(frame.dataset.scrollY || 0));
+        }}
+        if (message.type === 'scroll_applied') {{
+          frame.dataset.appliedScrollX = String(Math.round(Number(message.scroll_x || 0)));
+          frame.dataset.appliedScrollY = String(Math.round(Number(message.scroll_y || 0)));
+          frame.dataset.requestedScrollX = String(Math.round(Number(message.requested_scroll_x || 0)));
+          frame.dataset.requestedScrollY = String(Math.round(Number(message.requested_scroll_y || 0)));
+          frame.dataset.scrollAck = 'true';
+        }}
+      }});
+
+      function setActivePage(target, pageUrl) {{
+        const selector = target === 'heatmap' ? '.heatmap-frame' : '#replay-stage .replay-frame';
+        document.querySelectorAll(selector).forEach((frame) => {{
+          frame.classList.toggle('is-hidden', frame.dataset.pageUrl !== pageUrl);
+        }});
+        document.querySelectorAll(`.page-switch[data-viz-target="${{target}}"]`).forEach((button) => {{
+          button.classList.toggle('is-active', button.dataset.pageUrl === pageUrl);
+        }});
+        if (target === 'heatmap') updateHeatmapControls();
+      }}
+
+      function activeHeatmapFrame() {{
+        return document.querySelector('.heatmap-frame:not(.is-hidden)') || document.querySelector('.heatmap-frame');
+      }}
+
+      function renderHeatmap() {{
+        const frame = activeHeatmapFrame();
+        if (!frame) return;
+        const overlay = frame.querySelector('.telemetry-overlay');
+        if (!overlay) return;
+        overlay.querySelectorAll('.heat-point').forEach((point) => point.remove());
+        const pageUrl = frame.dataset.pageUrl || '';
+        const scrollX = Number(frame.dataset.scrollX || 0);
+        const scrollY = Number(frame.dataset.scrollY || 0);
+        const viewportWidth = Math.max(Number(frame.dataset.viewportWidth || 1), 1);
+        const viewportHeight = Math.max(Number(frame.dataset.viewportHeight || 1), 1);
+        const documentWidth = Math.max(Number(frame.dataset.documentWidth || viewportWidth), viewportWidth);
+        const documentHeight = Math.max(Number(frame.dataset.documentHeight || viewportHeight), viewportHeight);
+        const visiblePoints = heatmapEvents.filter((event) => !event.page_url || event.page_url === pageUrl);
+        visiblePoints.slice(0, 240).forEach((event) => {{
+          const docX = Number(event.x) * Number(event.document_width || documentWidth);
+          const docY = Number(event.y) * Number(event.document_height || documentHeight);
+          const viewportX = (docX - scrollX) / viewportWidth;
+          const viewportY = (docY - scrollY) / viewportHeight;
+          if (viewportX < -0.08 || viewportX > 1.08 || viewportY < -0.08 || viewportY > 1.08) return;
+          const point = document.createElement('span');
+          point.className = 'heat-point';
+          point.style.left = `${{Math.max(-8, Math.min(108, viewportX * 100))}}%`;
+          point.style.top = `${{Math.max(-8, Math.min(108, viewportY * 100))}}%`;
+          point.style.opacity = String(0.24 + Math.min(0.45, Number(event.confidence || 0.5) * 0.35));
+          overlay.appendChild(point);
+        }});
+      }}
+
+      function updateHeatmapControls() {{
+        const frame = activeHeatmapFrame();
+        if (!frame || !heatmapRange) return;
+        const viewportHeight = Math.max(Number(frame.dataset.viewportHeight || 1), 1);
+        const documentHeight = Math.max(Number(frame.dataset.documentHeight || viewportHeight), viewportHeight);
+        const maxScroll = Math.max(0, Math.round(documentHeight - viewportHeight));
+        const current = Math.max(0, Math.min(maxScroll, Number(frame.dataset.scrollY || 0)));
+        heatmapRange.max = String(maxScroll);
+        heatmapRange.value = String(current);
+        heatmapRange.disabled = maxScroll === 0;
+        if (heatmapScrollLabel) heatmapScrollLabel.textContent = `${{Math.round(current)}}px`;
+        scrollFrameTo(frame, Number(frame.dataset.scrollX || 0), current);
+        renderHeatmap();
+      }}
+
+      document.querySelectorAll('.live-site-frame iframe').forEach((iframe) => {{
+        iframe.addEventListener('load', () => {{
+          const frame = iframe.closest('.live-site-frame');
+          scrollFrameTo(frame, Number(frame?.dataset.scrollX || 0), Number(frame?.dataset.scrollY || 0));
+          if (frame?.classList.contains('heatmap-frame')) renderHeatmap();
+        }});
+      }});
+
+      document.querySelectorAll('.page-switch').forEach((button) => {{
+        button.addEventListener('click', () => {{
+          const pageUrl = button.dataset.pageUrl || '';
+          const target = button.dataset.vizTarget || '';
+          setActivePage(target, pageUrl);
+          if (target === 'replay') stage.dataset.activePageUrl = pageUrl;
+        }});
+      }});
+
+      heatmapRange?.addEventListener('input', () => {{
+        const frame = activeHeatmapFrame();
+        if (!frame) return;
+        const scrollY = Number(heatmapRange.value || 0);
+        frame.dataset.scrollY = String(Math.round(scrollY));
+        if (heatmapScrollLabel) heatmapScrollLabel.textContent = `${{Math.round(scrollY)}}px`;
+        scrollFrameTo(frame, Number(frame.dataset.scrollX || 0), scrollY);
+        renderHeatmap();
+      }});
+
+      function replayPointPosition(event, frame, scrollX, scrollY) {{
+        if (!frame || typeof event.x !== 'number' || typeof event.y !== 'number') return null;
+        const viewportWidth = Math.max(Number(frame.dataset.viewportWidth || event.viewport_width || 1), 1);
+        const viewportHeight = Math.max(Number(frame.dataset.viewportHeight || event.viewport_height || 1), 1);
+        const documentWidth = Math.max(Number(event.document_width || frame.dataset.documentWidth || viewportWidth), viewportWidth);
+        const documentHeight = Math.max(Number(event.document_height || frame.dataset.documentHeight || viewportHeight), viewportHeight);
+        const pointX = ((Number(event.x) * documentWidth) - scrollX) / viewportWidth;
+        const pointY = ((Number(event.y) * documentHeight) - scrollY) / viewportHeight;
+        if (pointX < 0 || pointX > 1 || pointY < 0 || pointY > 1) return null;
+        return {{
+          left: `${{Math.max(0, Math.min(100, pointX * 100))}}%`,
+          top: `${{Math.max(0, Math.min(100, pointY * 100))}}%`,
+        }};
+      }}
 
       function setTime(ms) {{
         const bounded = Math.max(0, Math.min(duration, ms));
@@ -369,45 +613,57 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
         if (!current) return;
         const activeFrame = current.page_url
           ? stage.querySelector(`[data-page-url="${{CSS.escape(current.page_url)}}"]`)
-          : stage.querySelector('.screen-frame');
-        const visibleFrame = activeFrame || stage.querySelector('.screen-frame');
-        stage.querySelectorAll('.screen-frame').forEach((frame) => {{
+          : stage.querySelector('.replay-frame');
+        const visibleFrame = activeFrame || stage.querySelector('.replay-frame');
+        stage.querySelectorAll('.replay-frame').forEach((frame) => {{
           frame.classList.toggle('is-hidden', frame !== visibleFrame);
         }});
-        const activeCanvas = visibleFrame?.querySelector('.page-canvas') || stage.querySelector('.page-canvas') || stage;
-        if (dot.parentElement !== activeCanvas) activeCanvas.appendChild(dot);
-        const currentPoint = elapsedEvents.filter((event) =>
+        if (visibleFrame?.dataset.pageUrl) setActivePage('replay', visibleFrame.dataset.pageUrl);
+        const activeOverlay = visibleFrame?.querySelector('.telemetry-overlay') || stage.querySelector('.telemetry-overlay') || stage;
+        if (dot.parentElement !== activeOverlay) activeOverlay.appendChild(dot);
+        const scrollX = Math.max(0, Number(current.scroll_x || 0));
+        const scrollY = Math.max(0, Number(current.scroll_y || 0));
+        stage.dataset.activePageUrl = current.page_url || '';
+        stage.dataset.scrollX = String(Math.round(scrollX));
+        stage.dataset.scrollY = String(Math.round(scrollY));
+        scrollFrameTo(visibleFrame, scrollX, scrollY);
+        const currentPageUrl = visibleFrame?.dataset.pageUrl || current.page_url || '';
+        stage.querySelectorAll('.replay-trail, .replay-click').forEach((element) => element.remove());
+        const pagePointEvents = elapsedEvents.filter((event) =>
           typeof event.x === 'number' &&
           typeof event.y === 'number' &&
-          (!current.page_url || !event.page_url || event.page_url === current.page_url)
-        ).at(-1) || elapsedEvents.filter((event) => typeof event.x === 'number' && typeof event.y === 'number').at(-1);
-        const documentHeight = Math.max(Number(visibleFrame?.dataset.documentHeight || current.document_height || 1), 1);
-        const viewportHeight = Math.max(Number(current.viewport_height || visibleFrame?.dataset.viewportHeight || documentHeight), 1);
-        const scrollY = Math.max(0, Number(current.scroll_y ?? (currentPoint ? ((currentPoint.y * documentHeight) - (viewportHeight / 2)) : 0)));
-        const maxScroll = Math.max(documentHeight - viewportHeight, 1);
-        const translatePct = Math.max(0, Math.min(100 - ((viewportHeight / documentHeight) * 100), (scrollY / documentHeight) * 100));
-        activeCanvas.style.transform = `translateY(-${{translatePct}}%)`;
-        stage.dataset.activePageUrl = current.page_url || '';
-        stage.dataset.scrollY = String(Math.round(Math.min(scrollY, maxScroll)));
-        if (!currentPoint) return;
-        const left = `${{Math.max(0, Math.min(100, currentPoint.x * 100))}}%`;
-        const top = `${{Math.max(0, Math.min(100, currentPoint.y * 100))}}%`;
-        dot.style.left = left;
-        dot.style.top = top;
-        dot.style.transform = 'translate(0,0)';
-        if (currentPoint.type === 'click') {{
-          const click = document.createElement('span');
-          click.className = 'replay-click';
-          click.style.left = left;
-          click.style.top = top;
-          activeCanvas.appendChild(click);
-        }} else if (trailCount % 4 === 0) {{
-          const trail = document.createElement('span');
-          trail.className = 'replay-trail';
-          trail.style.left = left;
-          trail.style.top = top;
-          activeCanvas.appendChild(trail);
+          (!currentPageUrl || event.page_url === currentPageUrl)
+        );
+        pagePointEvents.slice(-80).forEach((event, index) => {{
+          const projected = replayPointPosition(event, visibleFrame, scrollX, scrollY);
+          if (!projected) return;
+          if (event.type === 'click') {{
+            const click = document.createElement('span');
+            click.className = 'replay-click';
+            click.style.left = projected.left;
+            click.style.top = projected.top;
+            activeOverlay.appendChild(click);
+          }} else if (index % 4 === 0) {{
+            const trail = document.createElement('span');
+            trail.className = 'replay-trail';
+            trail.style.left = projected.left;
+            trail.style.top = projected.top;
+            activeOverlay.appendChild(trail);
+          }}
+        }});
+        const currentPoint = pagePointEvents.at(-1);
+        if (!currentPoint) {{
+          dot.style.transform = 'translate(-100px,-100px)';
+          return;
         }}
+        const projectedCurrentPoint = replayPointPosition(currentPoint, visibleFrame, scrollX, scrollY);
+        if (!projectedCurrentPoint) {{
+          dot.style.transform = 'translate(-100px,-100px)';
+          return;
+        }}
+        dot.style.left = projectedCurrentPoint.left;
+        dot.style.top = projectedCurrentPoint.top;
+        dot.style.transform = 'translate(0,0)';
         trailCount += 1;
       }}
 
@@ -442,6 +698,7 @@ def _render_session_report_html(report: SessionReportResponse) -> str:
         setTime(Number(range.value || 0));
       }});
       setTime(0);
+      updateHeatmapControls();
     }})();
   </script>
 </body>

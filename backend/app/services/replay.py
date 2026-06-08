@@ -192,6 +192,11 @@ def build_replay_events(events: list[EventEnvelope], aois: list[AoiRecord]) -> l
                 aois,
                 event_page_url if isinstance(event_page_url, str) else None,
             )
+            viewport_x = event.payload.get("viewport_x")
+            viewport_y = event.payload.get("viewport_y")
+            if isinstance(viewport_x, int | float) and isinstance(viewport_y, int | float):
+                payload["viewport_x"] = round(float(viewport_x), 4)
+                payload["viewport_y"] = round(float(viewport_y), 4)
 
         confidence = extract_confidence(event.payload)
         if confidence is not None:
@@ -209,7 +214,7 @@ def build_replay_events(events: list[EventEnvelope], aois: list[AoiRecord]) -> l
         if page_path is not None:
             payload["page_path"] = page_path
 
-        for numeric_key in ("scroll_y", "viewport_height", "document_height"):
+        for numeric_key in ("scroll_x", "scroll_y", "viewport_width", "viewport_height", "document_width", "document_height"):
             numeric_value = event.payload.get(numeric_key)
             if isinstance(numeric_value, int | float):
                 payload[numeric_key] = round(float(numeric_value), 3)

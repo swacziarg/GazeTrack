@@ -517,6 +517,16 @@
           "minimum": 0,
           "maximum": 1
         },
+        "viewport_x": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "viewport_y": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
         "confidence": {
           "type": ["number", "null"],
           "minimum": 0,
@@ -541,11 +551,23 @@
         "page_path": {
           "type": ["string", "null"]
         },
+        "scroll_x": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
         "scroll_y": {
           "type": ["number", "null"],
           "minimum": 0
         },
+        "viewport_width": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
         "viewport_height": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "document_width": {
           "type": ["number", "null"],
           "minimum": 0
         },

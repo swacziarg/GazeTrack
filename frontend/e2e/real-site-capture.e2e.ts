@@ -86,7 +86,10 @@ test('runs a real-site fixed AOI capture against a local fixture page', async ({
   )
   const reportViewResponse = await request.get(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/report-view`)
   expect(reportViewResponse.ok()).toBeTruthy()
-  expect(await reportViewResponse.text()).toContain('Find the plan that keeps your launch moving')
+  const reportHtml = await reportViewResponse.text()
+  expect(reportHtml).toContain('Captured website context')
+  expect(reportHtml).toContain('/fixture-real-site.html')
+  expect(reportHtml).not.toContain('Find the plan that keeps your launch moving')
 })
 
 test('continues real-site capture across SPA navigation and scroll depth', async ({ page, request }) => {
@@ -143,12 +146,55 @@ test('continues real-site capture across SPA navigation and scroll depth', async
   expect(report.page_layouts.some((layout: { page_url?: string }) => layout.page_url?.includes('/how-it-works'))).toBe(true)
 
   await page.goto(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/report-view`)
+  await expect(page.locator('.page-switch[data-viz-target="heatmap"]')).toHaveCount(2)
+  await page.locator('.page-switch[data-viz-target="heatmap"]').nth(1).click()
+  await expect(page.locator('.page-switch[data-viz-target="heatmap"]').nth(1)).toHaveClass(/is-active/)
+  await expect(page.locator('.heatmap-frame').nth(1)).not.toHaveClass(/is-hidden/)
+  await expect(page.locator('.heatmap-frame').nth(1).locator('iframe')).toHaveAttribute('src', /how-it-works/)
+  await expect(page.locator('.heatmap-frame').nth(1).locator('iframe')).toHaveAttribute('src', /gazetrack_report_view=1/)
+  await expect.poll(() =>
+    page.locator('.heatmap-frame').nth(1).locator('.site-viewport').evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      return Number((box.width / box.height).toFixed(2))
+    }),
+  ).toBeCloseTo(1.78, 1)
+  await expect.poll(() =>
+    page.locator('.heatmap-frame').nth(1).locator('.site-viewport').evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      return Math.round(box.width)
+    }),
+  ).toBeGreaterThan(1100)
+  await expect.poll(() =>
+    page.locator('.heatmap-frame').nth(1).locator('.telemetry-overlay').evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        position: style.position,
+        pointerEvents: style.pointerEvents,
+      }
+    }),
+  ).toEqual(expect.objectContaining({ position: 'absolute', pointerEvents: 'none' }))
+  await page.locator('.page-switch[data-viz-target="heatmap"]').first().click()
+  await expect(page.locator('.heatmap-frame').first()).not.toHaveClass(/is-hidden/)
+  await expect(page.locator('#heatmap-scroll-range')).toBeVisible()
+  await page.locator('#heatmap-scroll-range').evaluate((element) => {
+    const input = element as HTMLInputElement
+    input.value = String(Math.min(700, Number(input.max || 0)))
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await expect.poll(() =>
+    page
+      .frameLocator('.heatmap-frame:not(.is-hidden) iframe')
+      .locator('body')
+      .evaluate(() => window.scrollY),
+  ).toBeGreaterThan(0)
+  await expect(page.locator('.page-switch[data-viz-target="replay"]')).toHaveCount(0)
   await page.locator('#replay-range').evaluate((element) => {
     const input = element as HTMLInputElement
     input.value = input.max
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   await expect.poll(() => page.locator('#replay-stage').evaluate((element) => element.dataset.activePageUrl || '')).toContain('/how-it-works')
+  await expect(page.locator('#replay-stage .replay-frame:not(.is-hidden)').locator('iframe')).toHaveAttribute('src', /how-it-works/)
 })
 
 test('runs WebGazer-enabled real-site setup with calibration and task telemetry', async ({ page, request }) => {
@@ -252,11 +298,54 @@ test('runs WebGazer-enabled real-site setup with calibration and task telemetry'
   expect(report.event_type_counts.scroll).toBeGreaterThanOrEqual(1)
   expect(report.event_type_counts.task_start).toBe(1)
   expect(report.privacy_summary.raw_media_stored).toBe(false)
+  const firstScrolledReplayMs = report.replay_events.find(
+    (event: { type?: string; scroll_y?: number; relative_ms?: number }) => event.type === 'scroll' && Number(event.scroll_y || 0) > 0,
+  )?.relative_ms
+  expect(firstScrolledReplayMs).toBeGreaterThan(0)
 
   await page.goto(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/report-view`)
+  await page.locator('#replay-range').evaluate((element, value) => {
+    const input = element as HTMLInputElement
+    input.value = String(value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }, firstScrolledReplayMs)
+  await expect.poll(() => page.locator('#replay-stage').evaluate((element) => Number(element.dataset.scrollY || 0))).toBeGreaterThan(0)
+  await expect.poll(() =>
+    page
+      .frameLocator('#replay-stage .replay-frame iframe')
+      .first()
+      .locator('body')
+      .evaluate(() => window.scrollY),
+  ).toBeGreaterThan(0)
+  await expect.poll(() => page.locator('#replay-dot').evaluate((element) => (element as HTMLElement).style.transform)).toContain(
+    '-100px',
+  )
+  await expect.poll(() =>
+    page.locator('#replay-stage .replay-frame').first().evaluate((element) => element.getAttribute('data-scroll-ack')),
+  ).toBe('true')
   await page.getByRole('button', { name: 'Play replay' }).click()
   await expect.poll(() => page.locator('#replay-stage').evaluate((element) => Number(element.dataset.scrollY || 0))).toBeGreaterThan(0)
-  await expect.poll(() => page.locator('#replay-stage .page-canvas').first().evaluate((element) => getComputedStyle(element).transform)).not.toBe('none')
+  await expect(page.locator('#replay-stage .replay-frame').first().locator('iframe')).toHaveAttribute('src', /fixture-real-site/)
+  await expect.poll(() =>
+    page.locator('#replay-stage .replay-frame').first().locator('.site-viewport').evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      return Number((box.width / box.height).toFixed(2))
+    }),
+  ).toBeCloseTo(1.78, 1)
+  await expect.poll(() =>
+    page.locator('#replay-stage .replay-frame').first().locator('.site-viewport').evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      return Math.round(box.width)
+    }),
+  ).toBeGreaterThan(1100)
+  await expect.poll(() =>
+    page
+      .frameLocator('#replay-stage .replay-frame iframe')
+      .first()
+      .locator('body')
+      .evaluate(() => window.scrollY),
+  ).toBeGreaterThan(0)
+  await expect.poll(() => page.locator('#replay-dot').evaluate((element) => getComputedStyle(element).left)).not.toBe('auto')
 
   const mediaResponse = await request.post(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/events`, {
     data: {

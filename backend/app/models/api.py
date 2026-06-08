@@ -310,14 +310,19 @@ class ReplayEventResponse(BaseModel):
     relative_ms: int | None = None
     x: float | None = None
     y: float | None = None
+    viewport_x: float | None = None
+    viewport_y: float | None = None
     confidence: float | None = None
     aoi_ids: list[UUID] = Field(default_factory=list)
     label: str | None = None
     message: str | None = None
     page_url: str | None = None
     page_path: str | None = None
+    scroll_x: float | None = None
     scroll_y: float | None = None
+    viewport_width: float | None = None
     viewport_height: float | None = None
+    document_width: float | None = None
     document_height: float | None = None
     source: str | None = None
 

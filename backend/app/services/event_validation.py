@@ -24,6 +24,8 @@ SAFE_PAYLOAD_KEYS = {
     "aoi",
     "x",
     "y",
+    "viewport_x",
+    "viewport_y",
     "point",
     "viewport_width",
     "viewport_height",
@@ -323,7 +325,7 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
             if point is not None:
                 sanitized[key] = point
             continue
-        if key in {"x", "y", "viewport_width", "viewport_height", "document_width", "document_height",
+        if key in {"x", "y", "viewport_x", "viewport_y", "viewport_width", "viewport_height", "document_width", "document_height",
                    "scroll_x", "scroll_y", "confidence", "calibration_error_px",
                    "calibration_error_normalized", "error_px", "error_normalized", "dwell_ms",
                    "scroll_depth_percent", "quality_score", "camera_readiness_score",

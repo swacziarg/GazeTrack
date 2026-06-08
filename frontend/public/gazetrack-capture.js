@@ -13,6 +13,59 @@
   const webgazerFaceMeshSolutionPath = String(config.webgazerFaceMeshSolutionPath || `${apiBaseUrl}/webgazer-mediapipe/face_mesh`)
   const calibrationPasses = Math.max(1, Math.min(5, Number(config.calibrationPasses || 1) || 1))
   const requireCameraReadiness = config.requireCameraReadiness !== false
+  const reportViewMode = (() => {
+    try {
+      return window.self !== window.top && new URLSearchParams(window.location.search).get('gazetrack_report_view') === '1'
+    } catch (error) {
+      return false
+    }
+  })()
+
+  if (reportViewMode) {
+    function reportScrollTo(scrollX, scrollY) {
+      const nextX = Math.max(0, Number(scrollX || 0))
+      const nextY = Math.max(0, Number(scrollY || 0))
+      window.scrollTo(nextX, nextY)
+      window.setTimeout(() => window.scrollTo(nextX, nextY), 50)
+      window.setTimeout(() => window.scrollTo(nextX, nextY), 150)
+      try {
+        window.parent.postMessage(
+          {
+            source: 'gazetrack_report_frame',
+            type: 'scroll_applied',
+            page_url: window.location.href,
+            scroll_x: Math.round(window.scrollX),
+            scroll_y: Math.round(window.scrollY),
+            requested_scroll_x: Math.round(nextX),
+            requested_scroll_y: Math.round(nextY),
+          },
+          '*',
+        )
+      } catch (error) {}
+    }
+
+    window.addEventListener('message', (event) => {
+      const data = event.data || {}
+      if (!data || data.source !== 'gazetrack_report' || data.type !== 'scroll_to') {
+        return
+      }
+      reportScrollTo(data.scroll_x, data.scroll_y)
+    })
+    window.__GazeTrackReportViewMode = true
+    try {
+      window.parent.postMessage(
+        {
+          source: 'gazetrack_report_frame',
+          type: 'ready',
+          page_url: window.location.href,
+          scroll_x: Math.round(window.scrollX),
+          scroll_y: Math.round(window.scrollY),
+        },
+        '*',
+      )
+    } catch (error) {}
+    return
+  }
 
   if (!apiBaseUrl || !studyId || !captureToken || window.__GazeTrackCaptureLoaded) {
     return
@@ -1088,6 +1141,8 @@
       ...basePayload('Real-site click'),
       x: point.x,
       y: point.y,
+      viewport_x: roundCoordinate(event.clientX / Math.max(window.innerWidth, 1)),
+      viewport_y: roundCoordinate(event.clientY / Math.max(window.innerHeight, 1)),
     })
   }
 
@@ -1119,6 +1174,8 @@
       tracker_type: SOURCE,
       x: point.x,
       y: point.y,
+      viewport_x: point.viewport_x,
+      viewport_y: point.viewport_y,
       viewport_width: window.innerWidth,
       viewport_height: window.innerHeight,
       document_width: point.document_width,
