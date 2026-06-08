@@ -171,7 +171,7 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
     replay_events = build_replay_events(events, aois)
     replay_fixations = build_replay_fixations(fixations, events, aois)
     replay_aoi_overlay = build_replay_aoi_overlay(aois)
-    replay_summary = build_replay_summary(events, replay_events, replay_fixations)
+    replay_summary = build_replay_summary(events, replay_events, replay_fixations, aois)
     tracker_metadata = _tracker_report_metadata(events)
     quality_interpretation_payload = quality_interpretation(quality_summary)
     aoi_attention_ranking_payload = aoi_attention_ranking(aoi_metrics)

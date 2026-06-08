@@ -79,7 +79,7 @@ export type BackendReplaySummary = {
   scroll_count: number
   task_event_count: number
   duration_ms: number
-  coordinate_space: 'normalized'
+  coordinate_space: 'normalized' | 'document_normalized'
 }
 
 export type BackendReplayEvent = {

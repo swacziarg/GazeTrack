@@ -244,3 +244,50 @@ def test_event_ingest_accepts_quality_metadata_without_media_payloads() -> None:
     assert gaze_payload["quality_flags"] == ["face_center_drift", "low_light"]
     assert gaze_payload["drift_metrics"]["low_light"] is True
     assert "webcam_frame" not in str(gaze_payload)
+
+
+def test_event_ingest_rejects_out_of_range_quality_scores() -> None:
+    session_id = uuid4()
+    payload = {
+        "events": [
+            {
+                "event_type": "task_start",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "target": "Find the CTA.",
+                },
+            },
+            {
+                "event_type": "calibration",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "calibration_points_completed": 9,
+                    "camera_readiness_score": 101,
+                },
+            },
+            {
+                "event_type": "gaze",
+                "timestamp": "2026-01-01T00:00:02Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "x": 0.52,
+                    "y": 0.41,
+                    "quality_score": -1,
+                },
+            },
+        ],
+    }
+
+    response = client.post(f"/api/v1/sessions/{session_id}/events", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["accepted_count"] == 1
+    assert body["rejected_count"] == 2
+    assert "Rejected camera_readiness_score outside 0-100 range." in body["rejected_reasons"]
+    assert "Rejected quality_score outside 0-100 range." in body["rejected_reasons"]

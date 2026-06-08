@@ -344,6 +344,18 @@ def _validate_confidence(confidence: float | None) -> str | None:
     return None
 
 
+def _validate_score_payload(payload: dict[str, Any]) -> str | None:
+    for key in ("quality_score", "camera_readiness_score"):
+        value = payload.get(key)
+        if value is None:
+            continue
+        if not _is_number(value):
+            return f"Rejected {key} with non-numeric value."
+        if not 0 <= float(value) <= 100:
+            return f"Rejected {key} outside 0-100 range."
+    return None
+
+
 def _validate_scroll(payload: dict[str, Any]) -> str | None:
     depth = payload.get("scroll_depth_percent")
     if depth is None:
@@ -404,6 +416,8 @@ def validate_event_for_ingest(event: EventEnvelope, has_task_context: bool = Fal
     confidence_error = _validate_confidence(confidence)
     if confidence_error is not None:
         return EventValidationResult(rejection_reason=confidence_error)
+    if score_error := _validate_score_payload(sanitized_payload):
+        return EventValidationResult(rejection_reason=score_error)
 
     if event.event_type.value in {"gaze", "click"}:
         if point is None:

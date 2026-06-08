@@ -300,7 +300,7 @@ class ReplaySummaryResponse(BaseModel):
     scroll_count: int = 0
     task_event_count: int = 0
     duration_ms: int = 0
-    coordinate_space: Literal["normalized"] = "normalized"
+    coordinate_space: Literal["normalized", "document_normalized"] = "normalized"
 
 
 class ReplayEventResponse(BaseModel):

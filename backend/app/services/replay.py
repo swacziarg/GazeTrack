@@ -16,7 +16,7 @@ from app.services.fixations import Fixation, extract_confidence
 
 
 REPLAY_COORDINATE_SPACES = {"normalized", "document_normalized"}
-REPLAY_COORDINATE_SPACE = "normalized"
+DEFAULT_REPLAY_COORDINATE_SPACE = "normalized"
 
 
 def _relative_ms(timestamp: str, session_start: datetime | None) -> int | None:
@@ -192,10 +192,18 @@ def build_replay_summary(
     events: list[EventEnvelope],
     replay_events: list[dict[str, Any]],
     replay_fixations: list[dict[str, Any]],
+    aois: list[AoiRecord] | None = None,
 ) -> dict[str, Any]:
     counts: dict[str, int] = {}
     for event in events:
         counts[event.event_type.value] = counts.get(event.event_type.value, 0) + 1
+
+    coordinate_spaces = {
+        aoi.coordinate_space
+        for aoi in (aois or [])
+        if aoi.coordinate_space in REPLAY_COORDINATE_SPACES
+    }
+    coordinate_space = coordinate_spaces.pop() if len(coordinate_spaces) == 1 else DEFAULT_REPLAY_COORDINATE_SPACE
 
     return {
         "event_count": len(replay_events),
@@ -205,5 +213,5 @@ def build_replay_summary(
         "scroll_count": counts.get("scroll", 0),
         "task_event_count": counts.get("task_start", 0) + counts.get("task_complete", 0),
         "duration_ms": _session_duration_ms(events, _session_start(events)),
-        "coordinate_space": REPLAY_COORDINATE_SPACE,
+        "coordinate_space": coordinate_space,
     }

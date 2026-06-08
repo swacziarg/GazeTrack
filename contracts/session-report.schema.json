@@ -97,7 +97,7 @@
     },
     "tracker_type": {
       "type": "string",
-      "enum": ["synthetic", "webgazer_experimental", "unknown"]
+      "enum": ["synthetic", "webgazer_experimental", "real_site_capture", "unknown"]
     },
     "tracker_mode_label": {
       "type": "string"
@@ -478,7 +478,7 @@
         },
         "coordinate_space": {
           "type": "string",
-          "const": "normalized"
+          "enum": ["normalized", "document_normalized"]
         }
       },
       "additionalProperties": false
@@ -684,8 +684,16 @@
         "gaze_sample_count",
         "average_gaze_confidence",
         "calibration_event_count",
+        "calibration_points_completed",
         "average_calibration_error_px",
+        "average_calibration_error_normalized",
+        "calibration_readiness_score",
         "quality_event_count",
+        "tracking_quality_counts",
+        "tracking_quality_percentages",
+        "drift_warning_count",
+        "quality_flag_counts",
+        "major_quality_flags",
         "sample_integrity_basis_event_count",
         "sample_completeness_score",
         "quality_verdict",

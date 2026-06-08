@@ -170,6 +170,7 @@ def test_report_prefers_detected_session_aoi_snapshots_and_marks_unresolved() ->
 
     assert report_response.status_code == 200
     assert report["aoi_count"] == 1
+    assert report["replay_summary"]["coordinate_space"] == "document_normalized"
     assert report["aoi_metrics"][0]["coordinate_space"] == "document_normalized"
     assert report["aoi_metrics"][0]["gaze_sample_count"] == 3
     assert report["aoi_metrics"][0]["click_count"] == 1

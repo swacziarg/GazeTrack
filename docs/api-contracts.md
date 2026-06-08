@@ -187,7 +187,7 @@ Replay fields are generated from persisted telemetry and computed fixations only
 - `scroll_count`
 - `task_event_count`
 - `duration_ms`
-- `coordinate_space` (`normalized`)
+- `coordinate_space` (`normalized` or `document_normalized`)
 
 Each `replay_events` item includes a narrow privacy-safe shape:
 
@@ -195,16 +195,16 @@ Each `replay_events` item includes a narrow privacy-safe shape:
 - `type`
 - `timestamp`
 - `relative_ms`
-- optional normalized `x`/`y`
+- optional normalized or document-normalized `x`/`y`
 - optional `confidence`
 - `aoi_ids`
 - optional `label`
 - optional `message`
 - optional `source`
 
-`replay_fixations` includes computed fixation points with `id`, `type: "fixation"`, start/end timestamps, start/end relative time, `duration_ms`, normalized `x`/`y`, `sample_count`, optional `average_confidence`, and `aoi_ids`.
+`replay_fixations` includes computed fixation points with `id`, `type: "fixation"`, start/end timestamps, start/end relative time, `duration_ms`, normalized or document-normalized `x`/`y`, `sample_count`, optional `average_confidence`, and `aoi_ids`.
 
-`replay_aoi_overlay` includes normalized AOI rectangles with `id`, `label`, `x`, `y`, `width`, `height`, and `coordinate_space`.
+`replay_aoi_overlay` includes normalized or document-normalized AOI rectangles with `id`, `label`, `x`, `y`, `width`, `height`, and `coordinate_space`.
 
 Replay responses do not include raw event payloads wholesale. They must not include webcam video, frames, images, screenshots, blobs, base64 media, or other raw media-like fields.
 
