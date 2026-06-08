@@ -16,14 +16,14 @@ GazeTrack is a privacy-first, task-based UX analytics demo for website builders.
 
 ## Current status
 
-- Synthetic mode: stable default portfolio/demo path with deterministic, camera-free telemetry.
+- Synthetic mode: stable default demo path with deterministic, camera-free telemetry.
 - Experimental browser gaze: opt-in browser experiment behind `VITE_ENABLE_WEBGAZER=true`; approximate, browser-dependent, and not medical-grade.
 - Reports: quality-aware UX insight reports with AOI ranking, attention callouts, cautious interpretation, and next-action recommendations.
 - Privacy: no raw webcam video, frames, screenshots, image blobs, base64 media, or media-like payloads are stored.
 
 ## Synthetic mode quickstart
 
-Synthetic mode is the default and the recommended portfolio/demo path. It does not request webcam permission.
+Synthetic mode is the default and the recommended demo path. It does not request webcam permission.
 
 1. Configure environment:
 
@@ -124,7 +124,7 @@ cd frontend
 npx playwright install chromium
 ```
 
-Validation run for this checkout during portfolio polish: frontend unit tests `56 passed`, frontend build passed, backend tests `44 passed`, and Playwright E2E `1 passed`. Re-run the commands above after future changes before relying on status.
+Validation run for this checkout: frontend unit tests `56 passed`, frontend build passed, backend tests `44 passed`, and Playwright E2E `1 passed`. Re-run the commands above after future changes before relying on status.
 
 ## Current limitations
 
@@ -168,7 +168,7 @@ Add screenshots or short GIFs later under a future `docs/assets/` folder, for ex
 
 Do not add real tester webcam imagery, raw frames, screenshots containing private data, or base64 media payload examples.
 
-## Portfolio / interview bullets
+## Project summary bullets
 
 - Built a privacy-first React/FastAPI UX analytics demo with configurable studies, task prompts, normalized AOIs, synthetic telemetry, SQLite persistence, and backend-generated reports.
 - Implemented quality-aware AOI insight reporting with TTFF, fixation dwell, attention share, CAF delay, weak-attention detection, and cautious next-action recommendations.

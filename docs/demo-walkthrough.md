@@ -85,7 +85,7 @@ If the tracker fails or quality is weak, use the fallback button. That is expect
 
 ## Screenshot / GIF slots
 
-Future portfolio media can be added under `docs/assets/`:
+Future demo media can be added under `docs/assets/`:
 
 - `demo-guide.png`: first viewport with Demo Guide and privacy copy.
 - `study-builder.png`: configured study/tasks/AOIs.

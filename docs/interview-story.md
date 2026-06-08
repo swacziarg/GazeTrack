@@ -1,7 +1,7 @@
 # Interview Story: GazeTrack
 
 ## Why I built it
-I wanted a flagship portfolio project that combines full-stack product engineering with event modeling and analytics, close to real product/data work I want after graduation. GazeTrack turns my analytics background into a privacy-first synthetic telemetry demo pipeline for task-based UX studies.
+I wanted to combine full-stack product engineering with event modeling and analytics, close to real product/data work. GazeTrack turns my analytics background into a privacy-first synthetic telemetry demo pipeline for task-based UX studies.
 
 ## Technical decisions
 - Made synthetic telemetry the default so the demo is safe, deterministic, and credible without webcam access.
@@ -45,7 +45,7 @@ I wanted a flagship portfolio project that combines full-stack product engineeri
 - **Product analytics:** Task funnel metrics, AOI attention metrics, quality-aware interpretation.
 - **Internal tools/full-stack:** Study setup, researcher dashboard panels, schematic replay/report UX.
 
-## Resume bullets (quantified placeholders)
+## Project impact bullets
 - Built a privacy-first synthetic UX telemetry demo capturing **[X]+ events/session** across gaze-like, click, scroll, calibration, and task streams.
 - Designed SQLite-backed event/report persistence with a documented PostgreSQL/Supabase schema direction.
 - Implemented synthetic calibration, quality modes, confidence-aware report verdicts, AOI attention ranking, TTFF, attention share, and CAF-style click-after-fixation insights across React/FastAPI.
