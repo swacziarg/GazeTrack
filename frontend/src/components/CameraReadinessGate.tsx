@@ -37,6 +37,10 @@ export function CameraReadinessGate({
     <section className="camera-readiness-gate" aria-label="Camera readiness">
       <div className="camera-readiness-preview">
         <video ref={videoRef as RefObject<HTMLVideoElement>} aria-label="Local camera preview" autoPlay muted playsInline />
+        <div className="camera-face-guide" aria-hidden="true">
+          <div className="camera-face-guide-oval" />
+          <span>Center face here</span>
+        </div>
       </div>
       <div className="camera-readiness-copy">
         <div className="card-header">

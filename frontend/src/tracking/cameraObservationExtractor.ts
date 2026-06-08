@@ -20,12 +20,13 @@ type BrightnessContrast = {
 const VIDEO_SAMPLE_SIZE = 24
 const MIN_EYE_DISTANCE = 0.04
 const MIN_LANDMARK_COUNT_FOR_FACE = 8
+const PUBLIC_BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, '')
 const MEDIAPIPE_WASM_BASE_URL =
   import.meta.env.VITE_MEDIAPIPE_WASM_BASE_URL ||
-  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
+  `${PUBLIC_BASE_URL}/mediapipe/tasks-vision/wasm`
 const MEDIAPIPE_FACE_LANDMARKER_MODEL_URL =
   import.meta.env.VITE_MEDIAPIPE_FACE_LANDMARKER_MODEL_URL ||
-  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task'
+  `${PUBLIC_BASE_URL}/mediapipe/models/face_landmarker/face_landmarker.task`
 
 const LEFT_EYE_INDICES = [33, 133, 159, 145]
 const RIGHT_EYE_INDICES = [362, 263, 386, 374]
@@ -243,14 +244,9 @@ export function observationFromFaceLandmarkerResult(
 export function fallbackObservationFromTrackingStatus(
   video: HTMLVideoElement | null,
   trackingStatus: BrowserGazeStatusSnapshot | null,
-  previousObservation: CameraQualityObservation | null,
+  _previousObservation: CameraQualityObservation | null,
 ): CameraQualityObservation {
   const capturedAt = nowIso()
-  const faceCenter = trackingStatus?.latestPoint ?? null
-  const movement =
-    faceCenter && previousObservation?.faceCenter
-      ? Math.hypot(faceCenter.x - previousObservation.faceCenter.x, faceCenter.y - previousObservation.faceCenter.y)
-      : null
   const validSampleRate =
     trackingStatus && trackingStatus.elapsedMs > 0
       ? trackingStatus.validSampleCount / (trackingStatus.elapsedMs / 1000)
@@ -263,13 +259,13 @@ export function fallbackObservationFromTrackingStatus(
     capturedAt,
     faceDetected: Boolean(trackingStatus?.latestPoint || trackingStatus?.validSampleCount),
     eyesVisible: trackingStatus?.latestPoint ? true : null,
-    faceCenter,
+    faceCenter: null,
     faceSize: null,
     headPose: null,
     brightness,
     contrast,
     observedFps: validSampleRate === null ? null : roundMetric(validSampleRate),
-    movement: movement === null ? null : roundMetric(movement),
+    movement: null,
   }
 }
 

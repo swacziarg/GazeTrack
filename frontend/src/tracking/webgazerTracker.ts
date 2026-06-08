@@ -520,6 +520,7 @@ export class WebGazerTracker implements TrackerProvider {
   private cameraQualityBaseline: CameraQualityBaseline | null = null
   private latestCameraObservation: CameraQualityObservation | null = null
   private latestDrift: DriftResult | null = null
+  private sessionOptions: TrackerSessionOptions | null = null
 
   constructor(options: { sampleIntervalMs?: number } = {}) {
     this.sampleIntervalMs = options.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS
@@ -632,8 +633,32 @@ export class WebGazerTracker implements TrackerProvider {
     )
     this.eventIndex += 1
     this.events.push(...calibrationEvents, completedEvent)
+    this.appendTaskStartedEvent()
     this.status = 'active'
     return [...calibrationEvents, completedEvent]
+  }
+
+  private appendTaskStartedEvent() {
+    if (this.events.some((event) => event.event_type === 'task_started')) {
+      return
+    }
+
+    const taskPrompt = this.sessionOptions?.taskPrompt ?? 'Find the team plan and start checkout'
+    this.events.push({
+      id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
+      event_type: 'task_started',
+      timestamp: createTimestamp(),
+      payload: {
+        label: 'Browser gaze experiment task started',
+        source: TRACKER_SOURCE,
+        tracker_type: TRACKER_SOURCE,
+        target: taskPrompt,
+        task_prompt: taskPrompt,
+        study_name: this.sessionOptions?.studyConfig?.name,
+        target_url: this.sessionOptions?.studyConfig?.targetUrl,
+      },
+    })
+    this.eventIndex += 1
   }
 
   async startSession(options?: TrackerSessionOptions) {
@@ -657,23 +682,8 @@ export class WebGazerTracker implements TrackerProvider {
     this.cameraQualityBaseline = null
     this.latestCameraObservation = null
     this.latestDrift = null
-    this.events = [
-      {
-        id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
-        event_type: 'task_started',
-        timestamp: createTimestamp(),
-        payload: {
-          label: 'Browser gaze experiment task started',
-          source: TRACKER_SOURCE,
-          tracker_type: TRACKER_SOURCE,
-          target: options?.taskPrompt ?? 'Find the team plan and start checkout',
-          task_prompt: options?.taskPrompt ?? 'Find the team plan and start checkout',
-          study_name: options?.studyConfig?.name,
-          target_url: options?.studyConfig?.targetUrl,
-        },
-      },
-    ]
-    this.eventIndex += 1
+    this.sessionOptions = options ?? null
+    this.events = []
     this.status = 'ready'
   }
 
@@ -773,6 +783,7 @@ export class WebGazerTracker implements TrackerProvider {
     this.cameraQualityBaseline = null
     this.latestCameraObservation = null
     this.latestDrift = null
+    this.sessionOptions = null
     this.status = 'idle'
   }
 }

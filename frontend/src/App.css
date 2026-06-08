@@ -770,6 +770,7 @@ dd {
 }
 
 .camera-readiness-preview {
+  position: relative;
   min-height: 360px;
   overflow: hidden;
   border: 1px solid #c6d2e1;
@@ -783,6 +784,37 @@ dd {
   min-height: 360px;
   object-fit: cover;
   transform: scaleX(-1);
+}
+
+.camera-face-guide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.camera-face-guide-oval {
+  width: min(46%, 210px);
+  aspect-ratio: 0.72;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 999px rgba(17, 24, 39, 0.28),
+    0 0 24px rgba(15, 23, 42, 0.35);
+}
+
+.camera-face-guide span {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.68);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .camera-readiness-copy {

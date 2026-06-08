@@ -30,16 +30,34 @@ type CameraReadinessHookState = {
 }
 
 const SAMPLE_INTERVAL_MS = 250
+const EXTRACTOR_RETRY_INTERVAL_MS = 2000
 
-function findExistingCameraVideo() {
+function findExistingCameraStream(previewVideo: HTMLVideoElement | null) {
   if (typeof document === 'undefined') {
     return null
   }
-  return (
-    document.querySelector<HTMLVideoElement>('#webgazerVideoFeed') ??
-    document.querySelector<HTMLVideoElement>('video[id*="webgazer" i]') ??
-    document.querySelector<HTMLVideoElement>('video')
-  )
+  const candidateVideos = [
+    document.querySelector<HTMLVideoElement>('#webgazerVideoFeed'),
+    ...Array.from(document.querySelectorAll<HTMLVideoElement>('video[id*="webgazer" i]')),
+  ]
+
+  for (const video of candidateVideos) {
+    if (!video || video === previewVideo || !(video.srcObject instanceof MediaStream)) {
+      continue
+    }
+    if (video.srcObject.getVideoTracks().some((track) => track.readyState === 'live')) {
+      return video.srcObject
+    }
+  }
+
+  return null
+}
+
+async function attachStreamToVideo(video: HTMLVideoElement, stream: MediaStream) {
+  video.srcObject = stream
+  video.muted = true
+  video.playsInline = true
+  await video.play()
 }
 
 export function useCameraReadiness({
@@ -49,7 +67,6 @@ export function useCameraReadiness({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const extractorRef = useRef<CameraObservationExtractor | null>(null)
-  const extractorFailedRef = useRef(false)
   const stableSinceRef = useRef<number | null>(null)
   const [observation, setObservation] = useState<CameraQualityObservation | null>(null)
   const observationRef = useRef<CameraQualityObservation | null>(null)
@@ -67,25 +84,26 @@ export function useCameraReadiness({
     let cancelled = false
 
     async function attachCamera() {
-      const existingVideo = findExistingCameraVideo()
-      if (existingVideo) {
-        videoRef.current = existingVideo
+      setError(null)
+      const previewVideo = videoRef.current
+      if (!previewVideo) {
         return
       }
 
       try {
+        const existingStream = findExistingCameraStream(previewVideo)
+        if (existingStream) {
+          await attachStreamToVideo(previewVideo, existingStream)
+          return
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
           return
         }
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.muted = true
-          videoRef.current.playsInline = true
-          await videoRef.current.play()
-        }
+        await attachStreamToVideo(previewVideo, stream)
       } catch (cameraError) {
         const message = cameraError instanceof Error ? cameraError.message : 'Camera preview is unavailable.'
         setError(message)
@@ -96,36 +114,57 @@ export function useCameraReadiness({
 
     return () => {
       cancelled = true
-      extractorRef.current?.dispose()
-      extractorRef.current = null
-      extractorFailedRef.current = false
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
   }, [enabled])
 
   useEffect(() => {
-    if (!enabled || extractorRef.current || extractorFailedRef.current) {
+    if (!enabled) {
       return
     }
 
     let cancelled = false
-    void MediaPipeCameraObservationExtractor.create()
-      .then((extractor) => {
+    let retryId: number | null = null
+
+    function scheduleRetry() {
+      retryId = window.setTimeout(() => {
+        void initializeExtractor()
+      }, EXTRACTOR_RETRY_INTERVAL_MS)
+    }
+
+    async function initializeExtractor() {
+      if (cancelled || extractorRef.current) {
+        return
+      }
+
+      try {
+        const extractor = await MediaPipeCameraObservationExtractor.create()
         if (cancelled) {
           extractor.dispose()
           return
         }
         extractorRef.current = extractor
         setWarning(null)
-      })
-      .catch(() => {
-        extractorFailedRef.current = true
-        setWarning('Direct camera setup checks are unavailable. Using lower-fidelity browser gaze setup signals.')
-      })
+      } catch {
+        if (cancelled) {
+          return
+        }
+        setWarning('Direct camera setup checks are starting. Using lower-fidelity browser gaze setup signals for now.')
+        scheduleRetry()
+      }
+    }
+
+    setWarning(null)
+    void initializeExtractor()
 
     return () => {
       cancelled = true
+      if (retryId !== null) {
+        window.clearTimeout(retryId)
+      }
+      extractorRef.current?.dispose()
+      extractorRef.current = null
     }
   }, [enabled])
 

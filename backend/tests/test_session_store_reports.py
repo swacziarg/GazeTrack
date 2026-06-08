@@ -141,6 +141,79 @@ def test_report_identifies_experimental_webgazer_tracker() -> None:
     assert any("not medical-grade" in insight for insight in report["insights"])
 
 
+def test_webgazer_replay_starts_at_task_after_setup_calibration() -> None:
+    session_id = uuid4()
+    payload = {
+        "events": [
+            {
+                "event_type": "calibration",
+                "timestamp": "2026-01-15T17:30:00.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "calibration_step": 1,
+                    "calibration_point_count": 1,
+                    "error_px": 42,
+                },
+            },
+            {
+                "event_type": "calibration",
+                "timestamp": "2026-01-15T17:30:01.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "calibration_points_completed": 1,
+                    "calibration_quality": "good",
+                },
+            },
+            {
+                "event_type": "task_start",
+                "timestamp": "2026-01-15T17:31:00.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "target": "Find checkout.",
+                },
+            },
+            {
+                "event_type": "gaze",
+                "timestamp": "2026-01-15T17:31:02.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "x": 0.52,
+                    "y": 0.41,
+                    "viewport_width": 1440,
+                    "viewport_height": 900,
+                    "confidence": 0.62,
+                },
+            },
+            {
+                "event_type": "task_complete",
+                "timestamp": "2026-01-15T17:31:05.000Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "completed": True,
+                },
+            },
+        ]
+    }
+
+    ingest_response = client.post(f"/api/v1/sessions/{session_id}/events", json=payload)
+    report_response = client.get(f"/api/v1/sessions/{session_id}/report")
+
+    assert ingest_response.status_code == 200
+    assert ingest_response.json()["accepted_count"] == 5
+    assert report_response.status_code == 200
+    report = report_response.json()
+    assert report["event_type_counts"]["calibration"] == 2
+    assert report["replay_summary"]["duration_ms"] == 5000
+    assert report["replay_summary"]["event_count"] == 3
+    assert [event["type"] for event in report["replay_events"]] == ["task_start", "gaze", "task_complete"]
+    assert [event["relative_ms"] for event in report["replay_events"]] == [0, 2000, 5000]
+
+
 def test_report_before_ingest_returns_safe_empty_report() -> None:
     session_id = uuid4()
 

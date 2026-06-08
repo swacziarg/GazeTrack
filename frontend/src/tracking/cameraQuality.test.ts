@@ -80,6 +80,16 @@ describe('cameraQuality readiness scoring', () => {
     expect(result.state).toBe('camera_frame_rate_too_low')
     expect(result.flags).toContain('sample_rate_low')
   })
+
+  it('allows readiness when fallback setup signals omit direct face geometry', () => {
+    const result = evaluateCameraReadiness(
+      observation({ faceCenter: null, faceSize: null, headPose: null, movement: null }),
+      cameraQualityThresholds.stableWindowMs,
+    )
+
+    expect(result.ready).toBe(true)
+    expect(result.state).toBe('ready')
+  })
 })
 
 describe('cameraQuality drift classification', () => {

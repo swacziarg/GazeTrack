@@ -174,7 +174,7 @@ describe('camera observation extraction from MediaPipe landmarks', () => {
 })
 
 describe('fallback camera observation', () => {
-  it('uses browser gaze status only when direct extractor is unavailable', () => {
+  it('uses only defensible browser gaze setup signals when direct extractor is unavailable', () => {
     const observation = fallbackObservationFromTrackingStatus(null, {
       trackerState: 'active',
       sampleCount: 8,
@@ -190,9 +190,10 @@ describe('fallback camera observation', () => {
       expect.objectContaining({
         faceDetected: true,
         eyesVisible: true,
-        faceCenter: { x: 0.62, y: 0.4 },
+        faceCenter: null,
         faceSize: null,
         observedFps: 4,
+        movement: null,
       }),
     )
   })

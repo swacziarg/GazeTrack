@@ -29,12 +29,26 @@ def _relative_ms(timestamp: str, session_start: datetime | None) -> int | None:
 
 
 def _session_start(events: list[EventEnvelope]) -> datetime | None:
+    task_start_timestamps = [
+        parsed_timestamp
+        for event in events
+        if event.event_type.value == "task_start"
+        and (parsed_timestamp := parse_event_timestamp(event.timestamp)) is not None
+    ]
+    if task_start_timestamps:
+        return min(task_start_timestamps)
+
     parsed_timestamps = [
         parsed_timestamp
         for event in events
         if (parsed_timestamp := parse_event_timestamp(event.timestamp)) is not None
     ]
     return min(parsed_timestamps) if parsed_timestamps else None
+
+
+def _is_before_session_start(timestamp: str, session_start: datetime | None) -> bool:
+    parsed_timestamp = parse_event_timestamp(timestamp)
+    return parsed_timestamp is not None and session_start is not None and parsed_timestamp < session_start
 
 
 def _session_duration_ms(events: list[EventEnvelope], session_start: datetime | None) -> int:
@@ -102,6 +116,9 @@ def build_replay_events(events: list[EventEnvelope], aois: list[AoiRecord]) -> l
     replay_events: list[dict[str, Any]] = []
 
     for index, event in enumerate(events):
+        if _is_before_session_start(event.timestamp, session_start):
+            continue
+
         payload: dict[str, Any] = {
             "id": f"event-{index + 1:04d}",
             "type": event.event_type.value,
@@ -146,6 +163,9 @@ def build_replay_fixations(fixations: list[Fixation], events: list[EventEnvelope
     replay_fixations: list[dict[str, Any]] = []
 
     for fixation in fixations:
+        if _is_before_session_start(fixation.start_timestamp, session_start):
+            continue
+
         start_relative_ms = _relative_ms(fixation.start_timestamp, session_start)
         end_relative_ms = _relative_ms(fixation.end_timestamp, session_start)
         payload: dict[str, Any] = {

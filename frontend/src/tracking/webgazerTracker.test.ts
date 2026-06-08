@@ -152,7 +152,7 @@ describe('WebGazerTracker', () => {
     )
   })
 
-  it('adds task and study context before storing browser gaze samples', async () => {
+  it('adds task and study context after calibration before storing browser gaze samples', async () => {
     vi.stubGlobal('window', {
       innerWidth: 1000,
       innerHeight: 500,
@@ -175,8 +175,10 @@ describe('WebGazerTracker', () => {
         aois: [],
       },
     })
+    expect(tracker.getEvents()).toEqual([])
+    await tracker.runCalibration({ targets: [] })
 
-    expect(tracker.getEvents()[0]).toEqual(
+    expect(tracker.getEvents().find((event) => event.event_type === 'task_started')).toEqual(
       expect.objectContaining({
         event_type: 'task_started',
         payload: expect.objectContaining({

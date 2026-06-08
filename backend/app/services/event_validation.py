@@ -386,7 +386,13 @@ def validate_event_for_ingest(event: EventEnvelope, has_task_context: bool = Fal
         return EventValidationResult(rejection_reason=f"Rejected event_type={event.event_type.value} payload over {MAX_PAYLOAD_BYTES} bytes.")
 
     source = telemetry_source(sanitized_payload)
-    if source == WEBGAZER_EXPERIMENTAL_SOURCE and event.event_type.value != "task_start" and not has_task_context:
+    webgazer_setup_event = event.event_type.value == "calibration"
+    if (
+        source == WEBGAZER_EXPERIMENTAL_SOURCE
+        and event.event_type.value != "task_start"
+        and not webgazer_setup_event
+        and not has_task_context
+    ):
         return EventValidationResult(
             rejection_reason=(
                 f"Rejected WebGazer event_type={event.event_type.value} without accepted task_start context."
