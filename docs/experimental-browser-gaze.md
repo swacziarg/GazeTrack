@@ -45,3 +45,12 @@ When enabled, the app reveals `Browser gaze experiment` in the tracker selector.
 ## Recommended reviewer framing
 
 Use synthetic mode to evaluate the implemented product/data pipeline. Use browser gaze only to discuss how the tracker abstraction, consent gate, quality feedback, and privacy-safe event envelope could support future browser-native gaze research.
+
+## Real-site embed mode
+
+The controlled-site embed at `frontend/public/gazetrack-capture.js` has two modes:
+
+- Interaction-only real-site capture is the default. It uses `window.GazeTrackConfig`, creates a capture session, snapshots configured AOIs from the page, and records task, click, scroll, and page-view telemetry.
+- WebGazer-enabled real-site capture requires `enableWebGazer: true`. The embed shows consent copy before loading WebGazer, starts setup only after the tester opts in, disables WebGazer session persistence and built-in preview/prediction UI, runs a lightweight local-only camera readiness phase, uses full-viewport calibration targets, then records capped gaze samples during the task.
+
+Real-site WebGazer events keep `source: "real_site_capture"` and `tracker_type: "real_site_capture"` so existing capture-token validation and reports continue to work. The standalone embed does not reuse the React/MediaPipe readiness component; its fallback readiness check is intentionally limited to camera stream activity, preview dimensions, and a stable hold timer.

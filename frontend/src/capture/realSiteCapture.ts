@@ -31,10 +31,27 @@ export type ResolvedAoiSnapshot = {
 }
 
 export type CaptureEvent = {
-  event_type: 'task_start' | 'task_complete' | 'gaze' | 'click' | 'scroll' | 'page_view' | 'quality'
+  event_type: 'task_start' | 'task_complete' | 'gaze' | 'click' | 'scroll' | 'page_view' | 'quality' | 'calibration'
   timestamp: string
   payload: Record<string, unknown>
 }
+
+export type CalibrationTarget = {
+  x: number
+  y: number
+}
+
+export const browserCalibrationTargets: CalibrationTarget[] = [
+  { x: 0.12, y: 0.12 },
+  { x: 0.5, y: 0.12 },
+  { x: 0.88, y: 0.12 },
+  { x: 0.12, y: 0.5 },
+  { x: 0.5, y: 0.5 },
+  { x: 0.88, y: 0.5 },
+  { x: 0.12, y: 0.88 },
+  { x: 0.5, y: 0.88 },
+  { x: 0.88, y: 0.88 },
+]
 
 function clampNormalized(value: number) {
   if (!Number.isFinite(value)) {
@@ -199,6 +216,40 @@ export function createClickEvent(
       document_width: documentSize.width,
       document_height: documentSize.height,
       coordinate_space: 'document_normalized',
+    },
+  }
+}
+
+export function expandCalibrationTargets(passes: number, targets: CalibrationTarget[] = browserCalibrationTargets) {
+  const safePasses = Math.max(1, Math.min(5, Math.floor(passes) || 1))
+  return Array.from({ length: safePasses }).flatMap(() => targets)
+}
+
+export function createCalibrationCompleteEvent(
+  pageUrl: string,
+  documentSize: DocumentSize,
+  pointsCompleted: number,
+  passes: number,
+  durationMs: number,
+): CaptureEvent {
+  return {
+    event_type: 'calibration',
+    timestamp: new Date().toISOString(),
+    payload: {
+      label: 'calibration_complete',
+      mode: 'calibration_complete',
+      source: REAL_SITE_CAPTURE_SOURCE,
+      tracker_type: REAL_SITE_CAPTURE_SOURCE,
+      page_url: pageUrl,
+      page_path: new URL(pageUrl).pathname,
+      document_width: documentSize.width,
+      document_height: documentSize.height,
+      coordinate_space: 'document_normalized',
+      calibration_points_completed: pointsCompleted,
+      calibration_point_count: pointsCompleted,
+      calibration_passes: passes,
+      calibration_duration_ms: durationMs,
+      calibration_quality: 'usable',
     },
   }
 }

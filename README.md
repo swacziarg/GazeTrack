@@ -9,6 +9,7 @@ GazeTrack is a privacy-first, task-based UX analytics demo for website builders.
 - Default `SyntheticTracker` with deterministic calibration, gaze, click, scroll, and task events.
 - Synthetic quality modes: `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze`.
 - Optional `WebGazerTracker` experiment hidden behind `VITE_ENABLE_WEBGAZER=true`, consent, and browser support checks.
+- Standalone real-site capture embed with interaction-only mode by default and an opt-in WebGazer setup flow for controlled websites.
 - FastAPI + SQLite persistence for studies, tasks, AOIs, tester sessions, accepted telemetry events, and report payloads.
 - Privacy-safe ingest validation that rejects media-like payload keys before persistence.
 - Backend reports with executive summaries, quality interpretation, AOI attention ranking, first/most/weak attention callouts, recommended next actions, event counts, AOI metrics, CAF delay when available, and schematic replay data.
@@ -52,6 +53,9 @@ Synthetic mode is the default and the recommended demo path. It does not request
 4. Open `http://localhost:5173`, click `Open demo study`, keep `Synthetic demo` selected, run calibration, complete the session, and inspect the backend report.
 
 SQLite demo data is stored locally in `backend/gazetrack_demo.db` unless `GAZETRACK_DATABASE_URL` or `DATABASE_URL` is set.
+The backend also loads the project-root `.env` file when present. For real-site embedding, set
+`GAZETRACK_CORS_ALLOWED_ORIGINS` to include the tested website origin; the example config includes GazeTrack local
+ports, common ShotzWeb local ports, `https://shotzapp.app`, and `https://www.shotzapp.app`.
 
 ## Experimental browser gaze quickstart
 
@@ -65,6 +69,40 @@ VITE_ENABLE_WEBGAZER=true npm run dev
 Then open `http://localhost:5173`, choose `Browser gaze experiment`, read the consent notice, allow browser camera permission, click each calibration target while looking at it, and complete a short session. If permission, lighting, device support, or calibration quality is poor, switch back to `Use synthetic demo`.
 
 Set `VITE_WEBGAZER_SCRIPT_URL` only if you need to point the browser at a different WebGazer script URL. WebGazer is not required for the default demo.
+
+## Real-site capture embed
+
+Controlled websites can include the standalone vanilla script with one config object and one script tag. The default mode is interaction-only: it creates a capture session, snapshots configured AOIs from the live page, and records page view, task, click, and scroll telemetry. If `window.webgazer` is already present, it may sample approximate gaze points, but the embed does not load WebGazer unless explicitly enabled.
+
+```html
+<script>
+  window.GazeTrackConfig = {
+    apiBaseUrl: 'https://your-gazetrack-api.example',
+    studyId: '00000000-0000-0000-0000-000000000000',
+    captureToken: 'capture-token-from-snippet-config'
+  }
+</script>
+<script src="https://your-gazetrack-api.example/gazetrack-capture.js" async></script>
+```
+
+For WebGazer-enabled real-site capture, add:
+
+```html
+<script>
+  window.GazeTrackConfig = {
+    apiBaseUrl: 'https://your-gazetrack-api.example',
+    studyId: '00000000-0000-0000-0000-000000000000',
+    captureToken: 'capture-token-from-snippet-config',
+    enableWebGazer: true,
+    webgazerScriptUrl: 'https://webgazer.cs.brown.edu/webgazer.js',
+    calibrationPasses: 1,
+    requireCameraReadiness: true
+  }
+</script>
+<script src="https://your-gazetrack-api.example/gazetrack-capture.js" async></script>
+```
+
+This mode is consent-gated. It loads WebGazer only after the tester starts setup, hides WebGazer preview/prediction UI, shows a local-only camera readiness preview, requires full-viewport calibration clicks, then starts task capture. It submits telemetry only: normalized gaze coordinates, confidence when available, calibration summaries, quality events, clicks, scrolls, and task events with `source`/`tracker_type` set to `real_site_capture`. WebGazer capture is approximate, browser-dependent, and not medical-grade.
 
 ## Privacy guarantees
 

@@ -39,10 +39,18 @@ SAFE_PAYLOAD_KEYS = {
     "calibration_points_completed",
     "calibration_quality",
     "calibration_recommendation",
+    "calibration_passes",
+    "calibration_duration_ms",
     "quality_warning",
     "quality_score",
     "quality_flags",
     "camera_readiness_score",
+    "readiness_method",
+    "readiness_hold_ms",
+    "setup_phase",
+    "setup_method",
+    "sample_interval_ms",
+    "gaze_sample_cap",
     "tracking_quality",
     "camera_readiness_baseline",
     "drift_metrics",
@@ -243,7 +251,9 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
         if key in {"x", "y", "viewport_width", "viewport_height", "document_width", "document_height",
                    "scroll_x", "scroll_y", "confidence", "calibration_error_px",
                    "calibration_error_normalized", "error_px", "error_normalized", "dwell_ms",
-                   "scroll_depth_percent", "quality_score", "camera_readiness_score"}:
+                   "scroll_depth_percent", "quality_score", "camera_readiness_score",
+                   "readiness_hold_ms", "sample_interval_ms", "gaze_sample_cap",
+                   "calibration_duration_ms"}:
             if value is None and key == "confidence":
                 sanitized[key] = None
             elif _is_number(value):
@@ -253,7 +263,7 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
             if isinstance(value, bool):
                 sanitized[key] = value
             continue
-        if key in {"calibration_step", "calibration_point_count", "calibration_points_completed"}:
+        if key in {"calibration_step", "calibration_point_count", "calibration_points_completed", "calibration_passes"}:
             if _is_number(value):
                 sanitized[key] = int(value)
             continue

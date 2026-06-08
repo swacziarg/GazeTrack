@@ -92,6 +92,49 @@
         apiBaseUrl: params.get('apiBaseUrl'),
         studyId: params.get('studyId'),
         captureToken: params.get('captureToken'),
+        enableWebGazer: params.get('enableWebGazer') === 'true',
+        webgazerScriptUrl: params.get('webgazerScriptUrl') || undefined,
+        calibrationPasses: Number(params.get('calibrationPasses') || 1),
+        requireCameraReadiness: params.get('requireCameraReadiness') !== 'false',
+      }
+      if (params.get('stubWebGazer') === 'true') {
+        window.__GazeTrackWebGazerCalls = []
+        window.webgazer = {
+          _listener: null,
+          saveDataAcrossSessions(value) {
+            window.__GazeTrackWebGazerCalls.push(['saveDataAcrossSessions', value])
+            return this
+          },
+          showVideoPreview(value) {
+            window.__GazeTrackWebGazerCalls.push(['showVideoPreview', value])
+            return this
+          },
+          showPredictionPoints(value) {
+            window.__GazeTrackWebGazerCalls.push(['showPredictionPoints', value])
+            return this
+          },
+          setGazeListener(listener) {
+            this._listener = listener
+            window.__GazeTrackWebGazerCalls.push(['setGazeListener'])
+            return this
+          },
+          begin() {
+            window.__GazeTrackWebGazerCalls.push(['begin'])
+            return Promise.resolve()
+          },
+          recordScreenPosition(x, y, eventType) {
+            window.__GazeTrackWebGazerCalls.push(['recordScreenPosition', x, y, eventType])
+            if (this._listener) {
+              this._listener({ x, y, confidence: 0.82 })
+            }
+            return this
+          },
+          emitPrediction(x, y, confidence) {
+            if (this._listener) {
+              this._listener({ x, y, confidence })
+            }
+          },
+        }
       }
     </script>
     <script src="/gazetrack-capture.js" async></script>

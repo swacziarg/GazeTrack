@@ -101,6 +101,46 @@ each calibration target while looking at it, then complete the session after a f
 `VITE_WEBGAZER_SCRIPT_URL` if you need to use a different WebGazer script URL. If predictions do not appear, check
 camera permission, browser support, lighting, tab focus, and script loading.
 
+## Real-Site Capture Embed
+
+`frontend/public/gazetrack-capture.js` is a standalone vanilla-JS embed for controlled websites. It does not depend on
+React. Integrators provide one `window.GazeTrackConfig` object and one script include.
+
+Interaction-only mode is the default:
+
+```html
+<script>
+  window.GazeTrackConfig = {
+    apiBaseUrl: 'http://localhost:8000',
+    studyId: 'study-id',
+    captureToken: 'capture-token'
+  }
+</script>
+<script src="/gazetrack-capture.js" async></script>
+```
+
+WebGazer-enabled mode is explicit:
+
+```html
+<script>
+  window.GazeTrackConfig = {
+    apiBaseUrl: 'http://localhost:8000',
+    studyId: 'study-id',
+    captureToken: 'capture-token',
+    enableWebGazer: true,
+    webgazerScriptUrl: 'https://webgazer.cs.brown.edu/webgazer.js',
+    calibrationPasses: 1,
+    requireCameraReadiness: true
+  }
+</script>
+<script src="/gazetrack-capture.js" async></script>
+```
+
+The WebGazer embed path shows consent copy before loading/starting WebGazer, runs a local-only camera readiness preview,
+uses full-viewport calibration targets, then records task telemetry. It sends only normalized coordinates, confidence
+when available, quality metadata, calibration summaries, clicks, scrolls, and task events as `real_site_capture`.
+WebGazer estimates are approximate, browser-dependent, and not medical-grade.
+
 ## Synthetic Report Visuals
 
 After completing the mock session, the local report renders synthetic visual previews:

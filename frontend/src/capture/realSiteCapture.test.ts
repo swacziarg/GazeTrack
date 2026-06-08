@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createClickEvent,
+  createCalibrationCompleteEvent,
   createPageViewEvent,
   documentSizeFromDom,
+  expandCalibrationTargets,
   normalizeDocumentPoint,
   resolveAoiSnapshot,
   selectorForAoi,
@@ -170,5 +172,29 @@ describe('real-site capture helpers', () => {
     } as HTMLElement
 
     expect(documentSizeFromDom(root, body)).toEqual({ width: 1200, height: 3000 })
+  })
+
+  it('expands browser calibration targets by bounded pass count', () => {
+    expect(expandCalibrationTargets(2)).toHaveLength(18)
+    expect(expandCalibrationTargets(0)).toHaveLength(9)
+    expect(expandCalibrationTargets(99)).toHaveLength(45)
+  })
+
+  it('creates real-site calibration completion telemetry without media-like payloads', () => {
+    const event = createCalibrationCompleteEvent('https://example.com/pricing', { width: 1200, height: 2400 }, 9, 1, 3500)
+
+    expect(event).toMatchObject({
+      event_type: 'calibration',
+      payload: {
+        label: 'calibration_complete',
+        mode: 'calibration_complete',
+        source: 'real_site_capture',
+        tracker_type: 'real_site_capture',
+        calibration_points_completed: 9,
+        calibration_point_count: 9,
+        calibration_passes: 1,
+      },
+    })
+    expect(JSON.stringify(event)).not.toMatch(/video|screenshot|frame|blob|base64|landmark|embedding/i)
   })
 })
