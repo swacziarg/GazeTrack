@@ -5,13 +5,14 @@ import { computeAoiAttentionSummary, extractGazeSamples } from '../lib/visualiza
 type AoiBreakdownProps = {
   events: MockStudyEvent[]
   aois: AreaOfInterest[]
+  telemetrySourceLabel?: string
 }
 
 function formatDwellMs(value: number) {
   return `${(value / 1000).toFixed(1)}s`
 }
 
-export function AoiBreakdown({ events, aois }: AoiBreakdownProps) {
+export function AoiBreakdown({ events, aois, telemetrySourceLabel = 'Synthetic telemetry' }: AoiBreakdownProps) {
   const summary = computeAoiAttentionSummary(extractGazeSamples(events), aois)
 
   return (
@@ -21,7 +22,7 @@ export function AoiBreakdown({ events, aois }: AoiBreakdownProps) {
           <p className="eyebrow">Demo-derived AOI attention</p>
           <h3>Region breakdown</h3>
         </div>
-        <span className="status-pill pending">Synthetic only</span>
+        <span className="status-pill pending">{telemetrySourceLabel}</span>
       </div>
 
       <div className="aoi-breakdown-list">
@@ -48,7 +49,7 @@ export function AoiBreakdown({ events, aois }: AoiBreakdownProps) {
         ))}
       </div>
 
-      <p className="visual-note">Counts and dwell-like values come from synthetic gaze points inside AOI boxes.</p>
+      <p className="visual-note">Counts and dwell-like values come from gaze points inside AOI boxes.</p>
     </article>
   )
 }

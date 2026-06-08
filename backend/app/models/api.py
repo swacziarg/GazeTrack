@@ -66,12 +66,15 @@ class TaskResponse(BaseModel):
 class AoiCreateRequest(BaseModel):
     label: str = Field(min_length=1, max_length=200)
     semantic_type: str | None = Field(default=None, max_length=64)
+    role_key: str | None = Field(default=None, max_length=64)
+    selector: str | None = Field(default=None, max_length=300)
+    required: bool = True
     page_url: str | None = None
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
     width: float = Field(gt=0, le=1)
     height: float = Field(gt=0, le=1)
-    coordinate_space: Literal["normalized"] = "normalized"
+    coordinate_space: Literal["normalized", "document_normalized"] = "normalized"
 
     @model_validator(mode="after")
     def validate_bounds(self) -> "AoiCreateRequest":
@@ -87,6 +90,9 @@ class AoiResponse(BaseModel):
     study_id: UUID
     label: str
     semantic_type: str | None = None
+    role_key: str | None = None
+    selector: str | None = None
+    required: bool = True
     page_url: str | None = None
     x: float
     y: float
@@ -94,6 +100,84 @@ class AoiResponse(BaseModel):
     height: float
     coordinate_space: str = "normalized"
     created_at: str
+
+
+class AoiSnapshotCreateRequest(BaseModel):
+    source_aoi_id: UUID | None = None
+    label: str = Field(min_length=1, max_length=200)
+    semantic_type: str | None = Field(default=None, max_length=64)
+    role_key: str | None = Field(default=None, max_length=64)
+    selector: str | None = Field(default=None, max_length=300)
+    page_url: str | None = None
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(gt=0, le=1)
+    height: float = Field(gt=0, le=1)
+    coordinate_space: Literal["document_normalized"] = "document_normalized"
+    detected: bool = True
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "AoiSnapshotCreateRequest":
+        if self.x + self.width > 1:
+            raise ValueError("AOI snapshot x + width must be <= 1 for document-normalized coordinates")
+        if self.y + self.height > 1:
+            raise ValueError("AOI snapshot y + height must be <= 1 for document-normalized coordinates")
+        return self
+
+
+class AoiSnapshotBatchRequest(BaseModel):
+    capture_token: str = Field(min_length=1, max_length=200)
+    snapshots: list[AoiSnapshotCreateRequest]
+
+
+class AoiSnapshotResponse(BaseModel):
+    snapshot_id: UUID
+    session_id: UUID
+    study_id: UUID
+    source_aoi_id: UUID | None = None
+    label: str
+    semantic_type: str | None = None
+    role_key: str | None = None
+    selector: str | None = None
+    page_url: str | None = None
+    x: float
+    y: float
+    width: float
+    height: float
+    coordinate_space: str = "document_normalized"
+    detected: bool = True
+    created_at: str
+
+
+class CaptureConfigAoiResponse(BaseModel):
+    aoi_id: UUID
+    label: str
+    semantic_type: str | None = None
+    role_key: str
+    selector: str | None = None
+    required: bool = True
+
+
+class CaptureConfigResponse(BaseModel):
+    study_id: UUID
+    name: str
+    objective: str | None = None
+    target_url: str | None = None
+    task_prompt: str
+    aois: list[CaptureConfigAoiResponse]
+
+
+class CaptureSnippetConfigResponse(CaptureConfigResponse):
+    capture_token: str
+
+
+class CaptureSessionCreateRequest(BaseModel):
+    capture_token: str = Field(min_length=1, max_length=200)
+    page_url: str | None = None
+    viewport_width: float | None = Field(default=None, gt=0)
+    viewport_height: float | None = Field(default=None, gt=0)
+    document_width: float | None = Field(default=None, gt=0)
+    document_height: float | None = Field(default=None, gt=0)
 
 
 class StudyTaskConfigRequest(BaseModel):
@@ -255,7 +339,7 @@ class ReplayAoiOverlayResponse(BaseModel):
     y: float
     width: float
     height: float
-    coordinate_space: Literal["normalized"] = "normalized"
+    coordinate_space: Literal["normalized", "document_normalized"] = "normalized"
 
 
 class SessionReportResponse(BaseModel):

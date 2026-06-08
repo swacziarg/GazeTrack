@@ -172,3 +172,75 @@ def test_event_ingest_rejects_webgazer_media_like_payload() -> None:
     body = response.json()
     assert body["accepted_count"] == 0
     assert body["rejected_count"] >= 1
+
+
+def test_event_ingest_accepts_quality_metadata_without_media_payloads() -> None:
+    session_id = uuid4()
+    payload = {
+        "events": [
+            {
+                "event_type": "task_start",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "target": "Find the CTA.",
+                },
+            },
+            {
+                "event_type": "calibration",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "calibration_points_completed": 9,
+                    "camera_readiness_score": 92,
+                    "camera_readiness_baseline": {
+                        "captured_at": "2026-01-01T00:00:01Z",
+                        "face_center": {"x": 0.5, "y": 0.5},
+                        "face_size": None,
+                        "brightness": 0.42,
+                        "contrast": 0.16,
+                        "observed_fps": 18,
+                        "readiness_score": 92,
+                    },
+                },
+            },
+            {
+                "event_type": "gaze",
+                "timestamp": "2026-01-01T00:00:02Z",
+                "payload": {
+                    "source": "webgazer_experimental",
+                    "tracker_type": "webgazer_experimental",
+                    "x": 0.52,
+                    "y": 0.41,
+                    "quality_score": 57,
+                    "quality_flags": ["face_center_drift", "low_light"],
+                    "tracking_quality": "medium",
+                    "drift_metrics": {
+                        "face_center_drift": 0.2,
+                        "face_size_drift": None,
+                        "head_pose_drift": None,
+                        "eye_visibility_lost": False,
+                        "face_lost": False,
+                        "low_light": True,
+                        "sample_rate_low": False,
+                        "calibration_baseline_age_ms": 1000,
+                        "overall_tracking_quality": "medium",
+                    },
+                },
+            },
+        ],
+    }
+    response = client.post(f"/api/v1/sessions/{session_id}/events", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["accepted_count"] == 3
+
+    from app.repository import GazeTrackRepository
+
+    events = GazeTrackRepository().get_accepted_events(session_id)
+    gaze_payload = events[-1].payload
+    assert gaze_payload["quality_flags"] == ["face_center_drift", "low_light"]
+    assert gaze_payload["drift_metrics"]["low_light"] is True
+    assert "webcam_frame" not in str(gaze_payload)

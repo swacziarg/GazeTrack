@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import secrets
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -34,6 +35,7 @@ DEMO_AOIS = [
     {
         "label": "Hero headline",
         "semantic_type": "hero",
+        "role_key": "hero_headline",
         "page_url": "https://example.test/pricing",
         "x": 0.12,
         "y": 0.18,
@@ -43,6 +45,7 @@ DEMO_AOIS = [
     {
         "label": "Primary CTA",
         "semantic_type": "CTA",
+        "role_key": "primary_cta",
         "page_url": "https://example.test/pricing",
         "x": 0.52,
         "y": 0.38,
@@ -52,6 +55,7 @@ DEMO_AOIS = [
     {
         "label": "Navigation",
         "semantic_type": "nav",
+        "role_key": "navigation",
         "page_url": "https://example.test/pricing",
         "x": 0.38,
         "y": 0.05,
@@ -61,6 +65,7 @@ DEMO_AOIS = [
     {
         "label": "Pricing preview",
         "semantic_type": "pricing",
+        "role_key": "pricing_preview",
         "page_url": "https://example.test/pricing",
         "x": 0.36,
         "y": 0.62,
@@ -70,6 +75,7 @@ DEMO_AOIS = [
     {
         "label": "Footer",
         "semantic_type": "footer",
+        "role_key": "footer",
         "page_url": "https://example.test/pricing",
         "x": 0.0,
         "y": 0.88,
@@ -89,6 +95,7 @@ class StudyRecord:
     title: str
     description: str | None
     target_url: str | None
+    capture_token: str | None
     created_at: str
     updated_at: str | None
 
@@ -129,6 +136,47 @@ class AoiRecord:
     coordinate_space: str
     created_at: str
     semantic_type: str | None = None
+    role_key: str | None = None
+    selector: str | None = None
+    required: bool = True
+
+
+@dataclass(frozen=True)
+class AoiSnapshotRecord:
+    id: UUID
+    session_id: UUID
+    study_id: UUID
+    source_aoi_id: UUID | None
+    label: str
+    page_url: str | None
+    x: float
+    y: float
+    width: float
+    height: float
+    coordinate_space: str
+    detected: bool
+    created_at: str
+    semantic_type: str | None = None
+    role_key: str | None = None
+    selector: str | None = None
+
+    def to_aoi_record(self) -> AoiRecord:
+        return AoiRecord(
+            id=self.source_aoi_id or self.id,
+            study_id=self.study_id,
+            label=self.label,
+            semantic_type=self.semantic_type,
+            role_key=self.role_key,
+            selector=self.selector,
+            required=True,
+            page_url=self.page_url,
+            x=self.x,
+            y=self.y,
+            width=self.width,
+            height=self.height,
+            coordinate_space=self.coordinate_space,
+            created_at=self.created_at,
+        )
 
 
 @dataclass(frozen=True)
@@ -168,24 +216,27 @@ class GazeTrackRepository:
     ) -> StudyRecord:
         now = utcnow_iso()
         record_id = study_id or uuid4()
+        capture_token = secrets.token_urlsafe(24)
         with connect_database(self.database_url) as connection:
             connection.execute(
                 """
-                INSERT INTO studies (id, title, description, target_url, updated_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO studies (id, title, description, target_url, capture_token, updated_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
                     description = excluded.description,
                     target_url = excluded.target_url,
+                    capture_token = COALESCE(studies.capture_token, excluded.capture_token),
                     updated_at = excluded.updated_at
                 """,
-                (str(record_id), title, description, target_url, now, now),
+                (str(record_id), title, description, target_url, capture_token, now, now),
             )
-        return StudyRecord(
+        return self.get_study(record_id) or StudyRecord(
             id=record_id,
             title=title,
             description=description,
             target_url=target_url,
+            capture_token=capture_token,
             created_at=now,
             updated_at=now,
         )
@@ -213,7 +264,11 @@ class GazeTrackRepository:
     def get_study(self, study_id: UUID) -> StudyRecord | None:
         with connect_database(self.database_url) as connection:
             row = connection.execute(
-                "SELECT id, title, description, target_url, created_at, updated_at FROM studies WHERE id = ?",
+                """
+                SELECT id, title, description, target_url, capture_token, created_at, updated_at
+                FROM studies
+                WHERE id = ?
+                """,
                 (str(study_id),),
             ).fetchone()
         if row is None:
@@ -223,6 +278,7 @@ class GazeTrackRepository:
             title=row["title"],
             description=row["description"],
             target_url=row["target_url"],
+            capture_token=row["capture_token"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -230,7 +286,11 @@ class GazeTrackRepository:
     def list_studies(self) -> list[StudyRecord]:
         with connect_database(self.database_url) as connection:
             rows = connection.execute(
-                "SELECT id, title, description, target_url, created_at, updated_at FROM studies ORDER BY created_at ASC"
+                """
+                SELECT id, title, description, target_url, capture_token, created_at, updated_at
+                FROM studies
+                ORDER BY created_at ASC
+                """
             ).fetchall()
         return [
             StudyRecord(
@@ -238,6 +298,7 @@ class GazeTrackRepository:
                 title=row["title"],
                 description=row["description"],
                 target_url=row["target_url"],
+                capture_token=row["capture_token"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
@@ -285,6 +346,9 @@ class GazeTrackRepository:
                 study_id=study_id,
                 label=str(aoi["label"]),
                 semantic_type=aoi.get("semantic_type") if isinstance(aoi.get("semantic_type"), str) else None,
+                role_key=aoi.get("role_key") if isinstance(aoi.get("role_key"), str) else None,
+                selector=aoi.get("selector") if isinstance(aoi.get("selector"), str) else None,
+                required=bool(aoi.get("required", True)),
                 page_url=aoi.get("page_url") if isinstance(aoi.get("page_url"), str) else target_url,
                 x=float(aoi["x"]),
                 y=float(aoi["y"]),
@@ -299,6 +363,7 @@ class GazeTrackRepository:
             title=title,
             description=description,
             target_url=target_url,
+            capture_token=None,
             created_at=now,
             updated_at=now,
         )
@@ -371,6 +436,9 @@ class GazeTrackRepository:
         semantic_type: str | None = None,
         page_url: str | None = None,
         coordinate_space: str = "normalized",
+        role_key: str | None = None,
+        selector: str | None = None,
+        required: bool = True,
         aoi_id: UUID | None = None,
     ) -> AoiRecord:
         if self.get_study(study_id) is None:
@@ -382,15 +450,31 @@ class GazeTrackRepository:
             connection.execute(
                 """
                 INSERT INTO aois (
-                    id, study_id, label, semantic_type, page_url, x, y, width, height, coordinate_space, created_at
+                    id,
+                    study_id,
+                    label,
+                    semantic_type,
+                    role_key,
+                    selector,
+                    required,
+                    page_url,
+                    x,
+                    y,
+                    width,
+                    height,
+                    coordinate_space,
+                    created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(record_id),
                     str(study_id),
                     label,
                     semantic_type,
+                    role_key,
+                    selector,
+                    1 if required else 0,
                     page_url,
                     x,
                     y,
@@ -405,6 +489,9 @@ class GazeTrackRepository:
             study_id=study_id,
             label=label,
             semantic_type=semantic_type,
+            role_key=role_key,
+            selector=selector,
+            required=required,
             page_url=page_url,
             x=x,
             y=y,
@@ -418,7 +505,21 @@ class GazeTrackRepository:
         with connect_database(self.database_url) as connection:
             rows = connection.execute(
                 """
-                SELECT id, study_id, label, semantic_type, page_url, x, y, width, height, coordinate_space, created_at
+                SELECT
+                    id,
+                    study_id,
+                    label,
+                    semantic_type,
+                    role_key,
+                    selector,
+                    required,
+                    page_url,
+                    x,
+                    y,
+                    width,
+                    height,
+                    coordinate_space,
+                    created_at
                 FROM aois
                 WHERE study_id = ?
                 ORDER BY created_at ASC
@@ -431,12 +532,148 @@ class GazeTrackRepository:
                 study_id=UUID(row["study_id"]),
                 label=row["label"],
                 semantic_type=row["semantic_type"],
+                role_key=row["role_key"],
+                selector=row["selector"],
+                required=bool(row["required"]),
                 page_url=row["page_url"],
                 x=float(row["x"]),
                 y=float(row["y"]),
                 width=float(row["width"]),
                 height=float(row["height"]),
                 coordinate_space=row["coordinate_space"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
+    def capture_token_matches(self, study_id: UUID, capture_token: str | None) -> bool:
+        study = self.get_study(study_id)
+        return bool(study and study.capture_token and capture_token and secrets.compare_digest(study.capture_token, capture_token))
+
+    def ensure_capture_token(self, study_id: UUID) -> str | None:
+        study = self.get_study(study_id)
+        if study is None:
+            return None
+        if study.capture_token:
+            return study.capture_token
+
+        capture_token = secrets.token_urlsafe(24)
+        now = utcnow_iso()
+        with connect_database(self.database_url) as connection:
+            connection.execute(
+                """
+                UPDATE studies
+                SET capture_token = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (capture_token, now, str(study_id)),
+            )
+        return capture_token
+
+    def replace_aoi_snapshots(
+        self,
+        session_id: UUID,
+        snapshots: list[dict[str, Any]],
+    ) -> list[AoiSnapshotRecord]:
+        session = self.ensure_session(session_id)
+        now = utcnow_iso()
+        rows = []
+        for snapshot in snapshots:
+            rows.append(
+                (
+                    str(uuid4()),
+                    str(session_id),
+                    str(session.study_id),
+                    str(snapshot["source_aoi_id"]) if snapshot.get("source_aoi_id") else None,
+                    str(snapshot["label"]),
+                    snapshot.get("semantic_type"),
+                    snapshot.get("role_key"),
+                    snapshot.get("selector"),
+                    snapshot.get("page_url"),
+                    float(snapshot["x"]),
+                    float(snapshot["y"]),
+                    float(snapshot["width"]),
+                    float(snapshot["height"]),
+                    str(snapshot.get("coordinate_space") or "document_normalized"),
+                    1 if snapshot.get("detected", True) else 0,
+                    now,
+                )
+            )
+
+        with connect_database(self.database_url) as connection:
+            connection.execute("DELETE FROM aoi_snapshots WHERE session_id = ?", (str(session_id),))
+            if rows:
+                connection.executemany(
+                    """
+                    INSERT INTO aoi_snapshots (
+                        id,
+                        session_id,
+                        study_id,
+                        source_aoi_id,
+                        label,
+                        semantic_type,
+                        role_key,
+                        selector,
+                        page_url,
+                        x,
+                        y,
+                        width,
+                        height,
+                        coordinate_space,
+                        detected,
+                        created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+
+        return self.list_aoi_snapshots_for_session(session_id)
+
+    def list_aoi_snapshots_for_session(self, session_id: UUID) -> list[AoiSnapshotRecord]:
+        with connect_database(self.database_url) as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    session_id,
+                    study_id,
+                    source_aoi_id,
+                    label,
+                    semantic_type,
+                    role_key,
+                    selector,
+                    page_url,
+                    x,
+                    y,
+                    width,
+                    height,
+                    coordinate_space,
+                    detected,
+                    created_at
+                FROM aoi_snapshots
+                WHERE session_id = ?
+                ORDER BY created_at ASC, label ASC
+                """,
+                (str(session_id),),
+            ).fetchall()
+        return [
+            AoiSnapshotRecord(
+                id=UUID(row["id"]),
+                session_id=UUID(row["session_id"]),
+                study_id=UUID(row["study_id"]),
+                source_aoi_id=UUID(row["source_aoi_id"]) if row["source_aoi_id"] else None,
+                label=row["label"],
+                semantic_type=row["semantic_type"],
+                role_key=row["role_key"],
+                selector=row["selector"],
+                page_url=row["page_url"],
+                x=float(row["x"]),
+                y=float(row["y"]),
+                width=float(row["width"]),
+                height=float(row["height"]),
+                coordinate_space=row["coordinate_space"],
+                detected=bool(row["detected"]),
                 created_at=row["created_at"],
             )
             for row in rows
@@ -561,7 +798,12 @@ class GazeTrackRepository:
     def append_accepted_events(self, session_id: UUID, events: list[EventEnvelope | AcceptedTelemetryEvent]) -> int:
         session = self.ensure_session(session_id)
         now = utcnow_iso()
-        aois = self.list_aois_for_study(session.study_id)
+        snapshots = self.list_aoi_snapshots_for_session(session_id)
+        aois = (
+            [snapshot.to_aoi_record() for snapshot in snapshots if snapshot.detected]
+            if snapshots
+            else self.list_aois_for_study(session.study_id)
+        )
         accepted_events = [
             event if isinstance(event, AcceptedTelemetryEvent) else self._event_to_accepted_telemetry(event)
             for event in events

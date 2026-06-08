@@ -5,7 +5,7 @@ export {
   generateMockStudyEvents,
   generateSyntheticStudyEvents,
 } from './syntheticTracker'
-export { WebGazerTracker, predictionToGazeEvent, type CalibrationSummary } from './webgazerTracker'
+export { WebGazerTracker, browserCalibrationTargets, predictionToGazeEvent, type CalibrationSummary } from './webgazerTracker'
 export {
   categorizeCalibrationQuality,
   deriveTrackingState,

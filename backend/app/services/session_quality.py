@@ -47,6 +47,47 @@ def average(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 3)
 
 
+def _quality_sample_breakdown(events: list[EventEnvelope]) -> dict[str, Any]:
+    gaze_events = [event for event in events if event.event_type.value == "gaze"]
+    quality_counts = {"high": 0, "medium": 0, "low": 0}
+    drift_warning_count = 0
+    flag_counts: dict[str, int] = {}
+    for event in gaze_events:
+        tracking_quality = event.payload.get("tracking_quality")
+        if tracking_quality in quality_counts:
+            quality_counts[str(tracking_quality)] += 1
+        flags = event.payload.get("quality_flags")
+        if isinstance(flags, list) and flags:
+            drift_warning_count += 1
+            for flag in flags:
+                if isinstance(flag, str):
+                    flag_counts[flag] = flag_counts.get(flag, 0) + 1
+
+    total = len(gaze_events)
+    percentages = {
+        key: (round(value / total, 3) if total else None)
+        for key, value in quality_counts.items()
+    }
+    return {
+        "tracking_quality_counts": quality_counts,
+        "tracking_quality_percentages": percentages,
+        "drift_warning_count": drift_warning_count,
+        "quality_flag_counts": flag_counts,
+        "major_quality_flags": sorted(flag_counts, key=flag_counts.get, reverse=True)[:5],
+    }
+
+
+def _camera_readiness_scores(events: list[EventEnvelope]) -> list[float]:
+    scores: list[float] = []
+    for event in events:
+        if event.event_type.value != "calibration":
+            continue
+        value = event.payload.get("camera_readiness_score")
+        if isinstance(value, int | float):
+            scores.append(float(value))
+    return scores
+
+
 def _numeric_payload_values(events: list[EventEnvelope], event_type: str, keys: tuple[str, ...]) -> list[float]:
     values: list[float] = []
     for event in events:
@@ -160,6 +201,8 @@ def compute_quality_summary(events: list[EventEnvelope], fixations: list[Fixatio
     )
     average_calibration_error_px = average(calibration_errors_px)
     average_calibration_error_normalized = average(calibration_errors_normalized)
+    quality_breakdown = _quality_sample_breakdown(events)
+    camera_readiness_scores = _camera_readiness_scores(events)
     quality_verdict, quality_reasons = _quality_verdict(
         gaze_count=counts.get("gaze", 0),
         fixation_count=len(fixations),
@@ -167,6 +210,11 @@ def compute_quality_summary(events: list[EventEnvelope], fixations: list[Fixatio
         average_calibration_error_px=average_calibration_error_px,
         average_calibration_error_normalized=average_calibration_error_normalized,
     )
+    if quality_breakdown["drift_warning_count"] > 0:
+        quality_reasons = [
+            *quality_reasons,
+            f"{quality_breakdown['drift_warning_count']} gaze samples include camera drift or setup quality warnings.",
+        ]
 
     return {
         "score": _session_quality_score(events, confidences),
@@ -178,7 +226,13 @@ def compute_quality_summary(events: list[EventEnvelope], fixations: list[Fixatio
         "calibration_points_completed": _calibration_points_completed(events),
         "average_calibration_error_px": average_calibration_error_px,
         "average_calibration_error_normalized": average_calibration_error_normalized,
+        "calibration_readiness_score": average(camera_readiness_scores),
         "quality_event_count": counts.get("quality", 0),
+        "tracking_quality_counts": quality_breakdown["tracking_quality_counts"],
+        "tracking_quality_percentages": quality_breakdown["tracking_quality_percentages"],
+        "drift_warning_count": quality_breakdown["drift_warning_count"],
+        "quality_flag_counts": quality_breakdown["quality_flag_counts"],
+        "major_quality_flags": quality_breakdown["major_quality_flags"],
         "sample_integrity_basis_event_count": min(len(events), MAX_DEMO_EVENT_SCORE_COUNT),
         "sample_completeness_score": _sample_completeness_score(counts),
         "quality_verdict": quality_verdict,

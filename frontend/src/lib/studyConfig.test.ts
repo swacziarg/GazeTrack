@@ -25,6 +25,9 @@ describe('study config transforms', () => {
         {
           label: 'Checkout CTA',
           semantic_type: 'CTA',
+          role_key: null,
+          selector: null,
+          required: true,
           page_url: 'https://example.test/checkout',
           x: 0.5,
           y: 0.4,
@@ -35,6 +38,9 @@ describe('study config transforms', () => {
         {
           label: 'Plan cards',
           semantic_type: 'pricing',
+          role_key: null,
+          selector: null,
+          required: true,
           page_url: 'https://example.test/checkout',
           x: 0.2,
           y: 0.55,

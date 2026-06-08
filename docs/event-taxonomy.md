@@ -39,7 +39,7 @@ Reports also run `simple_dispersion_v1` fixation detection over accepted `gaze` 
 
 Fixation-derived AOI metrics use the fixation centroid: a fixation belongs to an AOI when its centroid is inside the normalized rectangle. Fixation dwell is more meaningful than raw sample dwell but remains approximate and demo-grade.
 
-Calibration and quality events may include `confidence`, `calibration_error_px`, `calibration_error_normalized`, and `calibration_points_completed`. Synthetic per-target calibration events may also include:
+Calibration and quality events may include `confidence`, `calibration_error_px`, `calibration_error_normalized`, `calibration_points_completed`, `camera_readiness_score`, and a privacy-safe `camera_readiness_baseline`. Synthetic per-target calibration events may also include:
 
 - `target_point: { "x": 0.5, "y": 0.5 }`
 - `observed_point: { "x": 0.51, "y": 0.49 }`
@@ -48,6 +48,6 @@ Calibration and quality events may include `confidence`, `calibration_error_px`,
 - `calibration_step`
 - `calibration_point_count`
 
-The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, emits `webgazer_experimental` telemetry only, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment. WebGazer gaze/click/scroll/calibration events are accepted only after an accepted `task_start` event exists for the session, and frontend sampling is capped so long experiments do not become raw stream dumps.
+The default frontend calibration UI is synthetic: it renders five target dots and generates telemetry without requesting camera permission. The optional WebGazer/browser tracker spike is hidden unless `VITE_ENABLE_WEBGAZER=true`, requires explicit consent before initialization, emits `webgazer_experimental` telemetry only, and remains approximate browser gaze estimation, not medical-grade eye tracking or a biometric assessment. WebGazer gaze samples may carry `quality_score`, `quality_flags`, `tracking_quality`, and `drift_metrics` after the local camera readiness baseline is captured. WebGazer gaze/click/scroll/calibration events are accepted only after an accepted `task_start` event exists for the session, and frontend sampling is capped so long experiments do not become raw stream dumps.
 
 Privacy rule: events must not contain raw media fields, webcam frame content, images, screenshots, blobs, or base64 media.

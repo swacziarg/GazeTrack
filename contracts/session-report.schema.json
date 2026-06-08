@@ -637,7 +637,7 @@
         },
         "coordinate_space": {
           "type": "string",
-          "const": "normalized"
+          "enum": ["normalized", "document_normalized"]
         }
       },
       "additionalProperties": false
@@ -724,9 +724,51 @@
         "average_calibration_error_normalized": {
           "type": ["number", "null"]
         },
+        "calibration_readiness_score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
         "quality_event_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "tracking_quality_counts": {
+          "type": "object",
+          "required": ["high", "medium", "low"],
+          "properties": {
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "tracking_quality_percentages": {
+          "type": "object",
+          "required": ["high", "medium", "low"],
+          "properties": {
+            "high": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+            "medium": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+            "low": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "drift_warning_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quality_flag_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "major_quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "sample_integrity_basis_event_count": {
           "type": "integer",

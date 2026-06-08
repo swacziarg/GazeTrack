@@ -15,6 +15,7 @@ from app.services.aoi_metrics import is_point_inside_aoi, normalize_event_point,
 from app.services.fixations import Fixation, extract_confidence
 
 
+REPLAY_COORDINATE_SPACES = {"normalized", "document_normalized"}
 REPLAY_COORDINATE_SPACE = "normalized"
 
 
@@ -92,7 +93,7 @@ def build_replay_aoi_overlay(aois: list[AoiRecord]) -> list[dict[str, Any]]:
             "coordinate_space": aoi.coordinate_space,
         }
         for aoi in aois
-        if aoi.coordinate_space == REPLAY_COORDINATE_SPACE
+        if aoi.coordinate_space in REPLAY_COORDINATE_SPACES
     ]
 
 

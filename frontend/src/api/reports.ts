@@ -58,7 +58,13 @@ export type BackendQualitySummary = {
   calibration_points_completed: number | null
   average_calibration_error_px: number | null
   average_calibration_error_normalized: number | null
+  calibration_readiness_score?: number | null
   quality_event_count: number
+  tracking_quality_counts?: Record<'high' | 'medium' | 'low', number>
+  tracking_quality_percentages?: Record<'high' | 'medium' | 'low', number | null>
+  drift_warning_count?: number
+  quality_flag_counts?: Record<string, number>
+  major_quality_flags?: string[]
   sample_integrity_basis_event_count: number
   sample_completeness_score: number | null
   quality_verdict: 'pass' | 'warn' | 'fail'
@@ -112,7 +118,7 @@ export type BackendReplayAoiOverlay = {
   y: number
   width: number
   height: number
-  coordinate_space: 'normalized'
+  coordinate_space: 'normalized' | 'document_normalized'
 }
 
 export type BackendSessionReport = {

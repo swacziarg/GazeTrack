@@ -24,6 +24,9 @@ export type StudyAoi = {
   study_id: string
   label: string
   semantic_type: string | null
+  role_key?: string | null
+  selector?: string | null
+  required?: boolean
   page_url: string | null
   x: number
   y: number
@@ -46,6 +49,9 @@ export type StudyConfigurationPayload = {
   aois: Array<{
     label: string
     semantic_type: string | null
+    role_key?: string | null
+    selector?: string | null
+    required?: boolean
     page_url: string | null
     x: number
     y: number
@@ -73,6 +79,37 @@ export type StudySetupResult = {
 }
 
 export type StudySaveResult = StudySetupResult
+
+export type CaptureConfigAoi = {
+  aoi_id: string
+  label: string
+  semantic_type: string | null
+  role_key: string
+  selector: string | null
+  required: boolean
+}
+
+export type CaptureConfig = {
+  study_id: string
+  name: string
+  objective: string | null
+  target_url: string | null
+  task_prompt: string
+  aois: CaptureConfigAoi[]
+}
+
+export type CaptureSnippetConfig = CaptureConfig & {
+  capture_token: string
+}
+
+export type CaptureConfigResult = {
+  ok: boolean
+  backendAvailable: boolean
+  apiBaseUrl: string
+  statusCode?: number
+  config: CaptureSnippetConfig | null
+  message: string
+}
 
 export type StudySessionCreateResult = {
   ok: boolean
@@ -222,6 +259,43 @@ export async function createStudySession(studyId: string): Promise<StudySessionC
       sessionId: null,
       studyId: null,
       message: 'Backend unavailable — using a local fallback session ID.',
+    }
+  }
+}
+
+export async function fetchCaptureConfig(studyId: string): Promise<CaptureConfigResult> {
+  const apiBaseUrl = getApiBaseUrl()
+
+  try {
+    const result = await fetchJson<CaptureSnippetConfig>(
+      `${apiBaseUrl}/api/v1/studies/${encodeURIComponent(studyId)}/capture-snippet-config`,
+    )
+    if (!result.ok) {
+      return {
+        ok: false,
+        backendAvailable: true,
+        apiBaseUrl,
+        statusCode: result.status,
+        config: null,
+        message: `Backend responded with HTTP ${result.status}.`,
+      }
+    }
+
+    return {
+      ok: true,
+      backendAvailable: true,
+      apiBaseUrl,
+      statusCode: result.status,
+      config: result.body,
+      message: 'Capture snippet configuration loaded.',
+    }
+  } catch {
+    return {
+      ok: false,
+      backendAvailable: false,
+      apiBaseUrl,
+      config: null,
+      message: 'Backend unavailable - capture snippet cannot be generated yet.',
     }
   }
 }

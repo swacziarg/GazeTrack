@@ -5,6 +5,11 @@ from fastapi import APIRouter, HTTPException
 from app.models.api import (
     AoiCreateRequest,
     AoiResponse,
+    CaptureConfigAoiResponse,
+    CaptureConfigResponse,
+    CaptureSessionCreateRequest,
+    CaptureSnippetConfigResponse,
+    SessionResponse,
     StudyConfigurationRequest,
     StudyConfigurationResponse,
     StudyCreateRequest,
@@ -46,6 +51,9 @@ def _aoi_response(record: AoiRecord) -> AoiResponse:
         study_id=record.study_id,
         label=record.label,
         semantic_type=record.semantic_type,
+        role_key=record.role_key,
+        selector=record.selector,
+        required=record.required,
         page_url=record.page_url,
         x=record.x,
         y=record.y,
@@ -54,6 +62,13 @@ def _aoi_response(record: AoiRecord) -> AoiResponse:
         coordinate_space=record.coordinate_space,
         created_at=record.created_at,
     )
+
+
+def _role_key(record: AoiRecord) -> str:
+    if record.role_key:
+        return record.role_key
+    semantic_type = (record.semantic_type or record.label).strip().lower()
+    return semantic_type.replace(" ", "_").replace("-", "_")
 
 
 @router.post("", response_model=StudyResponse)
@@ -160,6 +175,9 @@ def create_aoi(study_id: UUID, payload: AoiCreateRequest) -> AoiResponse:
         study_id=study_id,
         label=payload.label,
         semantic_type=payload.semantic_type,
+        role_key=payload.role_key,
+        selector=payload.selector,
+        required=payload.required,
         page_url=payload.page_url,
         x=payload.x,
         y=payload.y,
@@ -176,3 +194,69 @@ def list_aois_for_study(study_id: UUID) -> list[AoiResponse]:
     if repository.get_study(study_id) is None:
         raise HTTPException(status_code=404, detail="Study not found")
     return [_aoi_response(record) for record in repository.list_aois_for_study(study_id)]
+
+
+def _capture_config_response(
+    study: StudyRecord,
+    tasks: list[TaskRecord],
+    aois: list[AoiRecord],
+) -> CaptureConfigResponse:
+    return CaptureConfigResponse(
+        study_id=study.id,
+        name=study.title,
+        objective=study.description,
+        target_url=study.target_url,
+        task_prompt=tasks[0].prompt if tasks else "Complete the website task.",
+        aois=[
+            CaptureConfigAoiResponse(
+                aoi_id=aoi.id,
+                label=aoi.label,
+                semantic_type=aoi.semantic_type,
+                role_key=_role_key(aoi),
+                selector=aoi.selector,
+                required=aoi.required,
+            )
+            for aoi in aois
+        ],
+    )
+
+
+def _capture_config_inputs(study_id: UUID) -> tuple[StudyRecord, list[TaskRecord], list[AoiRecord]]:
+    repository = get_repository()
+    study = repository.get_study(study_id)
+    if study is None:
+        raise HTTPException(status_code=404, detail="Study not found")
+    tasks = repository.list_tasks_for_study(study_id)
+    aois = repository.list_aois_for_study(study_id)
+    if not aois:
+        repository.ensure_default_study_content(study_id)
+        aois = repository.list_aois_for_study(study_id)
+    return study, tasks, aois
+
+
+@router.get("/{study_id}/capture-config", response_model=CaptureConfigResponse)
+def get_capture_config(study_id: UUID) -> CaptureConfigResponse:
+    study, tasks, aois = _capture_config_inputs(study_id)
+    return _capture_config_response(study, tasks, aois)
+
+
+@router.get("/{study_id}/capture-snippet-config", response_model=CaptureSnippetConfigResponse)
+def get_capture_snippet_config(study_id: UUID) -> CaptureSnippetConfigResponse:
+    repository = get_repository()
+    capture_token = repository.ensure_capture_token(study_id)
+    if capture_token is None:
+        raise HTTPException(status_code=404, detail="Study not found")
+    study, tasks, aois = _capture_config_inputs(study_id)
+    config = _capture_config_response(study, tasks, aois)
+    return CaptureSnippetConfigResponse(**config.model_dump(), capture_token=capture_token)
+
+
+@router.post("/{study_id}/capture-sessions", response_model=SessionResponse)
+def create_capture_session(study_id: UUID, payload: CaptureSessionCreateRequest) -> SessionResponse:
+    repository = get_repository()
+    if repository.get_study(study_id) is None:
+        raise HTTPException(status_code=404, detail="Study not found")
+    if not repository.capture_token_matches(study_id, payload.capture_token):
+        raise HTTPException(status_code=403, detail="Invalid capture token")
+    record = repository.create_session(study_id)
+    return SessionResponse(session_id=record.id, study_id=record.study_id, status="started")

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { AreaOfInterest } from '../data/demoStudy'
 import { generateMockStudyEvents, type MockStudyEvent } from './mockEvents'
-import { computeAoiAttentionSummary, extractClickEvents, extractGazeSamples } from './visualization'
+import {
+  computeAoiAttentionSummary,
+  computeGazePathAnchors,
+  computeHeatmapClusters,
+  extractClickEvents,
+  extractGazeSamples,
+} from './visualization'
 
 const forbiddenMediaKeys = ['video', 'frame', 'image', 'base64', 'blob', 'webcam_frame']
 
@@ -30,6 +36,76 @@ describe('synthetic visualization helpers', () => {
         yPercent: expect.closeTo(44, 2),
       }),
     )
+  })
+
+  it('keeps WebGazer normalized coordinates as percentages when viewport metadata is present', () => {
+    const events: MockStudyEvent[] = [
+      {
+        id: 'webgazer-sample-1',
+        event_type: 'gaze_sample_recorded',
+        timestamp: '2026-01-15T17:30:00.000Z',
+        payload: {
+          label: 'Browser gaze sample',
+          source: 'webgazer_experimental',
+          tracker_type: 'webgazer_experimental',
+          x: 0.52,
+          y: 0.41,
+          viewport_width: 1440,
+          viewport_height: 900,
+          confidence: null,
+        },
+      },
+      {
+        id: 'pixel-sample-1',
+        event_type: 'gaze_sample_recorded',
+        timestamp: '2026-01-15T17:30:01.000Z',
+        payload: {
+          label: 'Pixel-space gaze sample',
+          x: 720,
+          y: 450,
+          viewport_width: 1440,
+          viewport_height: 900,
+          confidence: 0.8,
+        },
+      },
+    ]
+
+    const samples = extractGazeSamples(events)
+
+    expect(samples[0]).toEqual(expect.objectContaining({ xPercent: 52, yPercent: 41 }))
+    expect(samples[1]).toEqual(expect.objectContaining({ xPercent: 50, yPercent: 50 }))
+  })
+
+  it('collapses synthetic gaze samples into readable heatmap clusters', () => {
+    const clusters = computeHeatmapClusters(extractGazeSamples(generateMockStudyEvents()))
+
+    expect(clusters).toHaveLength(4)
+    expect(clusters.map((cluster) => cluster.aoi)).toEqual([
+      'Navigation',
+      'Hero headline',
+      'Pricing preview',
+      'Primary CTA',
+    ])
+    expect(clusters[0]).toEqual(
+      expect.objectContaining({
+        sampleCount: 10,
+        xPercent: expect.closeTo(50, 1),
+        yPercent: expect.closeTo(10.5, 1),
+      }),
+    )
+  })
+
+  it('collapses consecutive gaze samples into sequential path anchors', () => {
+    const anchors = computeGazePathAnchors(extractGazeSamples(generateMockStudyEvents()))
+
+    expect(anchors.map((anchor) => `${anchor.sequenceLabel}:${anchor.aoi}`)).toEqual([
+      '1:Navigation',
+      '2:Hero headline',
+      '3:Pricing preview',
+      '4:Primary CTA',
+      '5:Pricing preview',
+    ])
+    expect(anchors[4]).toEqual(expect.objectContaining({ sampleCount: 8 }))
   })
 
   it('computes AOI counts and dwell-like totals for simple inputs', () => {

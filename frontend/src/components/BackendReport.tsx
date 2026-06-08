@@ -435,7 +435,38 @@ export function BackendReport({ ingestResult, isFetchingReport, reportResult }: 
                 <dt>Avg gaze confidence</dt>
                 <dd>{formatOptionalNumber(report.quality_summary.average_gaze_confidence)}</dd>
               </div>
+              <div>
+                <dt>Readiness score</dt>
+                <dd>{formatOptionalNumber(report.quality_summary.calibration_readiness_score ?? null)}</dd>
+              </div>
+              <div>
+                <dt>Drift warnings</dt>
+                <dd>{report.quality_summary.drift_warning_count ?? 0}</dd>
+              </div>
             </dl>
+            {report.quality_summary.tracking_quality_percentages ? (
+              <dl className="backend-report-stats compact-grid">
+                <div>
+                  <dt>High quality samples</dt>
+                  <dd>{formatPercent(report.quality_summary.tracking_quality_percentages.high)}</dd>
+                </div>
+                <div>
+                  <dt>Medium quality samples</dt>
+                  <dd>{formatPercent(report.quality_summary.tracking_quality_percentages.medium)}</dd>
+                </div>
+                <div>
+                  <dt>Low quality samples</dt>
+                  <dd>{formatPercent(report.quality_summary.tracking_quality_percentages.low)}</dd>
+                </div>
+              </dl>
+            ) : null}
+            {report.quality_summary.major_quality_flags?.length ? (
+              <ul className="quality-flag-list">
+                {report.quality_summary.major_quality_flags.map((flag) => (
+                  <li key={flag}>{flag.replace(/_/g, ' ')}</li>
+                ))}
+              </ul>
+            ) : null}
             <ul className="backend-insight-list">
               {report.quality_summary.quality_reasons.map((reason) => (
                 <li key={reason}>{reason}</li>

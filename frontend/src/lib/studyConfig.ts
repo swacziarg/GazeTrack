@@ -30,6 +30,9 @@ export function sanitizeStudyBuilderConfig(config: StudyBuilderConfig): StudyBui
       return {
         label: aoi.label.trim(),
         semanticType: aoi.semanticType?.trim() || undefined,
+        roleKey: aoi.roleKey?.trim() || undefined,
+        selector: aoi.selector?.trim() || undefined,
+        required: aoi.required ?? true,
         x,
         y,
         width: clampAoiDimension(x, aoi.width),
@@ -63,6 +66,9 @@ export function toStudyConfigurationPayload(config: StudyBuilderConfig): StudyCo
     aois: sanitized.aois.map((aoi) => ({
       label: aoi.label,
       semantic_type: aoi.semanticType || null,
+      role_key: aoi.roleKey || null,
+      selector: aoi.selector || null,
+      required: aoi.required ?? true,
       page_url: sanitized.targetUrl || null,
       x: aoi.x,
       y: aoi.y,
@@ -114,6 +120,9 @@ export function toSyntheticStudyConfig(config: StudyBuilderConfig): SyntheticStu
     aois: sanitized.aois.map((aoi) => ({
       label: aoi.label,
       semanticType: aoi.semanticType,
+      roleKey: aoi.roleKey,
+      selector: aoi.selector,
+      required: aoi.required,
       x: aoi.x,
       y: aoi.y,
       width: aoi.width,
@@ -136,6 +145,9 @@ export function backendSetupToBuilderConfig(
     aois: aois.map((aoi) => ({
       label: aoi.label,
       semanticType: aoi.semantic_type ?? undefined,
+      roleKey: aoi.role_key ?? undefined,
+      selector: aoi.selector ?? undefined,
+      required: aoi.required,
       x: aoi.x,
       y: aoi.y,
       width: aoi.width,

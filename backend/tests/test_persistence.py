@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import sqlite3
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -30,6 +31,68 @@ def test_database_initialization_creates_core_tables() -> None:
         ).fetchall()
 
     assert {row["name"] for row in rows} == {"studies", "tasks", "aois", "sessions", "telemetry_events", "reports"}
+
+
+def test_database_initialization_migrates_legacy_telemetry_table(tmp_path: Path) -> None:
+    database_path = tmp_path / "legacy.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE telemetry_events (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                accepted INTEGER NOT NULL,
+                rejection_reason TEXT,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+
+    initialize_database(f"sqlite:///{database_path}")
+
+    with connect_database(f"sqlite:///{database_path}") as connection:
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(telemetry_events)").fetchall()}
+        indexes = {row["name"] for row in connection.execute("PRAGMA index_list(telemetry_events)").fetchall()}
+
+    assert "telemetry_source" in columns
+    assert "event_schema_version" in columns
+    assert "idx_telemetry_events_source" in indexes
+
+
+def test_database_initialization_backfills_capture_tokens_for_legacy_studies(tmp_path: Path) -> None:
+    database_path = tmp_path / "legacy-studies.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE studies (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                target_url TEXT,
+                updated_at TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            INSERT INTO studies (id, title, description, target_url, updated_at, created_at)
+            VALUES
+                ('study-1', 'Legacy one', NULL, NULL, NULL, '2026-01-01T00:00:00Z'),
+                ('study-2', 'Legacy two', NULL, NULL, NULL, '2026-01-01T00:00:00Z');
+            """
+        )
+
+    initialize_database(f"sqlite:///{database_path}")
+
+    with connect_database(f"sqlite:///{database_path}") as connection:
+        tokens = [
+            row["capture_token"]
+            for row in connection.execute("SELECT capture_token FROM studies ORDER BY id").fetchall()
+        ]
+
+    assert all(tokens)
+    assert len(set(tokens)) == 2
 
 
 def test_repository_creates_study_and_session() -> None:

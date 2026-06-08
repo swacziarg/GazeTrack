@@ -6,7 +6,12 @@ from pydantic import ValidationError
 
 from app.models.api import EventBatchRequest, EventEnvelope, EventIngestResponse
 from app.repository import get_repository
-from app.services.event_validation import AcceptedTelemetryEvent, validate_event_for_ingest
+from app.services.event_validation import (
+    AcceptedTelemetryEvent,
+    REAL_SITE_CAPTURE_SOURCE,
+    telemetry_source,
+    validate_event_for_ingest,
+)
 
 router = APIRouter(tags=["events"])
 
@@ -32,11 +37,21 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
             rejected_count += 1
 
     repository = get_repository()
-    repository.ensure_session(session_id)
+    session = repository.ensure_session(session_id)
+    capture_token = payload.get("capture_token")
+    real_site_capture_authorized = repository.capture_token_matches(
+        session.study_id,
+        capture_token if isinstance(capture_token, str) else None,
+    )
     has_task_context = repository.session_has_event_type(session_id, "task_start")
     accepted_events: list[AcceptedTelemetryEvent] = []
 
     for event in events:
+        source = telemetry_source(event.payload)
+        if source == REAL_SITE_CAPTURE_SOURCE and not real_site_capture_authorized:
+            rejected_count += 1
+            rejected_reasons.append(f"Rejected real-site event_type={event.event_type.value} with invalid capture token.")
+            continue
         result = validate_event_for_ingest(event, has_task_context=has_task_context)
         if result.accepted_event is None:
             rejected_count += 1

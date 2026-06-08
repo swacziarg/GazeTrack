@@ -72,7 +72,9 @@ blobs, or base64 media.
 The frontend-only browser gaze debug UI may show a local approximate gaze dot, tracker state, sample counts, elapsed
 capture time, weak-signal messages, and calibration feedback (`good`, `usable`, or `weak`). These are operator-facing
 debug signals. Backend ingest still receives only the existing privacy-safe telemetry event envelope. Calibration
-summary payloads may include `calibration_quality` and `calibration_recommendation`; reports continue to label
+summary payloads may include `calibration_quality`, `calibration_recommendation`, `camera_readiness_score`, and a
+privacy-safe `camera_readiness_baseline`; gaze samples may include `quality_score`, `quality_flags`,
+`tracking_quality`, and `drift_metrics`. Reports continue to label
 `tracker_type: "webgazer_experimental"` sessions as experimental and not medical-grade.
 
 `GET /api/v1/sessions/{session_id}/report` includes:
@@ -161,6 +163,10 @@ Current `fixation_algorithm` is `simple_dispersion_v1`. It clusters accepted nor
 - `calibration_points_completed`
 - `average_calibration_error_normalized`
 - `average_gaze_confidence`
+- `calibration_readiness_score`
+- `tracking_quality_counts` and `tracking_quality_percentages`
+- `drift_warning_count`
+- `quality_flag_counts` and `major_quality_flags`
 - `sample_completeness_score`
 - `quality_verdict` (`pass`, `warn`, or `fail`)
 - `quality_reasons`

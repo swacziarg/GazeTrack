@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTrackerProvider } from './trackerFactory'
-import { WebGazerTracker, predictionToGazeEvent, summarizeCalibration } from './webgazerTracker'
+import { WebGazerTracker, browserCalibrationTargets, predictionToGazeEvent, summarizeCalibration } from './webgazerTracker'
 
 const forbiddenMediaKeys = ['video', 'frame', 'image', 'base64', 'blob', 'webcam_frame']
 
@@ -115,6 +115,41 @@ describe('WebGazerTracker', () => {
       }),
     )
     expect(tracker.getEvents().filter((event) => event.event_type === 'gaze_sample_recorded')).toHaveLength(2)
+  })
+
+  it('supports multi-pass browser calibration over the full nine-point target set', async () => {
+    vi.stubGlobal('window', {
+      innerWidth: 1000,
+      innerHeight: 500,
+      webgazer: {
+        setGazeListener: vi.fn().mockReturnThis(),
+        begin: vi.fn(),
+        pause: vi.fn().mockReturnThis(),
+        clearGazeListener: vi.fn().mockReturnThis(),
+        showVideoPreview: vi.fn().mockReturnThis(),
+        showPredictionPoints: vi.fn().mockReturnThis(),
+      },
+    })
+    const tracker = new WebGazerTracker()
+
+    await tracker.initialize()
+    await tracker.startSession({ viewportWidth: 1000, viewportHeight: 500 })
+    const calibrationEvents = await tracker.runCalibration({
+      calibrationPasses: 5,
+      targets: browserCalibrationTargets,
+    })
+
+    expect(browserCalibrationTargets).toHaveLength(9)
+    expect(calibrationEvents.filter((event) => event.event_type === 'calibration_point_recorded')).toHaveLength(45)
+    expect(calibrationEvents[calibrationEvents.length - 1]).toEqual(
+      expect.objectContaining({
+        event_type: 'calibration_completed',
+        payload: expect.objectContaining({
+          calibration_points_completed: 45,
+          calibration_point_count: 45,
+        }),
+      }),
+    )
   })
 
   it('adds task and study context before storing browser gaze samples', async () => {

@@ -20,6 +20,9 @@ export type NormalizedPoint = {
 export type SyntheticAoiConfig = {
   label: string
   semanticType?: string
+  roleKey?: string
+  selector?: string
+  required?: boolean
   x: number
   y: number
   width: number
@@ -59,6 +62,12 @@ export type TelemetryEventPayload = {
   calibration_quality?: 'good' | 'usable' | 'weak'
   calibration_recommendation?: 'continue' | 'retry_calibration' | 'use_synthetic_demo'
   quality_warning?: string
+  quality_score?: number
+  quality_flags?: string[]
+  camera_readiness_score?: number
+  tracking_quality?: 'high' | 'medium' | 'low'
+  camera_readiness_baseline?: Record<string, unknown>
+  drift_metrics?: Record<string, unknown>
   dwell_ms?: number
   scroll_depth_percent?: number
   target?: string
@@ -87,6 +96,9 @@ export type TrackerStatus =
   | 'error'
 
 export type TrackerCalibrationOptions = {
+  calibrationPasses?: number
+  samplesPerTarget?: number
+  surfaceElement?: HTMLElement | null
   targets?: NormalizedPoint[]
 }
 

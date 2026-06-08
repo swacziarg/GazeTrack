@@ -4,23 +4,27 @@ import { fetchBackendHealth, type BackendHealth } from './api/health'
 import { fetchSessionReport, type BackendReportResult } from './api/reports'
 import {
   createStudySession,
+  fetchCaptureConfig,
   fetchStudySetup,
   saveStudyConfiguration,
+  type CaptureConfigResult,
   type StudySetupResult,
 } from './api/studies'
+import { AoiBreakdown } from './components/AoiBreakdown'
 import { BackendReport } from './components/BackendReport'
 import { BrowserGazeStatusPanel } from './components/BrowserGazeStatusPanel'
-import { DemoGuide } from './components/DemoGuide'
+import { CameraReadinessGate } from './components/CameraReadinessGate'
+import { DemoTaskSurface } from './components/DemoTaskSurface'
 import { DemoReport } from './components/DemoReport'
+import { DisclosureCard } from './components/DisclosureCard'
 import { EventLog } from './components/EventLog'
-import { FlowCard } from './components/FlowCard'
 import { GazeDebugOverlay } from './components/GazeDebugOverlay'
-import { PlaceholderPanel } from './components/PlaceholderPanel'
+import { GazePathPreview } from './components/GazePathPreview'
 import { SessionControls, type SessionPhase } from './components/SessionControls'
-import { StatusCard } from './components/StatusCard'
-import { StudyBuilder } from './components/StudyBuilder'
+import { StudySetupWizard } from './components/StudySetupWizard'
+import { SyntheticHeatmapPreview } from './components/SyntheticHeatmapPreview'
 import { TrackerModePanel } from './components/TrackerModePanel'
-import { defaultStudyBuilderConfig, flowSteps, type StudyBuilderConfig } from './data/demoStudy'
+import { defaultStudyBuilderConfig, type StudyBuilderAoi, type StudyBuilderConfig } from './data/demoStudy'
 import { countCalibrationEvents, type MockStudyEvent, type SyntheticTelemetryMode } from './lib/mockEvents'
 import { generateDemoReport } from './lib/mockReport'
 import {
@@ -31,6 +35,7 @@ import {
 } from './lib/studyConfig'
 import {
   WebGazerTracker,
+  browserCalibrationTargets,
   createTrackerProvider,
   getTrackerOptions,
   type BrowserGazeStatusSnapshot,
@@ -38,6 +43,9 @@ import {
   type TrackerId,
   type TrackerStatus,
 } from './tracking'
+import { useCameraReadiness } from './tracking/useCameraReadiness'
+
+type ActiveSection = 'setup' | 'run' | 'report'
 
 const initialHealth: BackendHealth = {
   ok: false,
@@ -46,6 +54,7 @@ const initialHealth: BackendHealth = {
 }
 
 const DEMO_SESSION_ID = '11111111-1111-4111-8111-111111111111'
+const WEBGAZER_CALIBRATION_PASSES = 5
 
 function createBrowserGazeStatusSnapshot(
   trackerState: TrackerStatus,
@@ -67,7 +76,131 @@ function createDemoSessionId() {
   return window.crypto?.randomUUID?.() ?? DEMO_SESSION_ID
 }
 
+function backendStatusClass(isLoading: boolean, health: BackendHealth) {
+  if (isLoading) {
+    return 'pending'
+  }
+
+  return health.ok ? 'ok' : 'error'
+}
+
+function backendStatusLabel(isLoading: boolean, health: BackendHealth) {
+  if (isLoading) {
+    return 'Checking'
+  }
+
+  return health.ok ? 'Online' : 'Offline'
+}
+
+function getRunStatusLabel(phase: SessionPhase) {
+  const labels: Record<SessionPhase, string> = {
+    preview: 'Not started',
+    detail: 'Ready',
+    camera_readiness: 'Camera setup',
+    calibration: 'Calibration',
+    active: 'Running',
+    completed: 'Complete',
+  }
+
+  return labels[phase]
+}
+
+function WebGazerCalibrationScreen({
+  eventCount,
+  onRunCalibration,
+}: {
+  eventCount: number
+  onRunCalibration: () => void
+}) {
+  return (
+    <section className="webgazer-fullscreen-calibration" aria-label="Full-screen browser gaze calibration">
+      <div className="fullscreen-calibration-copy">
+        <p className="eyebrow">Browser gaze setup</p>
+        <h2>Calibrate across the full viewport</h2>
+        <p>
+          Keep your head still, look directly at each target, then click it. The sequence runs{' '}
+          {WEBGAZER_CALIBRATION_PASSES} passes over {browserCalibrationTargets.length} points before returning to the demo.
+        </p>
+        <dl className="session-stats compact-stats">
+          <div>
+            <dt>Targets</dt>
+            <dd>{browserCalibrationTargets.length}</dd>
+          </div>
+          <div>
+            <dt>Passes</dt>
+            <dd>{WEBGAZER_CALIBRATION_PASSES}</dd>
+          </div>
+          <div>
+            <dt>Clicks</dt>
+            <dd>{browserCalibrationTargets.length * WEBGAZER_CALIBRATION_PASSES}</dd>
+          </div>
+          <div>
+            <dt>Events</dt>
+            <dd>{eventCount}</dd>
+          </div>
+        </dl>
+        <button type="button" className="primary-button" onClick={onRunCalibration}>
+          Start full-screen calibration
+        </button>
+      </div>
+      <div className="fullscreen-calibration-map" aria-hidden="true">
+        {browserCalibrationTargets.map((target, index) => (
+          <span
+            className="fullscreen-calibration-target"
+            key={`${target.x}-${target.y}`}
+            style={{ left: `${target.x * 100}%`, top: `${target.y * 100}%` }}
+          >
+            {index + 1}
+          </span>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function getIngestStatusLabel(ingestResult: EventIngestResult | null, isIngestingEvents: boolean) {
+  if (isIngestingEvents) {
+    return 'Sending'
+  }
+
+  if (!ingestResult) {
+    return 'Pending'
+  }
+
+  if (ingestResult.ok) {
+    return 'Accepted'
+  }
+
+  return ingestResult.backendAvailable ? 'Rejected' : 'Unavailable'
+}
+
+function getIngestStatusClass(ingestResult: EventIngestResult | null, isIngestingEvents: boolean) {
+  if (isIngestingEvents || !ingestResult) {
+    return 'pending'
+  }
+
+  return ingestResult.ok ? 'ok' : 'error'
+}
+
+function buildCaptureSnippet(captureConfigResult: CaptureConfigResult | null) {
+  const config = captureConfigResult?.config
+  const apiBaseUrl = captureConfigResult?.apiBaseUrl ?? initialHealth.apiBaseUrl
+  if (!config) {
+    return null
+  }
+
+  return `<script>
+  window.GazeTrackConfig = {
+    apiBaseUrl: "${apiBaseUrl}",
+    studyId: "${config.study_id}",
+    captureToken: "${config.capture_token}"
+  }
+</script>
+<script src="${apiBaseUrl}/gazetrack-capture.js" async></script>`
+}
+
 function App() {
+  const [activeSection, setActiveSection] = useState<ActiveSection>('setup')
   const [backendHealth, setBackendHealth] = useState<BackendHealth>(initialHealth)
   const [isCheckingHealth, setIsCheckingHealth] = useState(true)
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>('preview')
@@ -80,6 +213,7 @@ function App() {
   const [backendReportResult, setBackendReportResult] = useState<BackendReportResult | null>(null)
   const [studySetupResult, setStudySetupResult] = useState<StudySetupResult | null>(null)
   const [studySaveResult, setStudySaveResult] = useState<StudySetupResult | null>(null)
+  const [captureConfigResult, setCaptureConfigResult] = useState<CaptureConfigResult | null>(null)
   const [isFetchingStudySetup, setIsFetchingStudySetup] = useState(true)
   const [studyBuilderConfig, setStudyBuilderConfig] = useState<StudyBuilderConfig>(defaultStudyBuilderConfig)
   const [isSavingStudy, setIsSavingStudy] = useState(false)
@@ -93,6 +227,14 @@ function App() {
   const [webGazerTrackingStatus, setWebGazerTrackingStatus] = useState<BrowserGazeStatusSnapshot | null>(null)
   const [debugOverlayEnabled, setDebugOverlayEnabled] = useState(true)
   const webGazerTrackerRef = useRef<WebGazerTracker | null>(null)
+  const demoTaskSurfaceRef = useRef<HTMLDivElement | null>(null)
+  const cameraReadiness = useCameraReadiness({
+    enabled:
+      trackerId === 'webgazer' &&
+      webGazerConsentGranted &&
+      (sessionPhase === 'camera_readiness' || sessionPhase === 'calibration' || sessionPhase === 'active'),
+    trackingStatus: webGazerTrackingStatus,
+  })
   const trackerOptions = useMemo(() => getTrackerOptions(), [])
   const configuredDemoStudy = useMemo(() => toDemoStudy(studyBuilderConfig), [studyBuilderConfig])
   const syntheticStudyConfig = useMemo(() => toSyntheticStudyConfig(studyBuilderConfig), [studyBuilderConfig])
@@ -120,6 +262,9 @@ function App() {
         ? (Date.parse(visibleEvents[visibleEvents.length - 1].timestamp) - Date.parse(visibleEvents[0].timestamp)) /
           1000
         : 0
+  const isFullscreenRun =
+    activeSection === 'run' && (sessionPhase === 'active' || (trackerId === 'webgazer' && sessionPhase === 'calibration'))
+  const captureSnippet = buildCaptureSnippet(captureConfigResult)
 
   useEffect(() => {
     let isMounted = true
@@ -131,6 +276,10 @@ function App() {
         setStudySetupResult(studySetup)
         if (studySetup.ok && studySetup.study) {
           setStudyBuilderConfig(backendSetupToBuilderConfig(studySetup.study, studySetup.tasks, studySetup.aois))
+          const captureConfig = await fetchCaptureConfig(studySetup.study.study_id)
+          if (isMounted) {
+            setCaptureConfigResult(captureConfig)
+          }
         }
         setIsCheckingHealth(false)
         setIsFetchingStudySetup(false)
@@ -177,12 +326,24 @@ function App() {
   }, [sessionPhase, trackerId])
 
   useEffect(() => {
+    if (trackerId !== 'webgazer') {
+      return
+    }
+
+    const drift = webGazerTrackerRef.current?.updateCameraQualityObservation(cameraReadiness.observation) ?? null
+    if (drift?.trackingQuality === 'low') {
+      setWebGazerCalibrationNotice('Tracking quality changed. Treat subsequent gaze samples as lower quality.')
+    }
+  }, [cameraReadiness.observation, trackerId])
+
+  useEffect(() => {
     return () => {
       webGazerTrackerRef.current?.dispose()
     }
   }, [])
 
   function openDemoStudy() {
+    setActiveSection('run')
     setSessionPhase('detail')
     setVisibleEventCount(0)
     setIngestResult(null)
@@ -190,9 +351,6 @@ function App() {
     setIsFetchingBackendReport(false)
     setBackendReportResult(null)
     setTrackerStatus(trackerId === 'webgazer' && !webGazerConsentGranted ? 'permission_needed' : 'idle')
-    window.setTimeout(() => {
-      document.getElementById('mock-session-panel')?.scrollIntoView({ behavior: 'smooth' })
-    }, 0)
   }
 
   function startMockSession() {
@@ -218,10 +376,10 @@ function App() {
           setWebGazerEvents(events)
           setVisibleEventCount(events.length)
           setWebGazerTrackingStatus(
-            status ? { ...status, trackerState: 'calibrating' } : createBrowserGazeStatusSnapshot('calibrating'),
+            status ? { ...status, trackerState: 'ready' } : createBrowserGazeStatusSnapshot('ready'),
           )
-          setTrackerStatus('calibrating')
-          setSessionPhase('calibration')
+          setTrackerStatus('ready')
+          setSessionPhase('camera_readiness')
         })
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : 'Browser gaze could not start.'
@@ -241,7 +399,10 @@ function App() {
   function runSyntheticCalibration() {
     if (trackerId === 'webgazer') {
       void webGazerTrackerRef.current
-        ?.runCalibration()
+        ?.runCalibration({
+          calibrationPasses: WEBGAZER_CALIBRATION_PASSES,
+          targets: browserCalibrationTargets,
+        })
         .then(() => {
           const events = webGazerTrackerRef.current?.getEvents() ?? []
           const summary = webGazerTrackerRef.current?.getCalibrationSummary()
@@ -267,6 +428,17 @@ function App() {
     setVisibleEventCount(Math.min(1 + calibrationEventCount, trackerEvents.length))
   }
 
+  function continueFromCameraReadiness() {
+    const baseline = cameraReadiness.captureBaseline()
+    webGazerTrackerRef.current?.setCameraQualityBaseline(baseline)
+    setWebGazerCalibrationNotice(null)
+    setTrackerStatus('calibrating')
+    setWebGazerTrackingStatus(
+      webGazerTrackerRef.current?.getTrackingStatus() ?? createBrowserGazeStatusSnapshot('calibrating'),
+    )
+    setSessionPhase('calibration')
+  }
+
   function updateQualityMode(mode: SyntheticTelemetryMode) {
     setQualityMode(mode)
     setSessionPhase('detail')
@@ -289,6 +461,13 @@ function App() {
     setWebGazerCalibrationSummary(null)
   }
 
+  function handleAoiChange(index: number, nextAoi: StudyBuilderAoi) {
+    handleStudyBuilderChange({
+      ...studyBuilderConfig,
+      aois: studyBuilderConfig.aois.map((aoi, aoiIndex) => (aoiIndex === index ? nextAoi : aoi)),
+    })
+  }
+
   function saveConfiguredStudy(mode: 'update' | 'create') {
     setIsSavingStudy(true)
     void saveStudyConfiguration(
@@ -300,6 +479,7 @@ function App() {
         if (result.ok && result.study) {
           setStudySetupResult(result)
           setStudyBuilderConfig(backendSetupToBuilderConfig(result.study, result.tasks, result.aois))
+          void fetchCaptureConfig(result.study.study_id).then(setCaptureConfigResult)
         }
       })
       .finally(() => {
@@ -329,6 +509,7 @@ function App() {
     }
     setVisibleEventCount(events.length)
     setSessionPhase('completed')
+    setActiveSection('report')
     setIngestResult(null)
     setBackendReportResult(null)
     setIsFetchingBackendReport(false)
@@ -363,17 +544,13 @@ function App() {
           accepted_count: 0,
           rejected_count: 0,
           stored_count_for_session: 0,
-          note: 'Backend unavailable — showing local demo report only.',
+          note: 'Backend unavailable - showing local demo report only.',
           rejected_reasons: [],
         },
       })
       setIsIngestingEvents(false)
       setIsFetchingBackendReport(false)
     })
-
-    window.setTimeout(() => {
-      document.getElementById('demo-report-panel')?.scrollIntoView({ behavior: 'smooth' })
-    }, 0)
   }
 
   function handleTrackerChange(nextTrackerId: TrackerId) {
@@ -385,6 +562,7 @@ function App() {
     webGazerTrackerRef.current = null
     setTrackerId(nextTrackerId)
     setSessionPhase('detail')
+    setActiveSection('run')
     setVisibleEventCount(0)
     setIngestResult(null)
     setBackendReportResult(null)
@@ -425,7 +603,7 @@ function App() {
     setWebGazerEvents(events)
     setVisibleEventCount(events.length)
 
-    if (sessionPhase === 'calibration' || sessionPhase === 'active') {
+    if (sessionPhase === 'camera_readiness' || sessionPhase === 'calibration' || sessionPhase === 'active') {
       setSessionPhase('detail')
       setIngestResult(null)
       setBackendReportResult(null)
@@ -462,260 +640,450 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${isFullscreenRun ? 'app-shell-fullscreen' : ''}`}>
       {trackerId === 'webgazer' ? (
         <GazeDebugOverlay enabled={debugOverlayEnabled} status={webGazerTrackingStatus} />
       ) : null}
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">Privacy-first UX telemetry demo</p>
+
+      {!isFullscreenRun ? <aside className="sidebar" aria-label="GazeTrack workflow">
+        <div className="brand-block">
+          <p className="eyebrow">Privacy-first UX telemetry</p>
           <h1>GazeTrack</h1>
-          <p className="subtitle">
-            Task-based gaze analytics pipeline with deterministic synthetic telemetry by default and an opt-in
-            experimental browser gaze mode for local research.
-          </p>
-          <p className="privacy-note">
-            Synthetic mode is the recommended demo path. GazeTrack stores privacy-safe telemetry only, not webcam video,
-            frames, screenshots, image blobs, or base64 media.
-          </p>
-          <button type="button" className="primary-button" onClick={openDemoStudy}>
-            Open demo study
-          </button>
-        </div>
-        <StatusCard health={backendHealth} isLoading={isCheckingHealth} />
-      </section>
-
-      <DemoGuide />
-
-      <section className="section-block">
-        <div className="section-heading">
-          <p className="eyebrow">MVP flow</p>
-          <h2>From study setup to report review</h2>
-        </div>
-        <div className="flow-grid">
-          {flowSteps.map((step, index) => (
-            <FlowCard key={step} step={index + 1} label={step} />
-          ))}
-        </div>
-      </section>
-
-      <section id="demo-study-preview" className="section-block">
-        <div className="section-heading">
-          <p className="eyebrow">Synthetic demo data</p>
-          <h2>Demo Study Preview</h2>
+          <p>Synthetic mode is the recommended demo path. GazeTrack stores privacy-safe telemetry only, not webcam video.</p>
         </div>
 
-        <div className="study-grid">
-          <article className="card study-summary">
-            <div className="card-header">
-              <h3>{configuredDemoStudy.name}</h3>
-              <span className="status-pill pending">Demo</span>
-            </div>
-            <dl>
-              <div>
-                <dt>Page</dt>
-                <dd>{configuredDemoStudy.pageLabel}</dd>
-              </div>
-              <div>
-                <dt>Task prompt</dt>
-                <dd>{configuredDemoStudy.taskPrompt}</dd>
-              </div>
-              <div>
-                <dt>Mock session quality</dt>
-                <dd>{configuredDemoStudy.sessionQuality}</dd>
-              </div>
-            </dl>
-            <button type="button" className="primary-button" onClick={openDemoStudy}>
-              Open demo study
+        <nav className="section-nav" aria-label="Workflow sections">
+          {(['setup', 'run', 'report'] as const).map((section) => (
+            <button
+              className={activeSection === section ? 'active' : ''}
+              key={section}
+              onClick={() => setActiveSection(section)}
+              type="button"
+            >
+              <span>{section === 'setup' ? 'Setup' : section === 'run' ? 'Run' : 'Report'}</span>
+              <small>
+                {section === 'setup'
+                  ? `${studyBuilderConfig.aois.length} regions`
+                  : section === 'run'
+                    ? getRunStatusLabel(sessionPhase)
+                    : backendReportResult?.ok
+                      ? 'Generated'
+                      : sessionPhase === 'completed'
+                        ? 'Processing'
+                        : 'Waiting'}
+              </small>
             </button>
-          </article>
-
-          <article className="card">
-            <div className="card-header">
-              <h3>AOIs / regions</h3>
-              <span className="status-pill pending">Demo</span>
-            </div>
-            <ul className="aoi-list">
-              {configuredDemoStudy.aois.map((aoi) => (
-                <li key={aoi.name}>
-                  <strong>{aoi.name}</strong>
-                  <span>{aoi.role}</span>
-                </li>
-              ))}
-            </ul>
-          </article>
-        </div>
-
-        <StudyBuilder
-          value={studyBuilderConfig}
-          persistedStudyId={studySetupResult?.study?.study_id}
-          saveResult={studySaveResult ?? studySetupResult}
-          isSaving={isSavingStudy}
-          onChange={handleStudyBuilderChange}
-          onSave={saveConfiguredStudy}
-        />
-
-        <article className="card study-builder-panel">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Study Builder</p>
-              <h3>Persisted task and AOI setup</h3>
-            </div>
-            <span className={`status-pill ${studySetupResult?.ok ? 'ok' : 'pending'}`}>
-              {isFetchingStudySetup ? 'Loading' : studySetupResult?.ok ? 'SQLite' : 'Local demo'}
-            </span>
-          </div>
-          <p className="privacy-note compact">
-            Tasks and AOIs are persisted as normalized rectangles. These are demo placeholders for synthetic telemetry,
-            not screenshot uploads or DOM-derived regions.
-          </p>
-          <div className="study-builder-grid">
-            <section>
-              <h4>{studySetupResult?.study?.name ?? configuredDemoStudy.name}</h4>
-              <p className="muted">{studySetupResult?.study?.objective ?? configuredDemoStudy.taskPrompt}</p>
-              {!studySetupResult?.ok && !isFetchingStudySetup ? (
-                <p className="backend-unavailable compact">{studySetupResult?.message ?? 'Using local demo setup.'}</p>
-              ) : null}
-            </section>
-            <section>
-              <h4>Tasks</h4>
-              {studySetupResult?.tasks.length ? (
-                <ul className="setup-list">
-                  {studySetupResult.tasks.map((task) => (
-                    <li key={task.task_id}>
-                      <strong>{task.title}</strong>
-                      <span>{task.prompt}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">Backend task setup is not loaded yet.</p>
-              )}
-            </section>
-            <section>
-              <h4>Persisted AOIs</h4>
-              {studySetupResult?.aois.length ? (
-                <ul className="setup-list">
-                  {studySetupResult.aois.map((aoi) => (
-                    <li key={aoi.aoi_id}>
-                      <strong>{aoi.label}</strong>
-                      <span>
-                        x {aoi.x.toFixed(2)}, y {aoi.y.toFixed(2)}, w {aoi.width.toFixed(2)}, h{' '}
-                        {aoi.height.toFixed(2)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">Backend AOI setup is not loaded yet.</p>
-              )}
-            </section>
-          </div>
-        </article>
-
-        <div className="insight-grid">
-          {configuredDemoStudy.insights.map((insight) => (
-            <article className="card insight-card" key={insight}>
-              <p>{insight}</p>
-              <span>Synthetic demo data</span>
-            </article>
           ))}
+        </nav>
+
+        <div className="sidebar-status">
+          <span className={`status-pill ${backendStatusClass(isCheckingHealth, backendHealth)}`}>
+            Backend {backendStatusLabel(isCheckingHealth, backendHealth)}
+          </span>
+          <span className="status-pill pending">{selectedTrackerOption.label}</span>
+          <span className={`status-pill ${getIngestStatusClass(ingestResult, isIngestingEvents)}`}>
+            Ingest {getIngestStatusLabel(ingestResult, isIngestingEvents)}
+          </span>
         </div>
-      </section>
+      </aside> : null}
 
-      {sessionPhase !== 'preview' ? (
-        <section id="mock-session-panel" className="section-block">
-          <div className="section-heading">
-            <p className="eyebrow">Local React state only</p>
-            <h2>Mock test session</h2>
-          </div>
-          <div className="session-grid">
-            <TrackerModePanel
-              options={trackerOptions}
-              selectedTrackerId={trackerId}
-              availabilityLabel={trackerAvailability}
-              consentGranted={webGazerConsentGranted}
-              calibrationComplete={calibrationComplete}
-              status={trackerStatus}
-              onTrackerChange={handleTrackerChange}
-              onGrantConsent={grantWebGazerConsent}
-              onCancelToSynthetic={cancelToSyntheticTracker}
-            />
-            {trackerId === 'webgazer' ? (
-              <BrowserGazeStatusPanel
-                status={webGazerTrackingStatus}
-                canTurnOff={webGazerConsentGranted}
-                debugOverlayEnabled={debugOverlayEnabled}
-                onDebugOverlayChange={setDebugOverlayEnabled}
-                onUseSyntheticDemo={cancelToSyntheticTracker}
-                onTurnOff={turnOffWebGazer}
+      <section className="workspace-panel" aria-live="polite">
+        {activeSection === 'setup' ? (
+          <>
+            <div className="workspace-heading">
+              <p className="eyebrow">Setup</p>
+              <h2>Define the task and key regions</h2>
+              <p className="muted">Use plain task context first. Advanced telemetry details stay collapsed.</p>
+            </div>
+
+            <section className="compact-guide" aria-label="Demo Guide">
+              <span>Demo Guide</span>
+              <ol>
+                <li>Review the page goal.</li>
+                <li>Confirm the task.</li>
+                <li>Run the synthetic session.</li>
+                <li>Read the visual report.</li>
+              </ol>
+            </section>
+
+            <DisclosureCard
+              defaultOpen
+              eyebrow="Study summary"
+              id="study-summary"
+              status={<span className="status-pill pending">Synthetic demo data</span>}
+              title={configuredDemoStudy.name}
+            >
+              <div className="summary-grid">
+                <dl className="summary-list">
+                  <div>
+                    <dt>Goal</dt>
+                    <dd>{studyBuilderConfig.objective}</dd>
+                  </div>
+                  <div>
+                    <dt>Page</dt>
+                    <dd>{configuredDemoStudy.pageLabel}</dd>
+                  </div>
+                  <div>
+                    <dt>Task</dt>
+                    <dd>{configuredDemoStudy.taskPrompt}</dd>
+                  </div>
+                </dl>
+                <section className="region-summary" aria-label="Key regions">
+                  <h3>Key regions</h3>
+                  <ul className="aoi-list">
+                    {configuredDemoStudy.aois.map((aoi) => (
+                      <li key={aoi.name}>
+                        <strong>{aoi.name}</strong>
+                        <span>{aoi.role}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
+              <button type="button" className="primary-button" onClick={openDemoStudy}>
+                Open run
+              </button>
+            </DisclosureCard>
+
+            <DisclosureCard
+              eyebrow="Edit"
+              id="setup-wizard"
+              status={<span className={`status-pill ${studySaveResult?.ok || studySetupResult?.ok ? 'ok' : 'pending'}`}>Setup</span>}
+              title="Setup wizard"
+            >
+              <StudySetupWizard
+                value={studyBuilderConfig}
+                persistedStudyId={studySetupResult?.study?.study_id}
+                saveResult={studySaveResult ?? studySetupResult}
+                isSaving={isSavingStudy}
+                onChange={handleStudyBuilderChange}
+                onSave={saveConfiguredStudy}
               />
-            ) : null}
-            <SessionControls
-              phase={sessionPhase}
-              trackerId={trackerId}
-              trackerLabel={selectedTrackerOption.label}
-              canStartSession={canStartSession}
-              eventCount={visibleEventCount}
-              totalEventCount={displayedTotalEventCount}
-              elapsedSeconds={elapsedSeconds}
-              taskPrompt={configuredDemoStudy.taskPrompt}
-              qualityMode={qualityMode}
-              calibrationEventCount={calibrationEventCount}
-              calibrationSummary={webGazerCalibrationSummary}
-              trackerNotice={webGazerCalibrationNotice}
-              onQualityModeChange={updateQualityMode}
-              onOpenStudy={openDemoStudy}
-              onStartSession={startMockSession}
-              onRunCalibration={runSyntheticCalibration}
-              onCompleteSession={completeMockSession}
-            />
-            <EventLog events={visibleEvents} sourceLabel={selectedTrackerOption.label} />
-          </div>
-        </section>
-      ) : null}
+            </DisclosureCard>
 
-      {sessionPhase === 'completed' ? (
-        <section id="demo-report-panel" className="section-block">
-          <DemoReport
-            report={demoReport}
-            events={trackerEvents}
-            aois={configuredDemoStudy.aois}
-            telemetrySourceLabel={selectedTrackerOption.label}
-            telemetrySourceIsExperimental={trackerId === 'webgazer'}
-            ingestResult={ingestResult}
-            isIngestingEvents={isIngestingEvents}
-          />
-          <BackendReport
-            ingestResult={ingestResult}
-            isFetchingReport={isFetchingBackendReport}
-            reportResult={backendReportResult}
-          />
-        </section>
-      ) : null}
+            <DisclosureCard
+              eyebrow="Real website"
+              id="real-site-capture"
+              status={<span className={`status-pill ${captureConfigResult?.ok ? 'ok' : 'pending'}`}>Snippet</span>}
+              title="Install on a controlled page"
+            >
+              <p className="privacy-note compact">
+                Add this snippet to a page you control. It resolves the five fixed AOIs from
+                <code>data-gazetrack-aoi</code> attributes or the saved CSS selectors, then stores telemetry JSON only.
+              </p>
+              {captureSnippet ? (
+                <pre className="snippet-block">
+                  <code>{captureSnippet}</code>
+                </pre>
+              ) : (
+                <p className="backend-unavailable compact">
+                  {captureConfigResult?.message ?? 'Save the study while the backend is online to generate a capture snippet.'}
+                </p>
+              )}
+              <div className="study-builder-grid">
+                <section>
+                  <h4>Allowed origin</h4>
+                  <p className="muted compact-text">
+                    Add the tested page origin to <code>GAZETRACK_CORS_ALLOWED_ORIGINS</code> before running outside localhost.
+                  </p>
+                </section>
+                <section>
+                  <h4>Fixed AOI attributes</h4>
+                  <ul className="setup-list">
+                    {(captureConfigResult?.config?.aois ?? studyBuilderConfig.aois).map((aoi) => {
+                      const roleKey = 'role_key' in aoi ? aoi.role_key : (aoi.roleKey ?? '')
+                      const selector = 'selector' in aoi ? aoi.selector : aoi.selector
+                      return (
+                        <li key={roleKey || aoi.label}>
+                          <strong>{aoi.label}</strong>
+                          <span>
+                            <code>data-gazetrack-aoi=&quot;{roleKey}&quot;</code>
+                            {selector ? ` or ${selector}` : ''}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              </div>
+            </DisclosureCard>
 
-      {sessionPhase !== 'completed' ? (
-        <section className="section-block">
-          <div className="section-heading">
-            <p className="eyebrow">Synthetic demo data</p>
-            <h2>Visualization placeholders</h2>
-          </div>
-          <div className="placeholder-grid">
-            <PlaceholderPanel
-              title="Heatmap preview"
-              description="Demo placeholder only. No real heatmap rendering is implemented yet."
-            />
-            <PlaceholderPanel
-              title="Gaze replay preview"
-              description="Demo placeholder only. No timeline playback or gaze rendering is implemented yet."
-            />
-            <PlaceholderPanel
-              title="AOI attention breakdown"
-              description="Demo placeholder only. No production charting or multi-session AOI analytics are implemented yet."
-            />
-          </div>
-        </section>
-      ) : null}
+            <DisclosureCard
+              eyebrow="Advanced"
+              id="setup-diagnostics"
+              status={<span className={`status-pill ${studySetupResult?.ok ? 'ok' : 'pending'}`}>{isFetchingStudySetup ? 'Loading' : studySetupResult?.ok ? 'SQLite' : 'Local'}</span>}
+              title="Saved setup details"
+            >
+              <p className="privacy-note compact">
+                Tasks and key regions are stored as text and normalized rectangles only. No screenshots or raw media are
+                accepted by this flow.
+              </p>
+              <div className="study-builder-grid">
+                <section>
+                  <h4>{studySetupResult?.study?.name ?? configuredDemoStudy.name}</h4>
+                  <p className="muted">{studySetupResult?.study?.objective ?? configuredDemoStudy.taskPrompt}</p>
+                  {!studySetupResult?.ok && !isFetchingStudySetup ? (
+                    <p className="backend-unavailable compact">{studySetupResult?.message ?? 'Using local demo setup.'}</p>
+                  ) : null}
+                </section>
+                <section>
+                  <h4>Tasks</h4>
+                  {studySetupResult?.tasks.length ? (
+                    <ul className="setup-list">
+                      {studySetupResult.tasks.map((task) => (
+                        <li key={task.task_id}>
+                          <strong>{task.title}</strong>
+                          <span>{task.prompt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">Backend task setup is not loaded yet.</p>
+                  )}
+                </section>
+                <section>
+                  <h4>Persisted key regions</h4>
+                  {studySetupResult?.aois.length ? (
+                    <ul className="setup-list">
+                      {studySetupResult.aois.map((aoi) => (
+                        <li key={aoi.aoi_id}>
+                          <strong>{aoi.label}</strong>
+                          <span>
+                            x {aoi.x.toFixed(2)}, y {aoi.y.toFixed(2)}, w {aoi.width.toFixed(2)}, h{' '}
+                            {aoi.height.toFixed(2)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">Backend key regions are not loaded yet.</p>
+                  )}
+                </section>
+              </div>
+            </DisclosureCard>
+
+            <DisclosureCard
+              eyebrow="Advanced"
+              id="backend-diagnostics"
+              status={<span className={`status-pill ${backendStatusClass(isCheckingHealth, backendHealth)}`}>{backendStatusLabel(isCheckingHealth, backendHealth)}</span>}
+              title="Backend diagnostics"
+            >
+              <dl className="summary-list">
+                <div>
+                  <dt>Health</dt>
+                  <dd>{isCheckingHealth ? 'Checking backend health endpoint.' : backendHealth.message}</dd>
+                </div>
+                <div>
+                  <dt>Endpoint</dt>
+                  <dd className="mono-value">GET {backendHealth.apiBaseUrl}/health</dd>
+                </div>
+              </dl>
+            </DisclosureCard>
+          </>
+        ) : null}
+
+        {activeSection === 'run' ? (
+          <>
+            {trackerId === 'webgazer' && sessionPhase === 'camera_readiness' ? (
+              <CameraReadinessGate
+                videoRef={cameraReadiness.videoRef}
+                observation={cameraReadiness.observation}
+                readiness={cameraReadiness.readiness}
+                baseline={cameraReadiness.baseline}
+                error={cameraReadiness.error}
+                onContinue={continueFromCameraReadiness}
+                onUseSyntheticDemo={cancelToSyntheticTracker}
+              />
+            ) : trackerId === 'webgazer' && sessionPhase === 'calibration' ? (
+              <WebGazerCalibrationScreen eventCount={visibleEventCount} onRunCalibration={runSyntheticCalibration} />
+            ) : sessionPhase === 'active' ? (
+              <DemoTaskSurface
+                ref={demoTaskSurfaceRef}
+                aois={studyBuilderConfig.aois}
+                fullscreen
+                phase={sessionPhase}
+                taskPrompt={configuredDemoStudy.taskPrompt}
+                canStartSession={canStartSession}
+                onAoiChange={handleAoiChange}
+                onStartSession={startMockSession}
+                onCompleteSession={completeMockSession}
+              />
+            ) : (
+              <>
+                <div className="workspace-heading">
+                  <p className="eyebrow">Run</p>
+                  <h2>Run the task session</h2>
+                  <p className="muted">The default path uses deterministic synthetic telemetry and requests no camera access.</p>
+                </div>
+
+                <DisclosureCard
+                  defaultOpen
+                  eyebrow="Current run"
+                  id="run-controls"
+                  status={<span className="status-pill pending">{getRunStatusLabel(sessionPhase)}</span>}
+                  title="Demo session"
+                >
+                  <DemoTaskSurface
+                    ref={demoTaskSurfaceRef}
+                    aois={studyBuilderConfig.aois}
+                    phase={sessionPhase}
+                    taskPrompt={configuredDemoStudy.taskPrompt}
+                    canStartSession={canStartSession}
+                    onAoiChange={handleAoiChange}
+                    onStartSession={startMockSession}
+                    onCompleteSession={completeMockSession}
+                  />
+                  <SessionControls
+                    phase={sessionPhase}
+                    trackerId={trackerId}
+                    trackerLabel={selectedTrackerOption.label}
+                    canStartSession={canStartSession}
+                    eventCount={visibleEventCount}
+                    totalEventCount={displayedTotalEventCount}
+                    elapsedSeconds={elapsedSeconds}
+                    taskPrompt={configuredDemoStudy.taskPrompt}
+                    qualityMode={qualityMode}
+                    calibrationEventCount={calibrationEventCount}
+                    calibrationSummary={webGazerCalibrationSummary}
+                    trackerNotice={webGazerCalibrationNotice}
+                    onQualityModeChange={updateQualityMode}
+                    onOpenStudy={openDemoStudy}
+                    onStartSession={startMockSession}
+                    onRunCalibration={runSyntheticCalibration}
+                    onCompleteSession={completeMockSession}
+                  />
+                </DisclosureCard>
+
+                <DisclosureCard
+                  eyebrow="Advanced"
+                  id="tracker-details"
+                  status={<span className="status-pill pending">{selectedTrackerOption.label}</span>}
+                  title="Tracker and calibration details"
+                >
+                  <TrackerModePanel
+                    options={trackerOptions}
+                    selectedTrackerId={trackerId}
+                    availabilityLabel={trackerAvailability}
+                    consentGranted={webGazerConsentGranted}
+                    calibrationComplete={calibrationComplete}
+                    status={trackerStatus}
+                    onTrackerChange={handleTrackerChange}
+                    onGrantConsent={grantWebGazerConsent}
+                    onCancelToSynthetic={cancelToSyntheticTracker}
+                  />
+                  {trackerId === 'webgazer' ? (
+                    <BrowserGazeStatusPanel
+                      status={webGazerTrackingStatus}
+                      canTurnOff={webGazerConsentGranted}
+                      debugOverlayEnabled={debugOverlayEnabled}
+                      onDebugOverlayChange={setDebugOverlayEnabled}
+                      onUseSyntheticDemo={cancelToSyntheticTracker}
+                      onTurnOff={turnOffWebGazer}
+                    />
+                  ) : null}
+                </DisclosureCard>
+
+                <DisclosureCard
+                  eyebrow="Advanced"
+                  id="event-log"
+                  status={<span className="status-pill pending">{visibleEventCount} events</span>}
+                  title="Local event log"
+                >
+                  <EventLog events={visibleEvents} sourceLabel={selectedTrackerOption.label} />
+                </DisclosureCard>
+              </>
+            )}
+          </>
+        ) : null}
+
+        {activeSection === 'report' ? (
+          <>
+            <div className="workspace-heading">
+              <p className="eyebrow">Report</p>
+              <h2>Results</h2>
+              <p className="muted">Visual previews are schematic telemetry views, not video or screenshots.</p>
+            </div>
+
+            {sessionPhase === 'completed' ? (
+              <>
+                <section className="report-overview" aria-labelledby="visual-report-heading">
+                  <div className="card-header">
+                    <div>
+                      <p className="eyebrow">Visual report overview</p>
+                      <h3 id="visual-report-heading">What changed attention?</h3>
+                    </div>
+                    <span className={`status-pill ${getIngestStatusClass(ingestResult, isIngestingEvents)}`}>
+                      {getIngestStatusLabel(ingestResult, isIngestingEvents)}
+                    </span>
+                  </div>
+                  <div className="synthetic-visual-grid">
+                    <SyntheticHeatmapPreview
+                      events={trackerEvents}
+                      aois={configuredDemoStudy.aois}
+                      telemetrySourceLabel={selectedTrackerOption.label}
+                      telemetrySourceIsExperimental={trackerId === 'webgazer'}
+                    />
+                    <GazePathPreview
+                      events={trackerEvents}
+                      aois={configuredDemoStudy.aois}
+                      telemetrySourceLabel={selectedTrackerOption.label}
+                      telemetrySourceIsExperimental={trackerId === 'webgazer'}
+                    />
+                    <AoiBreakdown
+                      events={trackerEvents}
+                      aois={configuredDemoStudy.aois}
+                      telemetrySourceLabel={selectedTrackerOption.label}
+                    />
+                  </div>
+                  <p className="privacy-note compact">
+                    Reports are generated from telemetry only. GazeTrack does not store webcam video, frames, screenshots,
+                    image blobs, or base64 media.
+                  </p>
+                </section>
+
+                <DisclosureCard
+                  eyebrow="Advanced"
+                  id="local-report-details"
+                  status={<span className={`status-pill ${getIngestStatusClass(ingestResult, isIngestingEvents)}`}>Ingest</span>}
+                  title="Local metrics and ingest"
+                >
+                  <DemoReport
+                    report={demoReport}
+                    events={trackerEvents}
+                    aois={configuredDemoStudy.aois}
+                    telemetrySourceLabel={selectedTrackerOption.label}
+                    telemetrySourceIsExperimental={trackerId === 'webgazer'}
+                    ingestResult={ingestResult}
+                    isIngestingEvents={isIngestingEvents}
+                    showVisuals={false}
+                  />
+                </DisclosureCard>
+
+                <DisclosureCard
+                  eyebrow="Advanced"
+                  id="backend-report-details"
+                  status={<span className={`status-pill ${backendReportResult?.ok ? 'ok' : 'pending'}`}>{isFetchingBackendReport ? 'Loading' : backendReportResult?.ok ? 'Generated' : 'Pending'}</span>}
+                  title="Persisted telemetry report"
+                >
+                  <BackendReport
+                    ingestResult={ingestResult}
+                    isFetchingReport={isFetchingBackendReport}
+                    reportResult={backendReportResult}
+                  />
+                </DisclosureCard>
+              </>
+            ) : (
+              <section className="empty-state">
+                <h3>Report waiting for a completed run</h3>
+                <p>Run the default synthetic session to generate visual results and advanced telemetry details.</p>
+                <button type="button" className="primary-button" onClick={openDemoStudy}>
+                  Go to run
+                </button>
+              </section>
+            )}
+          </>
+        ) : null}
+      </section>
     </main>
   )
 }

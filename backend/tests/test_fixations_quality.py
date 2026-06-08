@@ -177,6 +177,47 @@ def test_quality_verdict_passes_on_healthy_synthetic_session() -> None:
     assert summary["average_gaze_confidence"] == 0.91
 
 
+def test_quality_summary_counts_camera_readiness_and_drift_metadata() -> None:
+    events = [
+        EventEnvelope(
+            event_type="calibration",
+            timestamp="2026-01-01T00:00:00.000Z",
+            payload={"calibration_error_px": 32, "camera_readiness_score": 88},
+        ),
+        gaze("2026-01-01T00:00:00.100Z", 0.5, 0.5, 0.9),
+        EventEnvelope(
+            event_type="gaze",
+            timestamp="2026-01-01T00:00:00.180Z",
+            payload={
+                "x": 0.51,
+                "y": 0.505,
+                "confidence": 0.92,
+                "tracking_quality": "low",
+                "quality_flags": ["face_center_drift", "low_light"],
+                "drift_metrics": {
+                    "face_center_drift": 0.22,
+                    "low_light": True,
+                    "calibration_baseline_age_ms": 1200,
+                    "overall_tracking_quality": "low",
+                },
+            },
+        ),
+        EventEnvelope(
+            event_type="gaze",
+            timestamp="2026-01-01T00:00:00.260Z",
+            payload={"x": 0.515, "y": 0.51, "confidence": 0.91, "tracking_quality": "high"},
+        ),
+    ]
+    summary = compute_quality_summary(events, detect_fixations(events))
+
+    assert summary["calibration_readiness_score"] == 88
+    assert summary["tracking_quality_counts"] == {"high": 1, "medium": 0, "low": 1}
+    assert summary["tracking_quality_percentages"]["low"] == 0.333
+    assert summary["drift_warning_count"] == 1
+    assert summary["quality_flag_counts"]["low_light"] == 1
+    assert "1 gaze samples include camera drift or setup quality warnings." in summary["quality_reasons"]
+
+
 def test_rich_synthetic_session_produces_fixations_and_populated_aoi_metrics() -> None:
     events = rich_synthetic_events()
     fixations = detect_fixations(events)

@@ -15,6 +15,7 @@ type DemoReportProps = {
   telemetrySourceIsExperimental: boolean
   ingestResult: EventIngestResult | null
   isIngestingEvents: boolean
+  showVisuals?: boolean
 }
 
 function getIngestStatusLabel(ingestResult: EventIngestResult | null, isIngestingEvents: boolean) {
@@ -49,6 +50,7 @@ export function DemoReport({
   telemetrySourceIsExperimental,
   ingestResult,
   isIngestingEvents,
+  showVisuals = true,
 }: DemoReportProps) {
   const response = ingestResult?.response
   const sourceDescription = telemetrySourceIsExperimental
@@ -109,11 +111,23 @@ export function DemoReport({
         ))}
       </div>
 
-      <div className="synthetic-visual-grid">
-        <SyntheticHeatmapPreview events={events} aois={aois} />
-        <GazePathPreview events={events} aois={aois} />
-        <AoiBreakdown events={events} aois={aois} />
-      </div>
+      {showVisuals ? (
+        <div className="synthetic-visual-grid">
+          <SyntheticHeatmapPreview
+            events={events}
+            aois={aois}
+            telemetrySourceLabel={telemetrySourceLabel}
+            telemetrySourceIsExperimental={telemetrySourceIsExperimental}
+          />
+          <GazePathPreview
+            events={events}
+            aois={aois}
+            telemetrySourceLabel={telemetrySourceLabel}
+            telemetrySourceIsExperimental={telemetrySourceIsExperimental}
+          />
+          <AoiBreakdown events={events} aois={aois} telemetrySourceLabel={telemetrySourceLabel} />
+        </div>
+      ) : null}
 
       <div className="insight-grid">
         {report.insights.map((insight) => (

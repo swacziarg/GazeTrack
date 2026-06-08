@@ -13,6 +13,7 @@ SUSPICIOUS_MEDIA_KEYS = {"video", "frame", "image", "base64", "blob", "webcam_fr
 MAX_PAYLOAD_BYTES = 4096
 EVENT_SCHEMA_VERSION = 1
 WEBGAZER_EXPERIMENTAL_SOURCE = "webgazer_experimental"
+REAL_SITE_CAPTURE_SOURCE = "real_site_capture"
 
 SAFE_PAYLOAD_KEYS = {
     "label",
@@ -39,16 +40,49 @@ SAFE_PAYLOAD_KEYS = {
     "calibration_quality",
     "calibration_recommendation",
     "quality_warning",
+    "quality_score",
+    "quality_flags",
+    "camera_readiness_score",
+    "tracking_quality",
+    "camera_readiness_baseline",
+    "drift_metrics",
     "dwell_ms",
     "scroll_depth_percent",
     "target",
     "task_prompt",
     "study_name",
     "target_url",
+    "page_url",
+    "page_path",
+    "document_width",
+    "document_height",
+    "scroll_x",
+    "scroll_y",
+    "aoi_role_key",
+    "coordinate_space",
     "completed",
 }
 
 POINT_KEYS = {"point", "target_point", "observed_point"}
+QUALITY_LEVELS = {"high", "medium", "low"}
+QUALITY_FLAGS = {
+    "face_lost",
+    "eye_visibility_lost",
+    "face_center_drift",
+    "face_size_drift",
+    "head_pose_drift",
+    "low_light",
+    "sample_rate_low",
+    "unstable_position",
+}
+BASELINE_NUMERIC_KEYS = {"brightness", "contrast", "observed_fps", "readiness_score", "face_size"}
+DRIFT_NUMERIC_KEYS = {
+    "face_center_drift",
+    "face_size_drift",
+    "head_pose_drift",
+    "calibration_baseline_age_ms",
+}
+DRIFT_BOOL_KEYS = {"eye_visibility_lost", "face_lost", "low_light", "sample_rate_low"}
 
 
 @dataclass(frozen=True)
@@ -134,6 +168,68 @@ def _sanitize_point(value: object) -> dict[str, float] | None:
     return {"x": _round_coordinate(x), "y": _round_coordinate(y)}
 
 
+def _sanitize_quality_flags(value: object) -> list[str] | None:
+    if not isinstance(value, list):
+        return None
+    flags = [str(item).strip() for item in value if str(item).strip() in QUALITY_FLAGS]
+    return flags[:12]
+
+
+def _sanitize_head_pose(value: object) -> dict[str, float | None] | None:
+    if not isinstance(value, dict):
+        return None
+    pose: dict[str, float | None] = {}
+    for key in ("yaw", "pitch", "roll"):
+        raw_value = value.get(key)
+        if raw_value is None:
+            pose[key] = None
+        elif _is_number(raw_value):
+            pose[key] = _round_metric(float(raw_value))
+    return pose or None
+
+
+def _sanitize_camera_baseline(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    sanitized: dict[str, Any] = {}
+    captured_at = value.get("captured_at")
+    if isinstance(captured_at, str) and parse_event_timestamp(captured_at) is not None:
+        sanitized["captured_at"] = captured_at
+    point = _sanitize_point(value.get("face_center"))
+    if point is not None:
+        sanitized["face_center"] = point
+    pose = _sanitize_head_pose(value.get("head_pose"))
+    if pose is not None:
+        sanitized["head_pose"] = pose
+    for key in BASELINE_NUMERIC_KEYS:
+        raw_value = value.get(key)
+        if raw_value is None:
+            sanitized[key] = None
+        elif _is_number(raw_value):
+            sanitized[key] = _round_metric(float(raw_value))
+    return sanitized or None
+
+
+def _sanitize_drift_metrics(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    sanitized: dict[str, Any] = {}
+    for key in DRIFT_NUMERIC_KEYS:
+        raw_value = value.get(key)
+        if raw_value is None:
+            sanitized[key] = None
+        elif _is_number(raw_value):
+            sanitized[key] = _round_metric(float(raw_value))
+    for key in DRIFT_BOOL_KEYS:
+        raw_value = value.get(key)
+        if isinstance(raw_value, bool):
+            sanitized[key] = raw_value
+    quality = value.get("overall_tracking_quality")
+    if isinstance(quality, str) and quality in QUALITY_LEVELS:
+        sanitized["overall_tracking_quality"] = quality
+    return sanitized or None
+
+
 def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     sanitized: dict[str, Any] = {}
     for key, value in payload.items():
@@ -144,9 +240,10 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
             if point is not None:
                 sanitized[key] = point
             continue
-        if key in {"x", "y", "viewport_width", "viewport_height", "confidence", "calibration_error_px",
+        if key in {"x", "y", "viewport_width", "viewport_height", "document_width", "document_height",
+                   "scroll_x", "scroll_y", "confidence", "calibration_error_px",
                    "calibration_error_normalized", "error_px", "error_normalized", "dwell_ms",
-                   "scroll_depth_percent"}:
+                   "scroll_depth_percent", "quality_score", "camera_readiness_score"}:
             if value is None and key == "confidence":
                 sanitized[key] = None
             elif _is_number(value):
@@ -163,7 +260,25 @@ def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(value, str):
             stripped = value.strip()
             if stripped:
+                if key == "tracking_quality" and stripped not in QUALITY_LEVELS:
+                    continue
                 sanitized[key] = stripped[:1000]
+            continue
+        if key == "quality_flags":
+            flags = _sanitize_quality_flags(value)
+            if flags is not None:
+                sanitized[key] = flags
+            continue
+        if key == "camera_readiness_baseline":
+            baseline = _sanitize_camera_baseline(value)
+            if baseline is not None:
+                sanitized[key] = baseline
+            continue
+        if key == "drift_metrics":
+            drift = _sanitize_drift_metrics(value)
+            if drift is not None:
+                sanitized[key] = drift
+            continue
     return sanitized
 
 

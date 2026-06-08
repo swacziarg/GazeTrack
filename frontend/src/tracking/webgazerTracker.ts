@@ -1,4 +1,10 @@
 import { calibrationTargets } from './syntheticTracker'
+import {
+  classifyTrackingDrift,
+  type CameraQualityBaseline,
+  type CameraQualityObservation,
+  type DriftResult,
+} from './cameraQuality'
 import type {
   NormalizedPoint,
   TelemetryEvent,
@@ -64,6 +70,18 @@ const DEFAULT_SAMPLE_INTERVAL_MS = 250
 const MAX_SESSION_GAZE_EVENTS = 240
 const TRACKER_SOURCE = 'webgazer_experimental'
 const DEFAULT_WEBGAZER_SCRIPT_URL = 'https://webgazer.cs.brown.edu/webgazer.js'
+
+export const browserCalibrationTargets: NormalizedPoint[] = [
+  { x: 0.12, y: 0.12 },
+  { x: 0.5, y: 0.12 },
+  { x: 0.88, y: 0.12 },
+  { x: 0.12, y: 0.5 },
+  { x: 0.5, y: 0.5 },
+  { x: 0.88, y: 0.5 },
+  { x: 0.12, y: 0.88 },
+  { x: 0.5, y: 0.88 },
+  { x: 0.88, y: 0.88 },
+]
 
 let webGazerScriptPromise: Promise<void> | null = null
 
@@ -244,7 +262,7 @@ export function summarizeCalibration(measurements: CalibrationMeasurement[]): Ca
 
 export function predictionToGazeEvent(
   prediction: WebGazerPrediction,
-  options: { eventIndex: number; viewportWidth: number; viewportHeight: number },
+  options: { eventIndex: number; viewportWidth: number; viewportHeight: number; drift?: DriftResult | null },
 ): TelemetryEvent {
   const point = normalizePrediction(prediction, options.viewportWidth, options.viewportHeight)
   const payload: TelemetryEventPayload = {
@@ -256,6 +274,10 @@ export function predictionToGazeEvent(
     viewport_width: options.viewportWidth,
     viewport_height: options.viewportHeight,
     confidence: safeConfidence(prediction),
+    quality_score: options.drift?.qualityScore,
+    quality_flags: options.drift?.qualityFlags,
+    tracking_quality: options.drift?.trackingQuality,
+    drift_metrics: options.drift?.driftMetrics,
   }
 
   return {
@@ -301,7 +323,12 @@ function calibrationMeasurementToEvent(
   }
 }
 
-function calibrationCompletedEvent(eventIndex: number, pointCount: number, summary: CalibrationSummary): TelemetryEvent {
+function calibrationCompletedEvent(
+  eventIndex: number,
+  pointCount: number,
+  summary: CalibrationSummary,
+  baseline: CameraQualityBaseline | null,
+): TelemetryEvent {
   return {
     id: `webgazer-event-${String(eventIndex).padStart(3, '0')}`,
     event_type: 'calibration_completed',
@@ -318,6 +345,8 @@ function calibrationCompletedEvent(eventIndex: number, pointCount: number, summa
       calibration_quality: summary.quality,
       calibration_recommendation: summary.recommendation,
       quality_warning: summary.warning ?? undefined,
+      camera_readiness_score: baseline?.readiness_score,
+      camera_readiness_baseline: baseline ?? undefined,
     },
   }
 }
@@ -359,76 +388,110 @@ function removeOverlay(overlay: HTMLElement) {
 }
 
 function collectCalibrationMeasurements(
-  targets: NormalizedPoint[],
+  options: {
+    calibrationPasses?: number
+    targets: NormalizedPoint[]
+    samplesPerTarget?: number
+    surfaceElement?: HTMLElement | null
+  },
   getLatestPrediction: () => WebGazerPrediction | null,
   recordTarget: (x: number, y: number) => void,
 ): Promise<CalibrationMeasurement[]> {
+  const { targets, surfaceElement } = options
+  const passCount = Math.max(1, Math.floor(options.calibrationPasses ?? options.samplesPerTarget ?? 1))
+  const sequence = Array.from({ length: passCount }, () => targets).flat()
+  const pointCount = sequence.length
+
+  if (targets.length === 0) {
+    return Promise.resolve([])
+  }
+
   const browserWindow = getBrowserWindow()
   if (!browserWindow || typeof document === 'undefined') {
     return Promise.resolve(
-      targets.map((target) => ({
-        target,
-        prediction: getLatestPrediction(),
-        viewportWidth: DEFAULT_VIEWPORT_WIDTH,
-        viewportHeight: DEFAULT_VIEWPORT_HEIGHT,
-      })),
+      Array.from({ length: passCount }, () =>
+        targets.map((target) => ({
+          target,
+          prediction: getLatestPrediction(),
+          viewportWidth: DEFAULT_VIEWPORT_WIDTH,
+          viewportHeight: DEFAULT_VIEWPORT_HEIGHT,
+        })),
+      ).flat(),
     )
   }
 
   const calibrationWindow = browserWindow
 
   return new Promise((resolve) => {
-    const overlay = document.createElement('div')
-    overlay.className = 'webgazer-calibration-overlay'
-    overlay.setAttribute('role', 'dialog')
-    overlay.setAttribute('aria-label', 'Browser gaze calibration')
+    const host = surfaceElement ?? document.body
+    const layer = document.createElement('div')
+    layer.className = surfaceElement ? 'webgazer-calibration-layer' : 'webgazer-calibration-overlay'
+    layer.setAttribute('role', 'dialog')
+    layer.setAttribute('aria-label', 'Browser gaze calibration')
 
     const copy = document.createElement('div')
     copy.className = 'webgazer-calibration-copy'
     const title = document.createElement('strong')
     title.textContent = 'Browser gaze calibration'
     const instructions = document.createElement('span')
-    instructions.textContent = 'Look at each target, then click it. This estimates rough browser-dependent quality only.'
-    copy.append(title, instructions)
-    overlay.appendChild(copy)
+    instructions.textContent = `Click each target while looking directly at it. This runs ${passCount} passes over ${targets.length} points.`
+    const progress = document.createElement('span')
+    progress.className = 'webgazer-calibration-progress'
+    copy.append(title, instructions, progress)
+    layer.appendChild(copy)
 
     let index = 0
     const measurements: CalibrationMeasurement[] = []
 
     function renderTarget() {
-      overlay.querySelector('.webgazer-calibration-target')?.remove()
+      layer.querySelector('.webgazer-calibration-target')?.remove()
 
-      const target = targets[index]
+      const targetIndex = index % targets.length
+      const passIndex = Math.floor(index / targets.length)
+      const target = sequence[index]
+      progress.textContent = `Pass ${passIndex + 1} of ${passCount}. Target ${targetIndex + 1} of ${targets.length}.`
       const button = document.createElement('button')
       button.type = 'button'
       button.className = 'webgazer-calibration-target'
-      button.textContent = String(index + 1)
+      button.textContent = String(targetIndex + 1)
       button.style.left = `${target.x * 100}%`
       button.style.top = `${target.y * 100}%`
-      button.setAttribute('aria-label', `Calibration target ${index + 1} of ${targets.length}`)
+      button.setAttribute(
+        'aria-label',
+        `Calibration target ${targetIndex + 1} of ${targets.length}, pass ${passIndex + 1} of ${passCount}`,
+      )
       button.addEventListener('click', () => {
         const viewportWidth = calibrationWindow.innerWidth || DEFAULT_VIEWPORT_WIDTH
         const viewportHeight = calibrationWindow.innerHeight || DEFAULT_VIEWPORT_HEIGHT
-        recordTarget(target.x * viewportWidth, target.y * viewportHeight)
+        const hostRect = surfaceElement?.getBoundingClientRect()
+        const targetX = hostRect ? hostRect.left + target.x * hostRect.width : target.x * viewportWidth
+        const targetY = hostRect ? hostRect.top + target.y * hostRect.height : target.y * viewportHeight
+        const measuredTarget = hostRect
+          ? {
+              x: roundCoordinate(clampNormalized(targetX / viewportWidth)),
+              y: roundCoordinate(clampNormalized(targetY / viewportHeight)),
+            }
+          : target
+        recordTarget(targetX, targetY)
         measurements.push({
-          target,
+          target: measuredTarget,
           prediction: getLatestPrediction(),
           viewportWidth,
           viewportHeight,
         })
         index += 1
-        if (index >= targets.length) {
-          removeOverlay(overlay)
+        if (index >= pointCount) {
+          removeOverlay(layer)
           resolve(measurements)
           return
         }
         renderTarget()
       })
-      overlay.appendChild(button)
+      layer.appendChild(button)
       button.focus()
     }
 
-    document.body.appendChild(overlay)
+    host.appendChild(layer)
     renderTarget()
   })
 }
@@ -454,6 +517,9 @@ export class WebGazerTracker implements TrackerProvider {
   private lowConfidenceCount = 0
   private storedGazeEventCount = 0
   private lastErrorMessage: string | null = null
+  private cameraQualityBaseline: CameraQualityBaseline | null = null
+  private latestCameraObservation: CameraQualityObservation | null = null
+  private latestDrift: DriftResult | null = null
 
   constructor(options: { sampleIntervalMs?: number } = {}) {
     this.sampleIntervalMs = options.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS
@@ -517,6 +583,7 @@ export class WebGazerTracker implements TrackerProvider {
             eventIndex: this.eventIndex,
             viewportWidth: this.viewportWidth,
             viewportHeight: this.viewportHeight,
+            drift: this.latestDrift,
           }),
         )
         this.eventIndex += 1
@@ -536,22 +603,33 @@ export class WebGazerTracker implements TrackerProvider {
     const targets = options?.targets ?? calibrationTargets
     this.status = 'calibrating'
     const measurements = await collectCalibrationMeasurements(
-      targets,
+      {
+        targets,
+        calibrationPasses: options?.calibrationPasses,
+        samplesPerTarget: options?.samplesPerTarget,
+        surfaceElement: options?.surfaceElement,
+      },
       () => this.latestPrediction,
       (x, y) => this.webgazer?.recordScreenPosition?.(x, y, 'click'),
     )
     const summary = summarizeCalibration(measurements)
     this.calibrationSummary = summary
+    const pointCount = measurements.length
     const calibrationEvents = measurements.map((measurement, index) =>
       calibrationMeasurementToEvent(measurement, {
         eventIndex: this.eventIndex + index,
         step: index + 1,
-        pointCount: targets.length,
+        pointCount,
       }),
     )
 
     this.eventIndex += calibrationEvents.length
-    const completedEvent = calibrationCompletedEvent(this.eventIndex, targets.length, summary)
+    const completedEvent = calibrationCompletedEvent(
+      this.eventIndex,
+      calibrationEvents.length,
+      summary,
+      this.cameraQualityBaseline,
+    )
     this.eventIndex += 1
     this.events.push(...calibrationEvents, completedEvent)
     this.status = 'active'
@@ -576,6 +654,9 @@ export class WebGazerTracker implements TrackerProvider {
     this.missingPredictionCount = 0
     this.lowConfidenceCount = 0
     this.storedGazeEventCount = 0
+    this.cameraQualityBaseline = null
+    this.latestCameraObservation = null
+    this.latestDrift = null
     this.events = [
       {
         id: `webgazer-event-${String(this.eventIndex).padStart(3, '0')}`,
@@ -618,6 +699,30 @@ export class WebGazerTracker implements TrackerProvider {
 
   getCalibrationSummary() {
     return this.calibrationSummary
+  }
+
+  setCameraQualityBaseline(baseline: CameraQualityBaseline | null) {
+    this.cameraQualityBaseline = baseline
+  }
+
+  updateCameraQualityObservation(observation: CameraQualityObservation | null, now = Date.now()) {
+    this.latestCameraObservation = observation
+    if (!observation || !this.cameraQualityBaseline) {
+      this.latestDrift = null
+      return null
+    }
+
+    this.latestDrift = classifyTrackingDrift(this.cameraQualityBaseline, observation, now)
+    if (this.status === 'active' && this.latestDrift.trackingQuality === 'low') {
+      this.status = 'weak_signal'
+    } else if (this.status === 'weak_signal' && this.latestDrift.trackingQuality !== 'low') {
+      this.status = 'active'
+    }
+    return this.latestDrift
+  }
+
+  getLatestDrift() {
+    return this.latestDrift
   }
 
   getEvents() {
@@ -665,6 +770,9 @@ export class WebGazerTracker implements TrackerProvider {
     this.missingPredictionCount = 0
     this.lowConfidenceCount = 0
     this.lastErrorMessage = null
+    this.cameraQualityBaseline = null
+    this.latestCameraObservation = null
+    this.latestDrift = null
     this.status = 'idle'
   }
 }

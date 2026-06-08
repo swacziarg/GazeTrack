@@ -1,15 +1,18 @@
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter
+from fastapi import HTTPException
 
 from app.models.api import (
+    AoiSnapshotBatchRequest,
+    AoiSnapshotResponse,
     EventEnvelope,
     SessionCompleteResponse,
     SessionCreateRequest,
     SessionReportResponse,
     SessionResponse,
 )
-from app.repository import get_repository
+from app.repository import AoiSnapshotRecord, get_repository
 from app.services.aoi_metrics import compute_aoi_metrics
 from app.services.fixations import detect_fixations, summarize_fixations
 from app.services.replay import build_replay_aoi_overlay, build_replay_events, build_replay_fixations, build_replay_summary
@@ -32,6 +35,27 @@ from app.services.session_quality import (
 router = APIRouter(tags=["sessions"])
 
 
+def _snapshot_response(record: AoiSnapshotRecord) -> AoiSnapshotResponse:
+    return AoiSnapshotResponse(
+        snapshot_id=record.id,
+        session_id=record.session_id,
+        study_id=record.study_id,
+        source_aoi_id=record.source_aoi_id,
+        label=record.label,
+        semantic_type=record.semantic_type,
+        role_key=record.role_key,
+        selector=record.selector,
+        page_url=record.page_url,
+        x=record.x,
+        y=record.y,
+        width=record.width,
+        height=record.height,
+        coordinate_space=record.coordinate_space,
+        detected=record.detected,
+        created_at=record.created_at,
+    )
+
+
 @router.post("/studies/{study_id}/sessions", response_model=SessionResponse)
 def create_session(study_id: UUID, payload: SessionCreateRequest) -> SessionResponse:
     _ = payload
@@ -49,6 +73,19 @@ def complete_session(session_id: UUID) -> SessionCompleteResponse:
         event_count=repository.count_accepted_events(session_id),
         completed=record.status == "completed",
     )
+
+
+@router.post("/sessions/{session_id}/aoi-snapshots", response_model=list[AoiSnapshotResponse])
+def replace_aoi_snapshots(session_id: UUID, payload: AoiSnapshotBatchRequest) -> list[AoiSnapshotResponse]:
+    repository = get_repository()
+    session = repository.ensure_session(session_id)
+    if not repository.capture_token_matches(session.study_id, payload.capture_token):
+        raise HTTPException(status_code=403, detail="Invalid capture token")
+    records = repository.replace_aoi_snapshots(
+        session_id,
+        [snapshot.model_dump() for snapshot in payload.snapshots],
+    )
+    return [_snapshot_response(record) for record in records]
 
 
 def _task_event_count(event_type_counts: dict[str, int]) -> int:
@@ -74,6 +111,16 @@ def _tracker_report_metadata(events: list[EventEnvelope]) -> dict[str, str | boo
             "tracker_experimental": True,
             "tracker_notice": (
                 "Webcam gaze estimates are approximate, browser-dependent, and not medical-grade eye tracking."
+            ),
+        }
+
+    if "real_site_capture" in sources:
+        return {
+            "tracker_type": "real_site_capture",
+            "tracker_mode_label": "Real-site capture snippet",
+            "tracker_experimental": True,
+            "tracker_notice": (
+                "Real-site capture uses document-normalized browser telemetry and optional approximate gaze samples."
             ),
         }
 
@@ -107,7 +154,14 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
     quality_summary = compute_quality_summary(events, fixations)
     study = repository.get_study(session.study_id)
     tasks = repository.list_tasks_for_study(session.study_id)
-    aois = repository.list_aois_for_study(session.study_id)
+    snapshots = repository.list_aoi_snapshots_for_session(session_id)
+    unresolved_snapshot_labels = [snapshot.label for snapshot in snapshots if not snapshot.detected]
+    detected_snapshots = [snapshot for snapshot in snapshots if snapshot.detected]
+    aois = (
+        [snapshot.to_aoi_record() for snapshot in detected_snapshots]
+        if snapshots
+        else repository.list_aois_for_study(session.study_id)
+    )
     aoi_metrics = compute_aoi_metrics(
         aois,
         events,
@@ -154,6 +208,7 @@ def get_session_report(session_id: UUID) -> SessionReportResponse:
         ),
         "No raw webcam media is stored by GazeTrack.",
     ]
+    insights.extend(f"AOI not detected on captured page: {label}." for label in unresolved_snapshot_labels)
     if tracker_metadata["tracker_experimental"]:
         insights.append(str(tracker_metadata["tracker_notice"]))
     report = SessionReportResponse(

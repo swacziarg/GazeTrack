@@ -1,7 +1,7 @@
 import { calibrationTargets, type SyntheticTelemetryMode } from '../lib/mockEvents'
 import type { CalibrationSummary, TrackerId } from '../tracking'
 
-export type SessionPhase = 'preview' | 'detail' | 'calibration' | 'active' | 'completed'
+export type SessionPhase = 'preview' | 'detail' | 'camera_readiness' | 'calibration' | 'active' | 'completed'
 
 type SessionControlsProps = {
   phase: SessionPhase
@@ -16,6 +16,7 @@ type SessionControlsProps = {
   calibrationEventCount: number
   calibrationSummary?: CalibrationSummary | null
   trackerNotice?: string | null
+  showCalibrationDetails?: boolean
   onQualityModeChange: (mode: SyntheticTelemetryMode) => void
   onOpenStudy: () => void
   onStartSession: () => void
@@ -26,6 +27,10 @@ type SessionControlsProps = {
 function getStatusLabel(phase: SessionPhase, trackerLabel: string) {
   if (phase === 'calibration') {
     return `${trackerLabel} calibration`
+  }
+
+  if (phase === 'camera_readiness') {
+    return 'Camera setup'
   }
 
   if (phase === 'active') {
@@ -65,13 +70,14 @@ export function SessionControls({
   calibrationEventCount,
   calibrationSummary,
   trackerNotice,
+  showCalibrationDetails = true,
   onQualityModeChange,
   onOpenStudy,
   onStartSession,
   onRunCalibration,
   onCompleteSession,
 }: SessionControlsProps) {
-  const canComplete = phase === 'active' && eventCount === totalEventCount
+  const canComplete = phase === 'active'
   const calibrationVisible = phase === 'calibration' || phase === 'active' || phase === 'completed'
   const isSynthetic = trackerId === 'synthetic'
 
@@ -94,7 +100,7 @@ export function SessionControls({
         <select
           value={qualityMode}
           onChange={(event) => onQualityModeChange(event.target.value as SyntheticTelemetryMode)}
-          disabled={!isSynthetic || phase === 'calibration' || phase === 'active'}
+          disabled={!isSynthetic || phase === 'camera_readiness' || phase === 'calibration' || phase === 'active'}
         >
           <option value="healthy">Healthy</option>
           <option value="low_confidence">Low confidence</option>
@@ -116,7 +122,7 @@ export function SessionControls({
         </div>
       </dl>
 
-      {calibrationVisible ? (
+      {calibrationVisible && showCalibrationDetails ? (
         <section className="calibration-panel" aria-label={`${trackerLabel} calibration`}>
           <div className="calibration-copy">
             <h4>{trackerLabel} calibration</h4>
@@ -126,7 +132,8 @@ export function SessionControls({
                 : 'Five target points generate calibration telemetry after consent. Raw camera media is not sent to ingest.'}
             </p>
           </div>
-          <div className="calibration-target-map" aria-label="Five synthetic calibration targets">
+          <div className="calibration-target-map" aria-label="Normalized calibration target map">
+            <span className="calibration-surface-label">Viewport calibration surface</span>
             {calibrationTargets.map((target, index) => (
               <span
                 key={`${target.x}-${target.y}`}
@@ -192,9 +199,16 @@ export function SessionControls({
           </button>
         ) : null}
         {phase === 'active' ? (
-          <button type="button" className="primary-button" onClick={onCompleteSession} disabled={!canComplete}>
-            Complete demo session
-          </button>
+          <>
+            {!isSynthetic ? (
+              <button type="button" className="secondary-button" onClick={onRunCalibration}>
+                Re-run browser calibration
+              </button>
+            ) : null}
+            <button type="button" className="primary-button" onClick={onCompleteSession} disabled={!canComplete}>
+              Complete demo session
+            </button>
+          </>
         ) : null}
       </div>
 

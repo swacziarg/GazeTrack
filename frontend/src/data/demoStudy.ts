@@ -11,6 +11,9 @@ export type AreaOfInterest = {
 export type StudyBuilderAoi = {
   label: string
   semanticType?: string
+  roleKey?: string
+  selector?: string
+  required?: boolean
   x: number
   y: number
   width: number
@@ -81,6 +84,15 @@ export const demoStudy: DemoStudy = {
       width: 34,
       height: 20,
     },
+    {
+      name: 'Footer',
+      role: 'Secondary navigation and trust region',
+      semanticType: 'footer',
+      x: 0,
+      y: 88,
+      width: 100,
+      height: 12,
+    },
   ],
   insights: [
     'Demo study preview: CTA fixation and click sequence',
@@ -98,6 +110,18 @@ export const defaultStudyBuilderConfig: StudyBuilderConfig = {
   aois: demoStudy.aois.map((aoi) => ({
     label: aoi.name,
     semanticType: aoi.semanticType,
+    roleKey:
+      aoi.name === 'Hero headline'
+        ? 'hero_headline'
+        : aoi.name === 'Primary CTA'
+          ? 'primary_cta'
+          : aoi.name === 'Navigation'
+            ? 'navigation'
+            : aoi.name === 'Pricing preview'
+              ? 'pricing_preview'
+              : 'footer',
+    selector: '',
+    required: true,
     x: aoi.x / 100,
     y: aoi.y / 100,
     width: aoi.width / 100,
