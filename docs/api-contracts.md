@@ -74,7 +74,8 @@ capture time, weak-signal messages, and calibration feedback (`good`, `usable`, 
 debug signals. Backend ingest still receives only the existing privacy-safe telemetry event envelope. Calibration
 summary payloads may include `calibration_quality`, `calibration_recommendation`, `camera_readiness_score`, and a
 privacy-safe `camera_readiness_baseline`; gaze samples may include `quality_score`, `quality_flags`,
-`tracking_quality`, and `drift_metrics`. Reports continue to label
+`tracking_quality`, and `drift_metrics`. Direct face box, eye visibility, and approximate head-pose setup checks are
+computed locally; raw face landmarks and biometric identity data are not part of the ingest contract. Reports continue to label
 `tracker_type: "webgazer_experimental"` sessions as experimental and not medical-grade.
 
 `GET /api/v1/sessions/{session_id}/report` includes:

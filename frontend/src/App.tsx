@@ -891,6 +891,7 @@ function App() {
                 readiness={cameraReadiness.readiness}
                 baseline={cameraReadiness.baseline}
                 error={cameraReadiness.error}
+                warning={cameraReadiness.warning}
                 onContinue={continueFromCameraReadiness}
                 onUseSyntheticDemo={cancelToSyntheticTracker}
               />

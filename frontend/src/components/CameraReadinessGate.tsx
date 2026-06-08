@@ -12,6 +12,7 @@ type CameraReadinessGateProps = {
   readiness: CameraReadinessResult | null
   baseline: CameraQualityBaseline | null
   error: string | null
+  warning: string | null
   onContinue: () => void
   onUseSyntheticDemo: () => void
 }
@@ -26,6 +27,7 @@ export function CameraReadinessGate({
   readiness,
   baseline,
   error,
+  warning,
   onContinue,
   onUseSyntheticDemo,
 }: CameraReadinessGateProps) {
@@ -48,6 +50,7 @@ export function CameraReadinessGate({
         </div>
 
         {error ? <p className="backend-unavailable compact">{error}</p> : null}
+        {warning && !error ? <p className="privacy-note compact">{warning}</p> : null}
 
         <dl className="tracker-status-grid compact-grid">
           <div>

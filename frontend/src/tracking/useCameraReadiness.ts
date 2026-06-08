@@ -7,6 +7,11 @@ import {
   type CameraQualityObservation,
   type CameraReadinessResult,
 } from './cameraQuality'
+import {
+  fallbackObservationFromTrackingStatus,
+  MediaPipeCameraObservationExtractor,
+  type CameraObservationExtractor,
+} from './cameraObservationExtractor'
 import type { BrowserGazeStatusSnapshot } from './webgazerStatus'
 
 type UseCameraReadinessOptions = {
@@ -20,15 +25,11 @@ type CameraReadinessHookState = {
   readiness: CameraReadinessResult | null
   baseline: CameraQualityBaseline | null
   error: string | null
+  warning: string | null
   captureBaseline: () => CameraQualityBaseline | null
 }
 
 const SAMPLE_INTERVAL_MS = 250
-const VIDEO_SAMPLE_SIZE = 24
-
-function nowIso() {
-  return new Date().toISOString()
-}
 
 function findExistingCameraVideo() {
   if (typeof document === 'undefined') {
@@ -41,75 +42,14 @@ function findExistingCameraVideo() {
   )
 }
 
-function computeBrightnessContrast(video: HTMLVideoElement) {
-  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-    return { brightness: null, contrast: null }
-  }
-
-  const canvas = document.createElement('canvas')
-  canvas.width = VIDEO_SAMPLE_SIZE
-  canvas.height = VIDEO_SAMPLE_SIZE
-  const context = canvas.getContext('2d')
-  if (!context) {
-    return { brightness: null, contrast: null }
-  }
-
-  try {
-    context.drawImage(video, 0, 0, VIDEO_SAMPLE_SIZE, VIDEO_SAMPLE_SIZE)
-    const data = context.getImageData(0, 0, VIDEO_SAMPLE_SIZE, VIDEO_SAMPLE_SIZE).data
-    const luminance: number[] = []
-    for (let index = 0; index < data.length; index += 4) {
-      luminance.push((0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]) / 255)
-    }
-    const brightness = luminance.reduce((sum, value) => sum + value, 0) / luminance.length
-    const variance = luminance.reduce((sum, value) => sum + (value - brightness) ** 2, 0) / luminance.length
-    return {
-      brightness: Number(brightness.toFixed(3)),
-      contrast: Number(Math.sqrt(variance).toFixed(3)),
-    }
-  } catch {
-    return { brightness: null, contrast: null }
-  }
-}
-
-function createObservation(
-  video: HTMLVideoElement | null,
-  trackingStatus: BrowserGazeStatusSnapshot | null,
-  previousObservation: CameraQualityObservation | null,
-): CameraQualityObservation {
-  const faceCenter = trackingStatus?.latestPoint ?? null
-  const movement =
-    faceCenter && previousObservation?.faceCenter
-      ? Math.hypot(faceCenter.x - previousObservation.faceCenter.x, faceCenter.y - previousObservation.faceCenter.y)
-      : null
-  const validSampleRate =
-    trackingStatus && trackingStatus.elapsedMs > 0
-      ? trackingStatus.validSampleCount / (trackingStatus.elapsedMs / 1000)
-      : null
-  const { brightness, contrast } = video
-    ? computeBrightnessContrast(video)
-    : { brightness: null, contrast: null }
-
-  return {
-    capturedAt: nowIso(),
-    faceDetected: Boolean(trackingStatus?.latestPoint || trackingStatus?.validSampleCount),
-    eyesVisible: trackingStatus?.latestPoint ? true : null,
-    faceCenter,
-    faceSize: null,
-    headPose: null,
-    brightness,
-    contrast,
-    observedFps: validSampleRate === null ? null : Number(validSampleRate.toFixed(3)),
-    movement: movement === null ? null : Number(movement.toFixed(3)),
-  }
-}
-
 export function useCameraReadiness({
   enabled,
   trackingStatus,
 }: UseCameraReadinessOptions): CameraReadinessHookState {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const extractorRef = useRef<CameraObservationExtractor | null>(null)
+  const extractorFailedRef = useRef(false)
   const stableSinceRef = useRef<number | null>(null)
   const [observation, setObservation] = useState<CameraQualityObservation | null>(null)
   const observationRef = useRef<CameraQualityObservation | null>(null)
@@ -117,6 +57,7 @@ export function useCameraReadiness({
   const readinessRef = useRef<CameraReadinessResult | null>(null)
   const [baseline, setBaseline] = useState<CameraQualityBaseline | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
 
   useEffect(() => {
     if (!enabled) {
@@ -155,8 +96,36 @@ export function useCameraReadiness({
 
     return () => {
       cancelled = true
+      extractorRef.current?.dispose()
+      extractorRef.current = null
+      extractorFailedRef.current = false
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
+    }
+  }, [enabled])
+
+  useEffect(() => {
+    if (!enabled || extractorRef.current || extractorFailedRef.current) {
+      return
+    }
+
+    let cancelled = false
+    void MediaPipeCameraObservationExtractor.create()
+      .then((extractor) => {
+        if (cancelled) {
+          extractor.dispose()
+          return
+        }
+        extractorRef.current = extractor
+        setWarning(null)
+      })
+      .catch(() => {
+        extractorFailedRef.current = true
+        setWarning('Direct camera setup checks are unavailable. Using lower-fidelity browser gaze setup signals.')
+      })
+
+    return () => {
+      cancelled = true
     }
   }, [enabled])
 
@@ -167,7 +136,10 @@ export function useCameraReadiness({
     }
 
     const intervalId = window.setInterval(() => {
-      const nextObservation = createObservation(videoRef.current, trackingStatus, observationRef.current)
+      const nextObservation =
+        extractorRef.current && videoRef.current
+          ? extractorRef.current.sample(videoRef.current, observationRef.current)
+          : fallbackObservationFromTrackingStatus(videoRef.current, trackingStatus, observationRef.current)
       const prelim = evaluateCameraReadiness(nextObservation, cameraQualityThresholds.stableWindowMs)
       const now = Date.now()
       if (prelim.flags.includes('unstable_position')) {
@@ -202,6 +174,7 @@ export function useCameraReadiness({
     readiness,
     baseline,
     error,
+    warning,
     captureBaseline,
   }
 }
