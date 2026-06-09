@@ -56,7 +56,7 @@ test('runs a real-site fixed AOI capture against a local fixture page', async ({
     }))
     throw new Error(`Capture overlay did not load: ${JSON.stringify(captureState)}; console=${consoleMessages.join(' | ')}`)
   }
-  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/capture-sessions'))
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
   await page.getByRole('button', { name: 'Start task' }).click()
   const sessionResponse = await sessionResponsePromise
   const session = await sessionResponse.json()
@@ -117,7 +117,7 @@ test('continues real-site capture across SPA navigation and scroll depth', async
     )}&captureToken=${encodeURIComponent(captureConfig.capture_token)}`,
   )
 
-  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/capture-sessions'))
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
   await page.getByRole('button', { name: 'Start task' }).click()
   const session = await (await sessionResponsePromise).json()
   await expect(page.getByText('Task running')).toBeVisible()
@@ -200,7 +200,7 @@ test('continues real-site capture across SPA navigation and scroll depth', async
 test('runs WebGazer-enabled real-site setup with calibration and task telemetry', async ({ page, request }) => {
   const submittedBatches: Array<{ events: Array<{ event_type: string; payload: Record<string, unknown> }> }> = []
   page.on('request', (apiRequest) => {
-    if (apiRequest.method() === 'POST' && /\/api\/v1\/sessions\/.+\/events$/.test(apiRequest.url())) {
+    if (apiRequest.method() === 'POST' && /\/api\/v1\/capture\/sessions\/.+\/events$/.test(apiRequest.url())) {
       const body = apiRequest.postDataJSON()
       submittedBatches.push(body)
     }
@@ -235,7 +235,7 @@ test('runs WebGazer-enabled real-site setup with calibration and task telemetry'
   )
 
   await expect(page.getByText('GazeTrack setup')).toBeVisible()
-  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/capture-sessions'))
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
   await page.getByRole('button', { name: 'Start setup' }).click()
   const session = await (await sessionResponsePromise).json()
   await expect(page.getByText('Keep your head still. Look directly at the teal target, then click it.')).toBeVisible()
@@ -392,7 +392,7 @@ test('turns off WebGazer/camera during the task and continues interaction-only t
     )}&enableWebGazer=true&stubWebGazer=true&requireCameraReadiness=false&calibrationPasses=1`,
   )
 
-  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/capture-sessions'))
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
   await page.getByRole('button', { name: 'Start setup' }).click()
   const session = await (await sessionResponsePromise).json()
   await expect(page.getByText('Keep your head still. Look directly at the teal target, then click it.')).toBeVisible()

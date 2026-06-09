@@ -86,6 +86,7 @@ Controlled websites can include the standalone vanilla script with one config ob
 ```
 
 New integrations should use the versioned `/sdk/v0.2/gazetrack-capture.js` SDK path. The legacy `/gazetrack-capture.js` path remains available for existing controlled-site embeds.
+The SDK submits website telemetry through the token-protected `/api/v1/capture/...` API namespace while legacy dashboard/demo endpoints remain available for local synthetic runs.
 
 For WebGazer-enabled real-site capture, add:
 

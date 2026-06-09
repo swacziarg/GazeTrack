@@ -379,7 +379,11 @@
   }
 
   async function fetchConfig() {
-    const response = await fetch(`${apiBaseUrl}/api/v1/studies/${encodeURIComponent(studyId)}/capture-config`, {
+    const params = new URLSearchParams({
+      study_id: studyId,
+      capture_token: captureToken,
+    })
+    const response = await fetch(`${apiBaseUrl}/api/v1/capture/config?${params.toString()}`, {
       headers: { Accept: 'application/json' },
     })
     if (!response.ok) {
@@ -537,7 +541,8 @@
       return
     }
     const size = documentSize()
-    const session = await postJson(`/api/v1/studies/${encodeURIComponent(studyId)}/capture-sessions`, {
+    const session = await postJson('/api/v1/capture/sessions', {
+      study_id: studyId,
       capture_token: captureToken,
       page_url: window.location.href,
       viewport_width: window.innerWidth,
@@ -555,7 +560,7 @@
       return
     }
     const snapshots = captureConfig.aois.map(resolveAoi)
-    await postJson(`/api/v1/sessions/${encodeURIComponent(sessionId)}/aoi-snapshots`, {
+    await postJson(`/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/aoi-snapshots`, {
       capture_token: captureToken,
       snapshots,
     })
@@ -1234,7 +1239,9 @@
       confidence: latestPrediction && Number.isFinite(latestPrediction.confidence) ? latestPrediction.confidence : null,
     })
     await flushEvents()
-    await postJson(`/api/v1/sessions/${encodeURIComponent(sessionId)}/complete`, {})
+    await postJson(`/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/complete`, {
+      capture_token: captureToken,
+    })
     const reportUrl = `${apiBaseUrl}/api/v1/sessions/${encodeURIComponent(sessionId)}/report-view`
     host.innerHTML = [
       '<strong style="display:block">GazeTrack task complete</strong>',
@@ -1247,7 +1254,7 @@
     if (!sessionId || eventQueue.length === 0) {
       return
     }
-    await postJson(`/api/v1/sessions/${encodeURIComponent(sessionId)}/events`, {
+    await postJson(`/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/events`, {
       capture_token: captureToken,
       events: eventQueue,
     })

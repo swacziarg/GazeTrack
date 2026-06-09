@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from app.models.api import EventBatchRequest, EventEnvelope, EventIngestResponse
@@ -18,9 +18,26 @@ router = APIRouter(tags=["events"])
 
 @router.post("/sessions/{session_id}/events", response_model=EventIngestResponse)
 def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestResponse:
+    return ingest_event_payload(session_id=session_id, payload=payload)
+
+
+def ingest_event_payload(
+    session_id: UUID,
+    payload: dict[str, Any],
+    *,
+    require_valid_capture_token: bool = False,
+) -> EventIngestResponse:
     events: list[EventEnvelope] = []
     rejected_reasons: list[str] = []
     rejected_count = 0
+
+    repository = get_repository()
+    session = repository.ensure_session(session_id)
+    capture_token = payload.get("capture_token")
+    capture_token_value = capture_token if isinstance(capture_token, str) else None
+    real_site_capture_authorized = repository.capture_token_matches(session.study_id, capture_token_value)
+    if require_valid_capture_token and not real_site_capture_authorized:
+        raise HTTPException(status_code=403, detail="Invalid capture token")
 
     if "events" in payload:
         try:
@@ -36,13 +53,6 @@ def ingest_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestRespo
             rejected_reasons.append(f"Invalid single event shape: {exc.errors()[0]['msg']}")
             rejected_count += 1
 
-    repository = get_repository()
-    session = repository.ensure_session(session_id)
-    capture_token = payload.get("capture_token")
-    real_site_capture_authorized = repository.capture_token_matches(
-        session.study_id,
-        capture_token if isinstance(capture_token, str) else None,
-    )
     has_task_context = repository.session_has_event_type(session_id, "task_start")
     accepted_events: list[AcceptedTelemetryEvent] = []
 

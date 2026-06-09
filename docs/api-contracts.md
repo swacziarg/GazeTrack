@@ -17,6 +17,134 @@ These contracts describe the currently implemented backend demo API and SQLite-b
 - `POST /api/v1/sessions/{session_id}/events` → accepts single event or `{ "events": [...] }`; validates event shape, rejects media-like payload keys, and stores accepted telemetry in SQLite
 - `POST /api/v1/sessions/{session_id}/complete` → marks the demo session complete in SQLite and returns `event_count`
 - `GET /api/v1/sessions/{session_id}/report` → returns and persists a backend-generated demo report from stored synthetic telemetry
+- `GET /api/v1/capture/config?study_id=...&capture_token=...` → returns public capture task/AOI config for a token-authorized study
+- `POST /api/v1/capture/sessions` → creates a token-authorized real-site capture session
+- `POST /api/v1/capture/sessions/{session_id}/aoi-snapshots` → replaces session AOI snapshots for the captured page
+- `POST /api/v1/capture/sessions/{session_id}/events` → ingests token-authorized real-site capture telemetry
+- `POST /api/v1/capture/sessions/{session_id}/complete` → completes a token-authorized real-site capture session
+
+Legacy dashboard/demo endpoints remain available for local development and synthetic telemetry compatibility. New website embeds should use the `/api/v1/capture/...` namespace through the versioned SDK.
+
+## Public capture API
+
+The public capture API is the boundary used by `gazetrack-capture.js`. These endpoints require the study capture token and return `403` for an invalid token. The token is not a user-auth substitute; until auth exists, token retrieval endpoints are local/demo-admin surfaces.
+
+Fetch capture config:
+
+```http
+GET /api/v1/capture/config?study_id={study_id}&capture_token={capture_token}
+```
+
+Response shape is `CaptureConfigResponse`:
+
+```json
+{
+  "study_id": "00000000-0000-0000-0000-000000000000",
+  "name": "Checkout CTA study",
+  "objective": "Measure whether visitors notice checkout.",
+  "target_url": "https://example.test/pricing",
+  "task_prompt": "Find checkout.",
+  "aois": [
+    {
+      "aoi_id": "00000000-0000-0000-0000-000000000001",
+      "label": "Primary CTA",
+      "semantic_type": "CTA",
+      "role_key": "primary_cta",
+      "selector": "[data-gazetrack-aoi='primary_cta']",
+      "required": true
+    }
+  ]
+}
+```
+
+Create a capture session:
+
+```http
+POST /api/v1/capture/sessions
+```
+
+```json
+{
+  "study_id": "00000000-0000-0000-0000-000000000000",
+  "capture_token": "capture-token-from-snippet-config",
+  "page_url": "https://example.test/pricing",
+  "viewport_width": 1440,
+  "viewport_height": 900,
+  "document_width": 1440,
+  "document_height": 1800
+}
+```
+
+Response shape is `SessionResponse` with `session_id`, `study_id`, `status`, and `persistence`.
+
+Submit AOI snapshots:
+
+```http
+POST /api/v1/capture/sessions/{session_id}/aoi-snapshots
+```
+
+```json
+{
+  "capture_token": "capture-token-from-snippet-config",
+  "snapshots": [
+    {
+      "source_aoi_id": "00000000-0000-0000-0000-000000000001",
+      "label": "Primary CTA",
+      "semantic_type": "CTA",
+      "role_key": "primary_cta",
+      "selector": "[data-gazetrack-aoi='primary_cta']",
+      "page_url": "https://example.test/pricing",
+      "x": 0.1,
+      "y": 0.2,
+      "width": 0.2,
+      "height": 0.1,
+      "coordinate_space": "document_normalized",
+      "detected": true
+    }
+  ]
+}
+```
+
+Response shape is a list of `AoiSnapshotResponse` rows. Coordinates are normalized document rectangles.
+
+Submit capture events:
+
+```http
+POST /api/v1/capture/sessions/{session_id}/events
+```
+
+```json
+{
+  "capture_token": "capture-token-from-snippet-config",
+  "events": [
+    {
+      "event_type": "task_start",
+      "timestamp": "2026-01-01T00:00:00Z",
+      "payload": {
+        "source": "real_site_capture",
+        "tracker_type": "real_site_capture",
+        "page_url": "https://example.test/pricing"
+      }
+    }
+  ]
+}
+```
+
+Response shape is `EventIngestResponse` with `accepted_count`, `rejected_count`, `stored_count_for_session`, and `rejected_reasons`. Media-like payload keys are rejected and not persisted.
+
+Complete a capture session:
+
+```http
+POST /api/v1/capture/sessions/{session_id}/complete
+```
+
+```json
+{
+  "capture_token": "capture-token-from-snippet-config"
+}
+```
+
+Response shape is `SessionCompleteResponse` with `completed: true` and the accepted event count.
 
 ## Task contract
 

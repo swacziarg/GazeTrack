@@ -180,6 +180,14 @@ class CaptureSessionCreateRequest(BaseModel):
     document_height: float | None = Field(default=None, gt=0)
 
 
+class CaptureSessionStartRequest(CaptureSessionCreateRequest):
+    study_id: UUID
+
+
+class CaptureSessionCompleteRequest(BaseModel):
+    capture_token: str = Field(min_length=1, max_length=200)
+
+
 class StudyTaskConfigRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     prompt: str = Field(min_length=1, max_length=1000)

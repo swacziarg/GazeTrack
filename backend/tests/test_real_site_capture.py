@@ -77,6 +77,168 @@ def test_capture_session_rejects_invalid_token() -> None:
     assert response.status_code == 403
 
 
+def test_public_capture_namespace_rejects_invalid_tokens() -> None:
+    study, capture_token = create_real_site_study()
+    session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": capture_token},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["session_id"]
+
+    config_response = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": "wrong"},
+    )
+    session_start_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": "wrong"},
+    )
+    snapshot_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/aoi-snapshots",
+        json={"capture_token": "wrong", "snapshots": []},
+    )
+    events_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/events",
+        json={
+            "capture_token": "wrong",
+            "events": [
+                {
+                    "event_type": "task_start",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+                }
+            ],
+        },
+    )
+    complete_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/complete",
+        json={"capture_token": "wrong"},
+    )
+
+    assert config_response.status_code == 403
+    assert session_start_response.status_code == 403
+    assert snapshot_response.status_code == 403
+    assert events_response.status_code == 403
+    assert complete_response.status_code == 403
+
+
+def test_public_capture_namespace_happy_path() -> None:
+    study, capture_token = create_real_site_study()
+
+    config_response = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": capture_token},
+    )
+    assert config_response.status_code == 200
+    config = config_response.json()
+    assert config["study_id"] == study["study_id"]
+    assert "capture_token" not in config
+    assert [aoi["role_key"] for aoi in config["aois"]] == ["primary_cta", "footer"]
+
+    session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={
+            "study_id": study["study_id"],
+            "capture_token": capture_token,
+            "page_url": "https://example.com/pricing",
+            "viewport_width": 1440,
+            "viewport_height": 900,
+            "document_width": 1440,
+            "document_height": 1800,
+        },
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["session_id"]
+
+    snapshot_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/aoi-snapshots",
+        json={
+            "capture_token": capture_token,
+            "snapshots": [
+                {
+                    "source_aoi_id": config["aois"][0]["aoi_id"],
+                    "label": "Primary CTA",
+                    "semantic_type": "CTA",
+                    "role_key": "primary_cta",
+                    "selector": "[data-gazetrack-aoi='primary_cta']",
+                    "page_url": "https://example.com/pricing",
+                    "x": 0.1,
+                    "y": 0.2,
+                    "width": 0.2,
+                    "height": 0.1,
+                    "coordinate_space": "document_normalized",
+                    "detected": True,
+                }
+            ],
+        },
+    )
+    assert snapshot_response.status_code == 200
+    assert len(snapshot_response.json()) == 1
+
+    events_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/events",
+        json={
+            "capture_token": capture_token,
+            "events": [
+                {
+                    "event_type": "page_view",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "payload": {
+                        "source": "real_site_capture",
+                        "tracker_type": "real_site_capture",
+                        "page_url": "https://example.com/pricing",
+                    },
+                },
+                {
+                    "event_type": "task_start",
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+                },
+                {
+                    "event_type": "click",
+                    "timestamp": "2026-01-01T00:00:02Z",
+                    "payload": {
+                        "source": "real_site_capture",
+                        "tracker_type": "real_site_capture",
+                        "x": 0.15,
+                        "y": 0.25,
+                    },
+                },
+                {
+                    "event_type": "task_complete",
+                    "timestamp": "2026-01-01T00:00:03Z",
+                    "payload": {
+                        "source": "real_site_capture",
+                        "tracker_type": "real_site_capture",
+                        "completed": True,
+                    },
+                },
+            ],
+        },
+    )
+    assert events_response.status_code == 200
+    event_result = events_response.json()
+    assert event_result["accepted_count"] == 4
+    assert event_result["rejected_count"] == 0
+    assert event_result["stored_count_for_session"] == 4
+
+    complete_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/complete",
+        json={"capture_token": capture_token},
+    )
+    assert complete_response.status_code == 200
+    assert complete_response.json()["completed"] is True
+    assert complete_response.json()["event_count"] == 4
+
+    report_response = client.get(f"/api/v1/sessions/{session_id}/report")
+    report = report_response.json()
+    assert report_response.status_code == 200
+    assert report["completed"] is True
+    assert report["tracker_type"] == "real_site_capture"
+    assert report["event_type_counts"]["click"] == 1
+
+
 def test_aoi_snapshots_validate_document_normalized_bounds() -> None:
     study, capture_token = create_real_site_study()
     session_response = client.post(

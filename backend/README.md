@@ -55,6 +55,13 @@ PYTHONPATH=. pytest tests/test_session_report_schema_contract.py
 - `POST /api/v1/sessions/{session_id}/events`
 - `POST /api/v1/sessions/{session_id}/complete`
 - `GET /api/v1/sessions/{session_id}/report`
+- `GET /api/v1/capture/config?study_id=...&capture_token=...`
+- `POST /api/v1/capture/sessions`
+- `POST /api/v1/capture/sessions/{session_id}/aoi-snapshots`
+- `POST /api/v1/capture/sessions/{session_id}/events`
+- `POST /api/v1/capture/sessions/{session_id}/complete`
+
+The `/api/v1/capture/...` namespace is the public website capture boundary used by the versioned SDK. It requires a study capture token and preserves the older dashboard/demo endpoints for local synthetic flows.
 
 ## SQLite demo persistence
 
