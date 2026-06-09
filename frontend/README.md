@@ -116,8 +116,10 @@ Interaction-only mode is the default:
     captureToken: 'capture-token'
   }
 </script>
-<script src="/gazetrack-capture.js" async></script>
+<script src="/sdk/v0.2/gazetrack-capture.js" async></script>
 ```
+
+New integrations should use the versioned `/sdk/v0.2/gazetrack-capture.js` SDK path. The legacy `/gazetrack-capture.js` path remains available for existing controlled-site embeds.
 
 WebGazer-enabled mode is explicit:
 
@@ -133,7 +135,7 @@ WebGazer-enabled mode is explicit:
     requireCameraReadiness: true
   }
 </script>
-<script src="/gazetrack-capture.js" async></script>
+<script src="/sdk/v0.2/gazetrack-capture.js" async></script>
 ```
 
 The WebGazer embed path shows consent copy before loading/starting WebGazer, runs a local-only camera readiness preview,

@@ -82,8 +82,10 @@ Controlled websites can include the standalone vanilla script with one config ob
     captureToken: 'capture-token-from-snippet-config'
   }
 </script>
-<script src="https://your-gazetrack-api.example/gazetrack-capture.js" async></script>
+<script src="https://your-gazetrack-api.example/sdk/v0.2/gazetrack-capture.js" async></script>
 ```
+
+New integrations should use the versioned `/sdk/v0.2/gazetrack-capture.js` SDK path. The legacy `/gazetrack-capture.js` path remains available for existing controlled-site embeds.
 
 For WebGazer-enabled real-site capture, add:
 
@@ -99,7 +101,7 @@ For WebGazer-enabled real-site capture, add:
     requireCameraReadiness: true
   }
 </script>
-<script src="https://your-gazetrack-api.example/gazetrack-capture.js" async></script>
+<script src="https://your-gazetrack-api.example/sdk/v0.2/gazetrack-capture.js" async></script>
 ```
 
 This mode is consent-gated. It loads WebGazer only after the tester starts setup, hides WebGazer preview/prediction UI, shows a local-only camera readiness preview, requires full-viewport calibration clicks, then starts task capture. It submits telemetry only: normalized gaze coordinates, confidence when available, calibration summaries, quality events, clicks, scrolls, and task events with `source`/`tracker_type` set to `real_site_capture`. WebGazer capture is approximate, browser-dependent, and not medical-grade.

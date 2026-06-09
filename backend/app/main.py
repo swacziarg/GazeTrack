@@ -34,10 +34,19 @@ app.include_router(health_router)
 app.include_router(api_router)
 
 
-@app.get("/gazetrack-capture.js", include_in_schema=False)
-def capture_script() -> FileResponse:
+def _capture_script_response() -> FileResponse:
     script_path = Path(__file__).resolve().parents[2] / "frontend" / "public" / "gazetrack-capture.js"
     return FileResponse(script_path, media_type="application/javascript")
+
+
+@app.get("/gazetrack-capture.js", include_in_schema=False)
+def capture_script() -> FileResponse:
+    return _capture_script_response()
+
+
+@app.get("/sdk/v0.2/gazetrack-capture.js", include_in_schema=False)
+def versioned_capture_script() -> FileResponse:
+    return _capture_script_response()
 
 
 @app.get("/webgazer-mediapipe/{asset_path:path}", include_in_schema=False)

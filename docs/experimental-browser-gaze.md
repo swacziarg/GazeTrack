@@ -48,7 +48,7 @@ Use synthetic mode to evaluate the implemented product/data pipeline. Use browse
 
 ## Real-site embed mode
 
-The controlled-site embed at `frontend/public/gazetrack-capture.js` has two modes:
+The controlled-site embed is served for new integrations at `/sdk/v0.2/gazetrack-capture.js`; the legacy `/gazetrack-capture.js` path remains available for existing embeds. The SDK has two modes:
 
 - Interaction-only real-site capture is the default. It uses `window.GazeTrackConfig`, creates a capture session, snapshots configured AOIs from the page, and records task, click, scroll, and page-view telemetry.
 - WebGazer-enabled real-site capture requires `enableWebGazer: true`. The embed shows consent copy before loading WebGazer, starts setup only after the tester opts in, disables WebGazer session persistence and built-in preview/prediction UI, runs a lightweight local-only camera readiness phase, uses full-viewport calibration targets, then records capped gaze samples during the task.

@@ -39,6 +39,16 @@ def test_shotzweb_localhost_cors_preflight_is_allowed() -> None:
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3001"
 
 
+def test_capture_script_is_served_at_legacy_and_versioned_paths() -> None:
+    for path in ("/gazetrack-capture.js", "/sdk/v0.2/gazetrack-capture.js"):
+        response = client.get(path)
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/javascript")
+        assert "GazeTrackConfig" in response.text
+        assert "real_site_capture" in response.text
+
+
 def test_webgazer_mediapipe_proxy_fetches_from_fixed_upstream(monkeypatch) -> None:
     requested_urls: list[str] = []
 
