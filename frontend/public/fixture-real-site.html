@@ -112,6 +112,7 @@
         webgazerFaceMeshSolutionPath: params.get('webgazerFaceMeshSolutionPath') || undefined,
         calibrationPasses: Number(params.get('calibrationPasses') || 1),
         requireCameraReadiness: params.get('requireCameraReadiness') !== 'false',
+        flushIntervalMs: params.has('flushIntervalMs') ? Number(params.get('flushIntervalMs')) : undefined,
       }
       if (params.get('stubWebGazer') === 'true') {
         window.__GazeTrackWebGazerCalls = []

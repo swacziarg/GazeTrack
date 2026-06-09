@@ -92,6 +92,74 @@ test('runs a real-site fixed AOI capture against a local fixture page', async ({
   expect(reportHtml).not.toContain('Find the plan that keeps your launch moving')
 })
 
+test('retains queued events after a failed periodic flush and retries them', async ({ page, request }) => {
+  const submittedBatches: Array<{ events: Array<{ event_type: string; client_event_id?: string }> }> = []
+  let failedFirstFlush = false
+  await page.route(/\/api\/v1\/capture\/sessions\/.+\/events$/, async (route) => {
+    const body = route.request().postDataJSON() as { events?: Array<{ event_type: string; client_event_id?: string }> }
+    submittedBatches.push({ events: body.events || [] })
+    if (!failedFirstFlush) {
+      failedFirstFlush = true
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'temporary test failure' }),
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  const createResponse = await request.post(`${apiBaseUrl}/api/v1/studies/configurations`, {
+    data: {
+      name: 'Fixture retry real-site study',
+      objective: 'Verify capture retry keeps queued interaction events.',
+      target_url: 'http://127.0.0.1:5173/fixture-real-site.html',
+      tasks: [{ prompt: 'Start and complete checkout after a transient network failure.' }],
+      aois: [
+        { label: 'Primary CTA', semantic_type: 'CTA', role_key: 'primary_cta', x: 0, y: 0.25, width: 1, height: 0.1 },
+      ],
+    },
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const study = (await createResponse.json()).study
+  const configResponse = await request.get(`${apiBaseUrl}/api/v1/studies/${study.study_id}/capture-snippet-config`)
+  const captureConfig = await configResponse.json()
+
+  await page.goto(
+    `/fixture-real-site.html?apiBaseUrl=${encodeURIComponent(apiBaseUrl)}&studyId=${encodeURIComponent(
+      study.study_id,
+    )}&captureToken=${encodeURIComponent(captureConfig.capture_token)}&flushIntervalMs=250`,
+  )
+
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
+  await page.getByRole('button', { name: 'Start task' }).click()
+  const session = await (await sessionResponsePromise).json()
+  await expect(page.getByText('Task running')).toBeVisible()
+
+  await expect.poll(() => submittedBatches.length, { timeout: 8000 }).toBeGreaterThanOrEqual(2)
+  const failedIds = new Set(submittedBatches[0].events.map((event) => event.client_event_id).filter(Boolean))
+  const retryIds = new Set(submittedBatches[1].events.map((event) => event.client_event_id).filter(Boolean))
+  expect(failedIds.size).toBeGreaterThanOrEqual(2)
+  for (const id of failedIds) {
+    expect(retryIds.has(id)).toBe(true)
+  }
+
+  await page.getByRole('button', { name: 'Start team checkout' }).click()
+  const completeResponsePromise = page.waitForResponse((response) => response.url().includes(`/sessions/${session.session_id}/complete`))
+  await page.getByRole('button', { name: 'Finish task' }).click()
+  await completeResponsePromise
+  await expect(page.getByText('GazeTrack task complete')).toBeVisible()
+
+  const reportResponse = await request.get(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/report`)
+  const report = await reportResponse.json()
+  expect(reportResponse.ok()).toBeTruthy()
+  expect(report.event_type_counts.page_view).toBe(1)
+  expect(report.event_type_counts.task_start).toBe(1)
+  expect(report.event_type_counts.click).toBeGreaterThanOrEqual(1)
+  expect(report.event_type_counts.task_complete).toBe(1)
+})
+
 test('continues real-site capture across SPA navigation and scroll depth', async ({ page, request }) => {
   const createResponse = await request.post(`${apiBaseUrl}/api/v1/studies/configurations`, {
     data: {

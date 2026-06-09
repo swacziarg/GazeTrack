@@ -4,6 +4,10 @@
   const MIN_AOI_SIZE = 0.0001
   const GAZE_SAMPLE_INTERVAL_MS = 250
   const MAX_SESSION_GAZE_EVENTS = 240
+  const DEFAULT_FLUSH_INTERVAL_MS = 5000
+  const MIN_FLUSH_INTERVAL_MS = 250
+  const RETRY_BASE_MS = 1000
+  const RETRY_MAX_MS = 15000
   const config = window.GazeTrackConfig || {}
   const apiBaseUrl = String(config.apiBaseUrl || '').replace(/\/$/, '')
   const studyId = String(config.studyId || '')
@@ -13,6 +17,7 @@
   const webgazerFaceMeshSolutionPath = String(config.webgazerFaceMeshSolutionPath || `${apiBaseUrl}/webgazer-mediapipe/face_mesh`)
   const calibrationPasses = Math.max(1, Math.min(5, Number(config.calibrationPasses || 1) || 1))
   const requireCameraReadiness = config.requireCameraReadiness !== false
+  const flushIntervalMs = Math.max(MIN_FLUSH_INTERVAL_MS, Number(config.flushIntervalMs || DEFAULT_FLUSH_INTERVAL_MS) || DEFAULT_FLUSH_INTERVAL_MS)
   const reportViewMode = (() => {
     try {
       return window.self !== window.top && new URLSearchParams(window.location.search).get('gazetrack_report_view') === '1'
@@ -108,6 +113,12 @@
   const capturedMediaStreams = new Set()
   let lastCapturedUrl = window.location.href
   let routeSnapshotTimer = null
+  let flushTimer = null
+  let retryTimer = null
+  let flushInFlight = false
+  let flushInFlightPromise = null
+  let retryDelayMs = RETRY_BASE_MS
+  let lifecycleFlushListenersInstalled = false
 
   function nowIso() {
     return new Date().toISOString()
@@ -386,6 +397,151 @@
     return response.json()
   }
 
+  async function postJsonKeepalive(path, body) {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      keepalive: true,
+    })
+    if (!response.ok) {
+      throw new Error(`GazeTrack API responded with HTTP ${response.status}`)
+    }
+    return response.json()
+  }
+
+  function beaconJson(path, body) {
+    if (!navigator.sendBeacon || typeof Blob === 'undefined') {
+      return false
+    }
+    try {
+      const blob = new Blob([JSON.stringify(body)], { type: 'application/json' })
+      return navigator.sendBeacon(`${apiBaseUrl}${path}`, blob)
+    } catch (error) {
+      return false
+    }
+  }
+
+  function eventIngestPath() {
+    return `/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/events`
+  }
+
+  function eventBatchBody(eventsToSend) {
+    return {
+      capture_token: captureToken,
+      batch_id: createDeliveryId('batch'),
+      events: eventsToSend,
+    }
+  }
+
+  function clearConfirmedEvents(sentEvents) {
+    const sentIds = new Set(sentEvents.map((event) => event.client_event_id).filter(Boolean))
+    let sentWithoutId = sentEvents.filter((event) => !event.client_event_id).length
+    eventQueue = eventQueue.filter((event) => {
+      if (event.client_event_id && sentIds.has(event.client_event_id)) {
+        return false
+      }
+      if (!event.client_event_id && sentWithoutId > 0) {
+        sentWithoutId -= 1
+        return false
+      }
+      return true
+    })
+  }
+
+  function clearFlushRetry() {
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  }
+
+  function scheduleFlushRetry() {
+    if (!sessionId || eventQueue.length === 0 || retryTimer) {
+      return
+    }
+    const delayMs = retryDelayMs
+    retryDelayMs = Math.min(RETRY_MAX_MS, retryDelayMs * 2)
+    retryTimer = window.setTimeout(() => {
+      retryTimer = null
+      flushEvents({ reason: 'retry' }).catch(function () {})
+    }, delayMs)
+  }
+
+  function resetFlushRetry() {
+    retryDelayMs = RETRY_BASE_MS
+    clearFlushRetry()
+  }
+
+  function startPeriodicFlush() {
+    if (flushTimer) {
+      return
+    }
+    flushTimer = window.setInterval(() => {
+      flushEvents({ reason: 'interval' }).catch(function () {})
+    }, flushIntervalMs)
+  }
+
+  function stopPeriodicFlush() {
+    if (flushTimer) {
+      clearInterval(flushTimer)
+      flushTimer = null
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+      flushEventsForLifecycle('visibilitychange')
+    }
+  }
+
+  function handlePageHide() {
+    flushEventsForLifecycle('pagehide')
+  }
+
+  function installLifecycleFlushListeners() {
+    if (lifecycleFlushListenersInstalled) {
+      return
+    }
+    lifecycleFlushListenersInstalled = true
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
+  }
+
+  function removeLifecycleFlushListeners() {
+    if (!lifecycleFlushListenersInstalled) {
+      return
+    }
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.removeEventListener('pagehide', handlePageHide)
+    lifecycleFlushListenersInstalled = false
+  }
+
+  function flushEventsForLifecycle() {
+    if (!sessionId || eventQueue.length === 0) {
+      return false
+    }
+    const eventsToSend = eventQueue.slice()
+    const path = eventIngestPath()
+    const body = eventBatchBody(eventsToSend)
+    if (beaconJson(path, body)) {
+      scheduleFlushRetry()
+      return true
+    }
+    postJsonKeepalive(path, body)
+      .then(() => {
+        clearConfirmedEvents(eventsToSend)
+        resetFlushRetry()
+      })
+      .catch(function () {
+        scheduleFlushRetry()
+      })
+    return false
+  }
+
   async function fetchConfig() {
     const params = new URLSearchParams({
       study_id: studyId,
@@ -580,7 +736,7 @@
     }
     routeSnapshotTimer = window.setTimeout(() => {
       routeSnapshotTimer = null
-      Promise.all([postAoiSnapshots(), flushEvents()]).catch(function (error) {
+      Promise.all([postAoiSnapshots(), flushEvents({ reason: 'route_change' })]).catch(function (error) {
         enqueue('quality', {
           ...basePayload('Route AOI snapshot failed'),
           setup_phase: 'route_snapshot_error',
@@ -1134,12 +1290,16 @@
     document.addEventListener('click', handleClick, true)
     window.addEventListener('scroll', handleScroll, { passive: true })
     installRouteListeners()
+    installLifecycleFlushListeners()
+    startPeriodicFlush()
   }
 
   function removeListeners() {
     document.removeEventListener('click', handleClick, true)
     window.removeEventListener('scroll', handleScroll)
     removeRouteListeners()
+    removeLifecycleFlushListeners()
+    stopPeriodicFlush()
   }
 
   function handleClick(event) {
@@ -1246,7 +1406,20 @@
       eye_tracking_disabled: eyeTrackingDisabled,
       confidence: latestPrediction && Number.isFinite(latestPrediction.confidence) ? latestPrediction.confidence : null,
     })
-    await flushEvents()
+    await submitFinalCapture(host)
+  }
+
+  async function submitFinalCapture(host) {
+    const flushed = await flushEvents({ reason: 'finish', force: true })
+    if (!flushed) {
+      host.innerHTML = [
+        '<strong style="display:block">GazeTrack is still submitting telemetry</strong>',
+        '<p style="margin:6px 0 12px;color:#374151">Your task is finished, but the network request did not complete. Please keep this tab open and try again.</p>',
+        `<button type="button" data-gazetrack-finish-retry style="width:100%;${buttonStyle(true)}">Retry submit</button>`,
+      ].join('')
+      host.querySelector('[data-gazetrack-finish-retry]').addEventListener('click', () => submitFinalCapture(host))
+      return
+    }
     await postJson(`/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/complete`, {
       capture_token: captureToken,
     })
@@ -1258,17 +1431,39 @@
     ].join('')
   }
 
-  async function flushEvents() {
+  async function flushEvents(options) {
     if (!sessionId || eventQueue.length === 0) {
-      return
+      return true
+    }
+    const force = options && options.force === true
+    if (flushInFlight) {
+      if (!force) {
+        return false
+      }
+      try {
+        await flushInFlightPromise
+      } catch (error) {}
+      if (!sessionId || eventQueue.length === 0) {
+        return true
+      }
     }
     const eventsToSend = eventQueue.slice()
-    await postJson(`/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/events`, {
-      capture_token: captureToken,
-      batch_id: createDeliveryId('batch'),
-      events: eventsToSend,
-    })
-    eventQueue = eventQueue.slice(eventsToSend.length)
+    flushInFlight = true
+    flushInFlightPromise = postJson(eventIngestPath(), eventBatchBody(eventsToSend))
+      .then(() => {
+        clearConfirmedEvents(eventsToSend)
+        resetFlushRetry()
+        return true
+      })
+      .catch(function () {
+        scheduleFlushRetry()
+        return false
+      })
+      .finally(function () {
+        flushInFlight = false
+        flushInFlightPromise = null
+      })
+    return flushInFlightPromise
   }
 
   fetchConfig()
