@@ -9,6 +9,9 @@ GazeTrack is designed around a narrow data boundary: collect task analytics tele
 - Browser gaze mode requires explicit in-app consent before initialization.
 - Raw webcam video is not sent to FastAPI and is not persisted.
 - Raw frames, screenshots, image blobs, base64 media, and media-like payload keys are rejected before persistence.
+- Real-site safe DOM layout snapshots do not capture arbitrary page text by default.
+- DOM text capture requires explicit SDK opt-in with `captureText: true` and `allowedTextSelectors`.
+- `redactSelectors`, inputs, textareas, and password fields never contribute stored DOM text, even when they also match an allowed selector.
 - Backend reports and schematic replay are generated from accepted telemetry and computed metrics only.
 
 ## Data that may be stored
@@ -24,6 +27,7 @@ Accepted telemetry can include:
 - Task labels/prompts needed for report context.
 - Scroll depth and click metadata.
 - Tracker type such as `synthetic` or `webgazer_experimental`.
+- Structural page layout metadata for real-site capture, including bounding boxes, tags, semantic types, CSS metadata by default, and study-configured AOI labels. Free-form DOM text is stored only when explicitly enabled and selector-allowed.
 
 This is local SQLite demo storage by default.
 
@@ -37,6 +41,8 @@ The current implementation must not persist:
 - Image blobs.
 - Base64 media payloads.
 - Generic session-recording media.
+- Arbitrary DOM text from pages unless the study owner explicitly opts in with allowed selectors.
+- Text from inputs, textareas, password fields, or elements matching configured redaction selectors.
 - Biometric identity templates.
 
 Backend tests cover rejection of media-like event payload keys. Any future tracker or report feature should preserve that boundary.

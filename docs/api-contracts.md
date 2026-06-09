@@ -150,6 +150,29 @@ POST /api/v1/capture/sessions/{session_id}/complete
 
 Response shape is `SessionCompleteResponse` with `completed: true` and the accepted event count.
 
+### SDK privacy options
+
+`window.GazeTrackConfig` supports these layout privacy options for real-site capture:
+
+```js
+window.GazeTrackConfig = {
+  apiBaseUrl: 'https://your-gazetrack-api.example',
+  studyId: '00000000-0000-0000-0000-000000000000',
+  captureToken: 'capture-token-from-snippet-config',
+  captureText: false,
+  captureCssMetadata: true,
+  allowedTextSelectors: ['[data-gazetrack-allow-text]'],
+  redactSelectors: ['[data-gazetrack-redact]', 'form']
+}
+```
+
+- `captureText` defaults to `false`. By default, `layout_snapshot.landmarks` stores structural metadata such as tag, semantic type, bounding boxes, CSS metadata, and configured AOI labels, but not arbitrary paragraph, heading, link, or button text.
+- `captureCssMetadata` defaults to `true`. Set it to `false` to omit color/font metadata from captured layout landmarks.
+- `allowedTextSelectors` is only used when `captureText: true`. Text is captured only for elements matching or contained by these selectors.
+- `redactSelectors` always win over allowed selectors. Inputs, textareas, and password fields never contribute text, placeholder, value, or aria text.
+- AOI labels may appear in layout snapshots and reports because they are configured by the study owner, not read from arbitrary page copy.
+- These options do not allow raw webcam video, frames, screenshots, image blobs, base64 media, face embeddings, or face landmarks.
+
 ## Task contract
 
 Task create payload:

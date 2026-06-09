@@ -80,7 +80,12 @@ test('runs a real-site fixed AOI capture against a local fixture page', async ({
   expect(report.event_type_counts.click).toBeGreaterThanOrEqual(1)
   expect(report.page_layouts.length).toBeGreaterThanOrEqual(1)
   expect(report.page_layouts[0].snapshot_type).toBe('safe_dom_layout_v1')
-  expect(JSON.stringify(report.page_layouts)).toContain('Find the plan that keeps your launch moving')
+  const layoutJson = JSON.stringify(report.page_layouts)
+  expect(layoutJson).toContain('Primary CTA')
+  expect(layoutJson).not.toContain('Find the plan that keeps your launch moving')
+  expect(layoutJson).not.toContain('Start team checkout')
+  expect(layoutJson).not.toContain('Allowed integration phrase for text capture')
+  expect(layoutJson).not.toContain('Private placeholder should never persist')
   expect(report.aoi_metrics.some((metric: { coordinate_space: string }) => metric.coordinate_space === 'document_normalized')).toBe(
     true,
   )
@@ -90,6 +95,93 @@ test('runs a real-site fixed AOI capture against a local fixture page', async ({
   expect(reportHtml).toContain('Captured website context')
   expect(reportHtml).toContain('/fixture-real-site.html')
   expect(reportHtml).not.toContain('Find the plan that keeps your launch moving')
+})
+
+test('captures DOM text only for explicit allowed selectors', async ({ page, request }) => {
+  const createResponse = await request.post(`${apiBaseUrl}/api/v1/studies/configurations`, {
+    data: {
+      name: 'Fixture text opt-in real-site study',
+      objective: 'Verify privacy-safe text capture opt-in behavior.',
+      target_url: 'http://127.0.0.1:5173/fixture-real-site.html',
+      tasks: [{ prompt: 'Capture only explicitly allowed text.' }],
+      aois: [
+        { label: 'Primary CTA', semantic_type: 'CTA', role_key: 'primary_cta', x: 0, y: 0.25, width: 1, height: 0.1 },
+      ],
+    },
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const study = (await createResponse.json()).study
+  const configResponse = await request.get(`${apiBaseUrl}/api/v1/studies/${study.study_id}/capture-snippet-config`)
+  const captureConfig = await configResponse.json()
+
+  await page.goto(
+    `/fixture-real-site.html?apiBaseUrl=${encodeURIComponent(apiBaseUrl)}&studyId=${encodeURIComponent(
+      study.study_id,
+    )}&captureToken=${encodeURIComponent(
+      captureConfig.capture_token,
+    )}&captureText=true&allowedTextSelectors=${encodeURIComponent('.safe-copy|[data-gazetrack-allow-text]')}`,
+  )
+
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
+  await page.getByRole('button', { name: 'Start task' }).click()
+  const session = await (await sessionResponsePromise).json()
+  await expect(page.getByText('Task running')).toBeVisible()
+  const completeResponsePromise = page.waitForResponse((response) => response.url().includes(`/sessions/${session.session_id}/complete`))
+  await page.getByRole('button', { name: 'Finish task' }).click()
+  await completeResponsePromise
+
+  const reportResponse = await request.get(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/report`)
+  const report = await reportResponse.json()
+  expect(reportResponse.ok()).toBeTruthy()
+  const layoutJson = JSON.stringify(report.page_layouts)
+  expect(layoutJson).toContain('Allowed integration phrase for text capture')
+  expect(layoutJson).not.toContain('Find the plan that keeps your launch moving')
+  expect(layoutJson).not.toContain('Start team checkout')
+  expect(layoutJson).not.toContain('Private placeholder should never persist')
+})
+
+test('redact selectors override allowed text selectors', async ({ page, request }) => {
+  const createResponse = await request.post(`${apiBaseUrl}/api/v1/studies/configurations`, {
+    data: {
+      name: 'Fixture text redaction real-site study',
+      objective: 'Verify redacted selectors do not store text even when allowed.',
+      target_url: 'http://127.0.0.1:5173/fixture-real-site.html',
+      tasks: [{ prompt: 'Capture allowed text except redacted elements.' }],
+      aois: [
+        { label: 'Primary CTA', semantic_type: 'CTA', role_key: 'primary_cta', x: 0, y: 0.25, width: 1, height: 0.1 },
+      ],
+    },
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const study = (await createResponse.json()).study
+  const configResponse = await request.get(`${apiBaseUrl}/api/v1/studies/${study.study_id}/capture-snippet-config`)
+  const captureConfig = await configResponse.json()
+
+  await page.goto(
+    `/fixture-real-site.html?apiBaseUrl=${encodeURIComponent(apiBaseUrl)}&studyId=${encodeURIComponent(
+      study.study_id,
+    )}&captureToken=${encodeURIComponent(
+      captureConfig.capture_token,
+    )}&captureText=true&allowedTextSelectors=${encodeURIComponent(
+      '.safe-copy|[data-gazetrack-allow-text]',
+    )}&redactSelectors=${encodeURIComponent('.private-copy|[data-gazetrack-redact]')}`,
+  )
+
+  const sessionResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/capture/sessions'))
+  await page.getByRole('button', { name: 'Start task' }).click()
+  const session = await (await sessionResponsePromise).json()
+  await expect(page.getByText('Task running')).toBeVisible()
+  const completeResponsePromise = page.waitForResponse((response) => response.url().includes(`/sessions/${session.session_id}/complete`))
+  await page.getByRole('button', { name: 'Finish task' }).click()
+  await completeResponsePromise
+
+  const reportResponse = await request.get(`${apiBaseUrl}/api/v1/sessions/${session.session_id}/report`)
+  const report = await reportResponse.json()
+  expect(reportResponse.ok()).toBeTruthy()
+  const layoutJson = JSON.stringify(report.page_layouts)
+  expect(layoutJson).toContain('Allowed integration phrase for text capture')
+  expect(layoutJson).not.toContain('Redacted integration phrase should never persist')
+  expect(layoutJson).not.toContain('Private placeholder should never persist')
 })
 
 test('retains queued events after a failed periodic flush and retries them', async ({ page, request }) => {

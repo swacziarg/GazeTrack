@@ -68,6 +68,11 @@
         background: #f8fafc;
       }
 
+      .privacy-test-copy {
+        margin-top: 18px;
+        color: #334155;
+      }
+
       nav button {
         border: 0;
         background: transparent;
@@ -92,6 +97,11 @@
       <section class="hero">
         <h1 data-gazetrack-aoi="hero_headline">Find the plan that keeps your launch moving</h1>
         <p>Compare starter and team packages, then start checkout for the team plan.</p>
+        <p class="privacy-test-copy safe-copy" data-gazetrack-allow-text>Allowed integration phrase for text capture</p>
+        <p class="privacy-test-copy safe-copy private-copy" data-gazetrack-allow-text data-gazetrack-redact>
+          Redacted integration phrase should never persist
+        </p>
+        <input class="safe-copy" aria-label="Private email field" placeholder="Private placeholder should never persist" />
         <button class="cta" data-gazetrack-aoi="primary_cta" type="button">Start team checkout</button>
       </section>
       <section class="pricing" data-gazetrack-aoi="pricing_preview">
@@ -103,11 +113,23 @@
     <footer data-gazetrack-aoi="footer">Footer links and trust copy</footer>
     <script>
       const params = new URLSearchParams(window.location.search)
+      const selectorListParam = (name) =>
+        params.has(name)
+          ? params
+              .get(name)
+              .split('|')
+              .map((selector) => selector.trim())
+              .filter(Boolean)
+          : undefined
       window.GazeTrackConfig = {
         apiBaseUrl: params.get('apiBaseUrl'),
         studyId: params.get('studyId'),
         captureToken: params.get('captureToken'),
         enableWebGazer: params.get('enableWebGazer') === 'true',
+        captureText: params.get('captureText') === 'true',
+        captureCssMetadata: params.get('captureCssMetadata') !== 'false',
+        allowedTextSelectors: selectorListParam('allowedTextSelectors'),
+        redactSelectors: selectorListParam('redactSelectors'),
         webgazerScriptUrl: params.get('webgazerScriptUrl') || undefined,
         webgazerFaceMeshSolutionPath: params.get('webgazerFaceMeshSolutionPath') || undefined,
         calibrationPasses: Number(params.get('calibrationPasses') || 1),

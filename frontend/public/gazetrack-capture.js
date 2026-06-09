@@ -18,6 +18,10 @@
   const calibrationPasses = Math.max(1, Math.min(5, Number(config.calibrationPasses || 1) || 1))
   const requireCameraReadiness = config.requireCameraReadiness !== false
   const flushIntervalMs = Math.max(MIN_FLUSH_INTERVAL_MS, Number(config.flushIntervalMs || DEFAULT_FLUSH_INTERVAL_MS) || DEFAULT_FLUSH_INTERVAL_MS)
+  const captureText = config.captureText === true
+  const captureCssMetadata = config.captureCssMetadata !== false
+  const redactSelectors = Array.isArray(config.redactSelectors) ? config.redactSelectors.filter((selector) => typeof selector === 'string' && selector.trim()) : []
+  const allowedTextSelectors = Array.isArray(config.allowedTextSelectors) ? config.allowedTextSelectors.filter((selector) => typeof selector === 'string' && selector.trim()) : []
   const reportViewMode = (() => {
     try {
       return window.self !== window.top && new URLSearchParams(window.location.search).get('gazetrack_report_view') === '1'
@@ -283,20 +287,57 @@
     return rectToDocumentBox(rect, size)
   }
 
-  function safeElementText(element) {
+  function matchesSelectorList(element, selectors) {
+    if (!element || !selectors.length) {
+      return false
+    }
+    return selectors.some((selector) => {
+      try {
+        return Boolean(element.matches(selector) || element.closest(selector))
+      } catch (error) {
+        return false
+      }
+    })
+  }
+
+  function isTextAlwaysRedacted(element) {
     const tag = element.tagName.toLowerCase()
+    const type = String(element.getAttribute('type') || '').toLowerCase()
+    if (tag === 'input' || tag === 'textarea' || type === 'password') {
+      return true
+    }
+    return matchesSelectorList(element, redactSelectors)
+  }
+
+  function safeElementText(element) {
+    if (!captureText || !allowedTextSelectors.length || isTextAlwaysRedacted(element)) {
+      return null
+    }
+    if (!matchesSelectorList(element, allowedTextSelectors)) {
+      return null
+    }
+    const tag = element.tagName.toLowerCase()
+    if (tag === 'input' || tag === 'textarea') {
+      return null
+    }
+    const textTags = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'a', 'button', 'label', 'li', 'summary', 'figcaption', 'strong', 'span'])
+    const clone = element.cloneNode(true)
+    redactSelectors.forEach((selector) => {
+      try {
+        clone.querySelectorAll(selector).forEach((node) => node.remove())
+      } catch (error) {}
+    })
+    const text = String(clone.textContent || '').replace(/\s+/g, ' ').trim()
+    if (textTags.has(tag) && text) return text.slice(0, 140)
     const aria = element.getAttribute('aria-label')
     if (aria && aria.trim()) return aria.trim().slice(0, 140)
-    if (tag === 'input' || tag === 'textarea') {
-      return (element.getAttribute('placeholder') || element.getAttribute('value') || tag).trim().slice(0, 140)
-    }
-    const textTags = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'a', 'button', 'label', 'li', 'summary', 'figcaption'])
-    const text = String(element.textContent || '').replace(/\s+/g, ' ').trim()
-    if (textTags.has(tag) && text) return text.slice(0, 140)
-    return tag
+    return null
   }
 
   function elementVisualStyle(element) {
+    if (!captureCssMetadata) {
+      return {}
+    }
     const style = window.getComputedStyle(element)
     return {
       background_color: style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)' ? style.backgroundColor : '',
@@ -329,14 +370,20 @@
         const role = element.getAttribute('role')
         const tag = element.tagName.toLowerCase()
         const semanticType = role || element.getAttribute('data-gazetrack-aoi') || tag
-        return {
+        const text = safeElementText(element)
+        const landmark = {
           id: `landmark-${index + 1}`,
-          label: safeElementText(element),
+          label: semanticType,
           semantic_type: semanticType,
           tag,
-          text: safeElementText(element),
           ...elementVisualStyle(element),
           ...box,
+        }
+        if (text) {
+          landmark.text = text
+        }
+        return {
+          ...landmark,
         }
       })
       .filter(Boolean)
@@ -360,11 +407,15 @@
             is_aoi: true,
             tag: 'aoi',
             text: aoi.label,
-            background_color: '',
-            text_color: '',
-            border_color: '',
-            font_size: '',
-            font_weight: '',
+            ...(captureCssMetadata
+              ? {
+                  background_color: '',
+                  text_color: '',
+                  border_color: '',
+                  font_size: '',
+                  font_weight: '',
+                }
+              : {}),
           }))
       : []
     return {
