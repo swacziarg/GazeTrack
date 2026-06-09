@@ -59,7 +59,11 @@ def test_database_initialization_migrates_legacy_telemetry_table(tmp_path: Path)
 
     assert "telemetry_source" in columns
     assert "event_schema_version" in columns
+    assert "batch_id" in columns
+    assert "client_event_id" in columns
     assert "idx_telemetry_events_source" in indexes
+    assert "idx_telemetry_events_session_client_event_id" in indexes
+    assert "idx_telemetry_events_session_batch_id" in indexes
 
 
 def test_database_initialization_backfills_capture_tokens_for_legacy_studies(tmp_path: Path) -> None:

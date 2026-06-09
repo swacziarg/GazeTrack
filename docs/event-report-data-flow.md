@@ -40,7 +40,8 @@ Payloads can include coordinates, timestamps, confidence, calibration metadata, 
 
 ## 4. Ingest validation
 
-`POST /api/v1/sessions/{session_id}/events` accepts a single event or an event batch.
+`POST /api/v1/sessions/{session_id}/events` accepts a single event or an event batch. The public capture SDK posts to
+`POST /api/v1/capture/sessions/{session_id}/events` with the same event envelope plus capture-token authorization.
 
 The backend:
 
@@ -48,9 +49,14 @@ The backend:
 2. Checks session linkage.
 3. Recursively rejects media-like payload keys such as video, frame, image, blob, base64, and webcam frame.
 4. Stores accepted events in append-only SQLite telemetry rows.
-5. Returns accepted, rejected, and stored counts.
+5. Uses optional `client_event_id` values as retry idempotency keys scoped to the session.
+6. Returns accepted, rejected, duplicate/skipped, and stored counts.
 
 Rejected media-like payloads are not persisted.
+
+The SDK sends an opaque `batch_id` for each flush and an opaque `client_event_id` for each event. Re-sending a batch with
+the same `client_event_id` values does not double-store those events. Synthetic/demo events can omit delivery IDs and
+continue to append normally.
 
 ## 5. Report generation
 

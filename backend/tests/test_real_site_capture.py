@@ -239,6 +239,83 @@ def test_public_capture_namespace_happy_path() -> None:
     assert report["event_type_counts"]["click"] == 1
 
 
+def test_public_capture_event_batch_retry_is_idempotent() -> None:
+    study, capture_token = create_real_site_study()
+    session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": capture_token},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["session_id"]
+    event_batch = {
+        "capture_token": capture_token,
+        "batch_id": "batch-retry-001",
+        "events": [
+            {
+                "event_type": "page_view",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "client_event_id": "event-page-view-001",
+                "payload": {
+                    "source": "real_site_capture",
+                    "tracker_type": "real_site_capture",
+                    "page_url": "https://example.com/pricing",
+                },
+            },
+            {
+                "event_type": "task_start",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "client_event_id": "event-task-start-001",
+                "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+            },
+            {
+                "event_type": "click",
+                "timestamp": "2026-01-01T00:00:02Z",
+                "client_event_id": "event-click-001",
+                "payload": {
+                    "source": "real_site_capture",
+                    "tracker_type": "real_site_capture",
+                    "x": 0.15,
+                    "y": 0.25,
+                },
+            },
+            {
+                "event_type": "task_complete",
+                "timestamp": "2026-01-01T00:00:03Z",
+                "client_event_id": "event-task-complete-001",
+                "payload": {
+                    "source": "real_site_capture",
+                    "tracker_type": "real_site_capture",
+                    "completed": True,
+                },
+            },
+        ],
+    }
+
+    first_response = client.post(f"/api/v1/capture/sessions/{session_id}/events", json=event_batch)
+    retry_response = client.post(f"/api/v1/capture/sessions/{session_id}/events", json=event_batch)
+
+    assert first_response.status_code == 200
+    first_body = first_response.json()
+    assert first_body["accepted_count"] == 4
+    assert first_body["duplicate_count"] == 0
+    assert first_body["skipped_count"] == 0
+    assert first_body["stored_count_for_session"] == 4
+
+    assert retry_response.status_code == 200
+    retry_body = retry_response.json()
+    assert retry_body["accepted_count"] == 4
+    assert retry_body["rejected_count"] == 0
+    assert retry_body["duplicate_count"] == 4
+    assert retry_body["skipped_count"] == 4
+    assert retry_body["stored_count_for_session"] == 4
+
+    report_response = client.get(f"/api/v1/sessions/{session_id}/report")
+    report = report_response.json()
+    assert report_response.status_code == 200
+    assert report["event_count"] == 4
+    assert report["event_type_counts"]["click"] == 1
+
+
 def test_aoi_snapshots_validate_document_normalized_bounds() -> None:
     study, capture_token = create_real_site_study()
     session_response = client.post(

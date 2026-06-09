@@ -5,6 +5,8 @@ export type EventIngestResponse = {
   session_id: string
   accepted_count: number
   rejected_count: number
+  duplicate_count: number
+  skipped_count: number
   stored_count_for_session: number
   note: string
   rejected_reasons: string[]
@@ -30,6 +32,8 @@ function createFallbackResponse(sessionId: string, note: string): EventIngestRes
     session_id: sessionId,
     accepted_count: 0,
     rejected_count: 0,
+    duplicate_count: 0,
+    skipped_count: 0,
     stored_count_for_session: 0,
     note,
     rejected_reasons: [],

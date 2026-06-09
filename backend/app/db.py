@@ -133,6 +133,8 @@ def initialize_database(database_url: str | None = None) -> None:
                 timestamp TEXT NOT NULL,
                 payload TEXT NOT NULL,
                 event_schema_version INTEGER NOT NULL DEFAULT 1,
+                batch_id TEXT,
+                client_event_id TEXT,
                 telemetry_source TEXT,
                 normalized_x REAL,
                 normalized_y REAL,
@@ -176,6 +178,8 @@ def initialize_database(database_url: str | None = None) -> None:
         _ensure_column(connection, "aois", "selector", "TEXT")
         _ensure_column(connection, "aois", "required", "INTEGER NOT NULL DEFAULT 1")
         _ensure_column(connection, "telemetry_events", "event_schema_version", "INTEGER NOT NULL DEFAULT 1")
+        _ensure_column(connection, "telemetry_events", "batch_id", "TEXT")
+        _ensure_column(connection, "telemetry_events", "client_event_id", "TEXT")
         _ensure_column(connection, "telemetry_events", "telemetry_source", "TEXT")
         _ensure_column(connection, "telemetry_events", "normalized_x", "REAL")
         _ensure_column(connection, "telemetry_events", "normalized_y", "REAL")
@@ -185,6 +189,20 @@ def initialize_database(database_url: str | None = None) -> None:
         _ensure_column(connection, "telemetry_events", "ingested_at", "TEXT")
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_telemetry_events_source ON telemetry_events(telemetry_source)"
+        )
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_telemetry_events_session_client_event_id
+            ON telemetry_events(session_id, client_event_id)
+            WHERE client_event_id IS NOT NULL
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_batch_id
+            ON telemetry_events(session_id, batch_id)
+            WHERE batch_id IS NOT NULL
+            """
         )
 
 

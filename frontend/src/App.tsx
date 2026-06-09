@@ -543,6 +543,8 @@ function App() {
           session_id: demoSessionId,
           accepted_count: 0,
           rejected_count: 0,
+          duplicate_count: 0,
+          skipped_count: 0,
           stored_count_for_session: 0,
           note: 'Backend unavailable - showing local demo report only.',
           rejected_reasons: [],

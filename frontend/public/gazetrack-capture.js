@@ -113,6 +113,13 @@
     return new Date().toISOString()
   }
 
+  function createDeliveryId(prefix) {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return `${prefix}_${window.crypto.randomUUID()}`
+    }
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
+  }
+
   function clamp(value) {
     return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0))
   }
@@ -187,6 +194,7 @@
     eventQueue.push({
       event_type,
       timestamp: nowIso(),
+      client_event_id: createDeliveryId('evt'),
       payload,
     })
   }
@@ -1254,11 +1262,13 @@
     if (!sessionId || eventQueue.length === 0) {
       return
     }
+    const eventsToSend = eventQueue.slice()
     await postJson(`/api/v1/capture/sessions/${encodeURIComponent(sessionId)}/events`, {
       capture_token: captureToken,
-      events: eventQueue,
+      batch_id: createDeliveryId('batch'),
+      events: eventsToSend,
     })
-    eventQueue = []
+    eventQueue = eventQueue.slice(eventsToSend.length)
   }
 
   fetchConfig()

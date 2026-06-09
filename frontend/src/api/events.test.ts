@@ -17,6 +17,8 @@ describe('ingestSessionEvents', () => {
         session_id: sessionId,
         accepted_count: 58,
         rejected_count: 0,
+        duplicate_count: 0,
+        skipped_count: 0,
         stored_count_for_session: 58,
         note: 'Accepted privacy-safe telemetry is stored in local SQLite persistence.',
         rejected_reasons: [],

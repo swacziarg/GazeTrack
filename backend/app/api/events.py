@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Any
 from uuid import UUID
 
@@ -28,6 +29,7 @@ def ingest_event_payload(
     require_valid_capture_token: bool = False,
 ) -> EventIngestResponse:
     events: list[EventEnvelope] = []
+    batch_id: str | None = None
     rejected_reasons: list[str] = []
     rejected_count = 0
 
@@ -43,6 +45,7 @@ def ingest_event_payload(
         try:
             batch = EventBatchRequest.model_validate(payload)
             events = batch.events
+            batch_id = batch.batch_id
         except ValidationError as exc:
             rejected_reasons.append(f"Invalid event batch shape: {exc.errors()[0]['msg']}")
             rejected_count += 1
@@ -67,21 +70,19 @@ def ingest_event_payload(
             rejected_count += 1
             rejected_reasons.append(result.rejection_reason or f"Rejected event_type={event.event_type.value}.")
             continue
-        accepted_events.append(result.accepted_event)
+        accepted_events.append(replace(result.accepted_event, batch_id=batch_id))
         if result.accepted_event.envelope.event_type.value == "task_start":
             has_task_context = True
 
-    stored_count_for_session = (
-        repository.append_accepted_events(session_id, accepted_events)
-        if accepted_events
-        else repository.count_accepted_events(session_id)
-    )
+    append_result = repository.append_accepted_events_with_result(session_id, accepted_events)
 
     return EventIngestResponse(
         session_id=session_id,
         accepted_count=len(accepted_events),
         rejected_count=rejected_count,
-        stored_count_for_session=stored_count_for_session,
+        duplicate_count=append_result.duplicate_count,
+        skipped_count=append_result.duplicate_count,
+        stored_count_for_session=append_result.stored_count_for_session,
         note="Accepted task-scoped, privacy-safe telemetry is stored in local SQLite persistence.",
         rejected_reasons=rejected_reasons,
     )

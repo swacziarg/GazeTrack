@@ -131,6 +131,7 @@ class AcceptedTelemetryEvent:
     normalized_y: float | None
     confidence: float | None
     payload_byte_size: int
+    batch_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -530,6 +531,7 @@ def validate_event_for_ingest(event: EventEnvelope, has_task_context: bool = Fal
     sanitized_event = EventEnvelope(
         event_type=event.event_type,
         timestamp=event.timestamp,
+        client_event_id=event.client_event_id,
         payload=sanitized_payload,
     )
 

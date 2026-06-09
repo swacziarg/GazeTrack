@@ -116,10 +116,12 @@ POST /api/v1/capture/sessions/{session_id}/events
 ```json
 {
   "capture_token": "capture-token-from-snippet-config",
+  "batch_id": "batch_opaque-random-id",
   "events": [
     {
       "event_type": "task_start",
       "timestamp": "2026-01-01T00:00:00Z",
+      "client_event_id": "evt_opaque-random-id",
       "payload": {
         "source": "real_site_capture",
         "tracker_type": "real_site_capture",
@@ -130,7 +132,9 @@ POST /api/v1/capture/sessions/{session_id}/events
 }
 ```
 
-Response shape is `EventIngestResponse` with `accepted_count`, `rejected_count`, `stored_count_for_session`, and `rejected_reasons`. Media-like payload keys are rejected and not persisted.
+`batch_id` and `client_event_id` are optional opaque delivery IDs. The capture SDK sends one `batch_id` per flush and one `client_event_id` per event so retries can be idempotent. The backend enforces uniqueness for `(session_id, client_event_id)` when `client_event_id` is present. Synthetic/demo ingest may omit these IDs and remains append-only.
+
+Response shape is `EventIngestResponse` with `accepted_count`, `rejected_count`, `duplicate_count`, `skipped_count`, `stored_count_for_session`, and `rejected_reasons`. `accepted_count` means validation-accepted events in the request, including duplicate retry events. `duplicate_count`/`skipped_count` identify accepted events that were not persisted again because the session already stored the same `client_event_id`. Media-like payload keys are rejected and not persisted.
 
 Complete a capture session:
 

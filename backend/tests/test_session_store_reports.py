@@ -28,6 +28,23 @@ def test_ingesting_shared_fixture_stores_accepted_events() -> None:
     assert "local SQLite persistence" in body["note"]
 
 
+def test_synthetic_ingest_without_client_event_ids_remains_append_only() -> None:
+    fixture = load_synthetic_fixture()
+    session_id = fixture["session_id"]
+
+    first_response = client.post(f"/api/v1/sessions/{session_id}/events", json=fixture)
+    second_response = client.post(f"/api/v1/sessions/{session_id}/events", json=fixture)
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    event_count = len(fixture["events"])  # type: ignore[arg-type]
+    assert first_response.json()["accepted_count"] == event_count
+    assert first_response.json()["duplicate_count"] == 0
+    assert second_response.json()["accepted_count"] == event_count
+    assert second_response.json()["duplicate_count"] == 0
+    assert second_response.json()["stored_count_for_session"] == event_count * 2
+
+
 def test_report_after_ingest_returns_matching_event_count() -> None:
     fixture = load_synthetic_fixture()
     session_id = fixture["session_id"]

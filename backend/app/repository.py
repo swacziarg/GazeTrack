@@ -187,6 +187,8 @@ class TelemetryEventRecord:
     timestamp: str
     payload: dict[str, Any]
     event_schema_version: int
+    batch_id: str | None
+    client_event_id: str | None
     telemetry_source: str | None
     normalized_x: float | None
     normalized_y: float | None
@@ -199,7 +201,19 @@ class TelemetryEventRecord:
     created_at: str
 
     def to_envelope(self) -> EventEnvelope:
-        return EventEnvelope(event_type=self.event_type, timestamp=self.timestamp, payload=self.payload)
+        return EventEnvelope(
+            event_type=self.event_type,
+            timestamp=self.timestamp,
+            client_event_id=self.client_event_id,
+            payload=self.payload,
+        )
+
+
+@dataclass(frozen=True)
+class AppendEventsResult:
+    stored_count_for_session: int
+    inserted_count: int
+    duplicate_count: int
 
 
 class GazeTrackRepository:
@@ -804,6 +818,13 @@ class GazeTrackRepository:
         )
 
     def append_accepted_events(self, session_id: UUID, events: list[EventEnvelope | AcceptedTelemetryEvent]) -> int:
+        return self.append_accepted_events_with_result(session_id, events).stored_count_for_session
+
+    def append_accepted_events_with_result(
+        self,
+        session_id: UUID,
+        events: list[EventEnvelope | AcceptedTelemetryEvent],
+    ) -> AppendEventsResult:
         session = self.ensure_session(session_id)
         now = utcnow_iso()
         snapshots = self.list_aoi_snapshots_for_session(session_id)
@@ -827,6 +848,8 @@ class GazeTrackRepository:
                     event.timestamp,
                     json.dumps(event.payload, sort_keys=True),
                     accepted_event.event_schema_version,
+                    accepted_event.batch_id,
+                    event.client_event_id,
                     accepted_event.telemetry_source,
                     accepted_event.normalized_x,
                     accepted_event.normalized_y,
@@ -841,31 +864,47 @@ class GazeTrackRepository:
             )
         if rows:
             with connect_database(self.database_url) as connection:
-                connection.executemany(
-                    """
-                    INSERT INTO telemetry_events (
-                        id,
-                        session_id,
-                        event_type,
-                        timestamp,
-                        payload,
-                        event_schema_version,
-                        telemetry_source,
-                        normalized_x,
-                        normalized_y,
-                        confidence,
-                        payload_byte_size,
-                        aoi_hit_count,
-                        ingested_at,
-                        accepted,
-                        rejection_reason,
-                        created_at
+                inserted_count = 0
+                duplicate_count = 0
+                for row in rows:
+                    cursor = connection.execute(
+                        """
+                        INSERT OR IGNORE INTO telemetry_events (
+                            id,
+                            session_id,
+                            event_type,
+                            timestamp,
+                            payload,
+                            event_schema_version,
+                            batch_id,
+                            client_event_id,
+                            telemetry_source,
+                            normalized_x,
+                            normalized_y,
+                            confidence,
+                            payload_byte_size,
+                            aoi_hit_count,
+                            ingested_at,
+                            accepted,
+                            rejection_reason,
+                            created_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        row,
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    rows,
-                )
-        return self.count_accepted_events(session_id)
+                    if cursor.rowcount == 1:
+                        inserted_count += 1
+                    elif row[7] is not None:
+                        duplicate_count += 1
+        else:
+            inserted_count = 0
+            duplicate_count = 0
+        return AppendEventsResult(
+            stored_count_for_session=self.count_accepted_events(session_id),
+            inserted_count=inserted_count,
+            duplicate_count=duplicate_count,
+        )
 
     def count_accepted_events(self, session_id: UUID) -> int:
         with connect_database(self.database_url) as connection:
@@ -886,6 +925,8 @@ class GazeTrackRepository:
                     timestamp,
                     payload,
                     event_schema_version,
+                    batch_id,
+                    client_event_id,
                     telemetry_source,
                     normalized_x,
                     normalized_y,
@@ -910,6 +951,8 @@ class GazeTrackRepository:
                 timestamp=row["timestamp"],
                 payload=json.loads(row["payload"]),
                 event_schema_version=int(row["event_schema_version"]),
+                batch_id=row["batch_id"],
+                client_event_id=row["client_event_id"],
                 telemetry_source=row["telemetry_source"],
                 normalized_x=float(row["normalized_x"]) if row["normalized_x"] is not None else None,
                 normalized_y=float(row["normalized_y"]) if row["normalized_y"] is not None else None,

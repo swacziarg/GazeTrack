@@ -235,10 +235,12 @@ class EventType(str, Enum):
 class EventEnvelope(BaseModel):
     event_type: EventType
     timestamp: str
+    client_event_id: str | None = Field(default=None, min_length=1, max_length=128)
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class EventBatchRequest(BaseModel):
+    batch_id: str | None = Field(default=None, min_length=1, max_length=128)
     events: list[EventEnvelope] = Field(min_length=1)
 
 
@@ -246,6 +248,8 @@ class EventIngestResponse(BaseModel):
     session_id: UUID
     accepted_count: int
     rejected_count: int
+    duplicate_count: int = 0
+    skipped_count: int = 0
     stored_count_for_session: int = 0
     note: str
     rejected_reasons: list[str] = Field(default_factory=list)
