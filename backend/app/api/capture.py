@@ -1,8 +1,9 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.api.capture_security import ensure_capture_origin_allowed
 from app.api.events import ingest_event_payload
 from app.api.studies import _capture_config_inputs, _capture_config_response
 from app.models.api import (
@@ -20,12 +21,13 @@ from app.repository import AoiSnapshotRecord, get_repository
 router = APIRouter(prefix="/capture", tags=["capture"])
 
 
-def _ensure_valid_capture_token(study_id: UUID, capture_token: str) -> None:
+def _ensure_valid_capture_token(study_id: UUID, capture_token: str, request: Request) -> None:
     repository = get_repository()
     if repository.get_study(study_id) is None:
         raise HTTPException(status_code=404, detail="Study not found")
     if not repository.capture_token_matches(study_id, capture_token):
         raise HTTPException(status_code=403, detail="Invalid capture token")
+    ensure_capture_origin_allowed(study_id, request.headers.get("origin"))
 
 
 def _snapshot_response(record: AoiSnapshotRecord) -> AoiSnapshotResponse:
@@ -51,29 +53,31 @@ def _snapshot_response(record: AoiSnapshotRecord) -> AoiSnapshotResponse:
 
 @router.get("/config", response_model=CaptureConfigResponse)
 def get_capture_config(
+    request: Request,
     study_id: UUID = Query(...),
     capture_token: str = Query(..., min_length=1, max_length=200),
 ) -> CaptureConfigResponse:
-    _ensure_valid_capture_token(study_id, capture_token)
+    _ensure_valid_capture_token(study_id, capture_token, request)
     study, tasks, aois = _capture_config_inputs(study_id)
     return _capture_config_response(study, tasks, aois)
 
 
 @router.post("/sessions", response_model=SessionResponse)
-def create_capture_session(payload: CaptureSessionStartRequest) -> SessionResponse:
-    _ensure_valid_capture_token(payload.study_id, payload.capture_token)
+def create_capture_session(request: Request, payload: CaptureSessionStartRequest) -> SessionResponse:
+    _ensure_valid_capture_token(payload.study_id, payload.capture_token, request)
     record = get_repository().create_session(payload.study_id)
     return SessionResponse(session_id=record.id, study_id=record.study_id, status="started")
 
 
 @router.post("/sessions/{session_id}/aoi-snapshots", response_model=list[AoiSnapshotResponse])
 def replace_capture_aoi_snapshots(
+    request: Request,
     session_id: UUID,
     payload: AoiSnapshotBatchRequest,
 ) -> list[AoiSnapshotResponse]:
     repository = get_repository()
     session = repository.ensure_session(session_id)
-    _ensure_valid_capture_token(session.study_id, payload.capture_token)
+    _ensure_valid_capture_token(session.study_id, payload.capture_token, request)
     records = repository.replace_aoi_snapshots(
         session_id,
         [snapshot.model_dump() for snapshot in payload.snapshots],
@@ -82,7 +86,9 @@ def replace_capture_aoi_snapshots(
 
 
 @router.post("/sessions/{session_id}/events", response_model=EventIngestResponse)
-def ingest_capture_events(session_id: UUID, payload: dict[str, Any]) -> EventIngestResponse:
+def ingest_capture_events(request: Request, session_id: UUID, payload: dict[str, Any]) -> EventIngestResponse:
+    session = get_repository().ensure_session(session_id)
+    ensure_capture_origin_allowed(session.study_id, request.headers.get("origin"))
     return ingest_event_payload(
         session_id=session_id,
         payload=payload,
@@ -92,12 +98,13 @@ def ingest_capture_events(session_id: UUID, payload: dict[str, Any]) -> EventIng
 
 @router.post("/sessions/{session_id}/complete", response_model=SessionCompleteResponse)
 def complete_capture_session(
+    request: Request,
     session_id: UUID,
     payload: CaptureSessionCompleteRequest,
 ) -> SessionCompleteResponse:
     repository = get_repository()
     session = repository.ensure_session(session_id)
-    _ensure_valid_capture_token(session.study_id, payload.capture_token)
+    _ensure_valid_capture_token(session.study_id, payload.capture_token, request)
     record = repository.complete_session(session_id)
     return SessionCompleteResponse(
         session_id=session_id,

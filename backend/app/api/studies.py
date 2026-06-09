@@ -28,6 +28,7 @@ def _study_response(record: StudyRecord) -> StudyResponse:
         name=record.title,
         objective=record.description,
         target_url=record.target_url,
+        allowed_origins=record.allowed_origins,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -77,6 +78,7 @@ def create_study(payload: StudyCreateRequest) -> StudyResponse:
         title=payload.name,
         description=payload.objective,
         target_url=payload.target_url,
+        allowed_origins=payload.allowed_origins,
     )
     return _study_response(record)
 
@@ -100,12 +102,14 @@ def create_study_configuration(payload: StudyConfigurationRequest) -> StudyConfi
         title=payload.name,
         description=payload.objective,
         target_url=payload.target_url,
+        allowed_origins=payload.allowed_origins,
     )
     study, tasks, aois = repository.replace_study_configuration(
         study_id=study.id,
         title=payload.name,
         description=payload.objective,
         target_url=payload.target_url,
+        allowed_origins=payload.allowed_origins,
         tasks=[task.model_dump() for task in payload.tasks],
         aois=[aoi.model_dump() for aoi in payload.aois],
     )
@@ -137,6 +141,7 @@ def replace_study_configuration(study_id: UUID, payload: StudyConfigurationReque
         title=payload.name,
         description=payload.objective,
         target_url=payload.target_url,
+        allowed_origins=payload.allowed_origins,
         tasks=[task.model_dump() for task in payload.tasks],
         aois=[aoi.model_dump() for aoi in payload.aois],
     )

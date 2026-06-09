@@ -90,21 +90,33 @@ def test_database_initialization_backfills_capture_tokens_for_legacy_studies(tmp
     initialize_database(f"sqlite:///{database_path}")
 
     with connect_database(f"sqlite:///{database_path}") as connection:
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(studies)").fetchall()}
         tokens = [
             row["capture_token"]
             for row in connection.execute("SELECT capture_token FROM studies ORDER BY id").fetchall()
         ]
+        allowed_origins = [
+            row["allowed_origins"]
+            for row in connection.execute("SELECT allowed_origins FROM studies ORDER BY id").fetchall()
+        ]
 
+    assert "allowed_origins" in columns
     assert all(tokens)
     assert len(set(tokens)) == 2
+    assert allowed_origins == ["[]", "[]"]
 
 
 def test_repository_creates_study_and_session() -> None:
     repository = GazeTrackRepository()
-    study = repository.create_study(title="Checkout study", description="Find the checkout CTA")
+    study = repository.create_study(
+        title="Checkout study",
+        description="Find the checkout CTA",
+        allowed_origins=["https://example.com"],
+    )
     session = repository.create_session(study.id)
 
     assert repository.get_study(study.id) == study
+    assert study.allowed_origins == ["https://example.com"]
     assert session.study_id == study.id
     assert session.status == "started"
 
@@ -112,10 +124,16 @@ def test_repository_creates_study_and_session() -> None:
 def test_api_creates_lists_studies_and_creates_session() -> None:
     create_response = client.post(
         "/api/v1/studies",
-        json={"name": "Pricing page study", "objective": "Find the team plan", "target_url": "https://example.test"},
+        json={
+            "name": "Pricing page study",
+            "objective": "Find the team plan",
+            "target_url": "https://example.test",
+            "allowed_origins": ["https://example.test"],
+        },
     )
     assert create_response.status_code == 200
     study = create_response.json()
+    assert study["allowed_origins"] == ["https://example.test"]
 
     list_response = client.get("/api/v1/studies")
     session_response = client.post(f"/api/v1/studies/{study['study_id']}/sessions", json={})

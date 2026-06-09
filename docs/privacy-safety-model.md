@@ -12,6 +12,7 @@ GazeTrack is designed around a narrow data boundary: collect task analytics tele
 - Real-site safe DOM layout snapshots do not capture arbitrary page text by default.
 - DOM text capture requires explicit SDK opt-in with `captureText: true` and `allowedTextSelectors`.
 - `redactSelectors`, inputs, textareas, and password fields never contribute stored DOM text, even when they also match an allowed selector.
+- Public capture endpoints require the study capture token and, when configured, an exact per-study `allowed_origins` match against the browser `Origin` header.
 - Backend reports and schematic replay are generated from accepted telemetry and computed metrics only.
 
 ## Data that may be stored
@@ -30,6 +31,8 @@ Accepted telemetry can include:
 - Structural page layout metadata for real-site capture, including bounding boxes, tags, semantic types, CSS metadata by default, and study-configured AOI labels. Free-form DOM text is stored only when explicitly enabled and selector-allowed.
 
 This is local SQLite demo storage by default.
+
+Study records may also store `allowed_origins` as a JSON allowlist of site origins approved for public capture. An empty allowlist keeps local/demo integration behavior permissive. A non-empty allowlist rejects public capture config/session/event requests from missing or non-matching origins with `403`. This is a defense-in-depth control alongside CORS and capture tokens, not authentication.
 
 ## Data that must not be stored
 

@@ -50,6 +50,7 @@ def initialize_database(database_url: str | None = None) -> None:
                 description TEXT,
                 target_url TEXT,
                 capture_token TEXT,
+                allowed_origins TEXT NOT NULL DEFAULT '[]',
                 updated_at TEXT,
                 created_at TEXT NOT NULL
             );
@@ -171,6 +172,7 @@ def initialize_database(database_url: str | None = None) -> None:
         )
         _ensure_column(connection, "studies", "target_url", "TEXT")
         _ensure_column(connection, "studies", "capture_token", "TEXT")
+        _ensure_column(connection, "studies", "allowed_origins", "TEXT NOT NULL DEFAULT '[]'")
         _backfill_capture_tokens(connection)
         _ensure_column(connection, "studies", "updated_at", "TEXT")
         _ensure_column(connection, "aois", "semantic_type", "TEXT")

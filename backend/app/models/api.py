@@ -8,13 +8,40 @@ Only telemetry metadata and interaction event payloads are accepted.
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def normalize_allowed_origin(origin: str) -> str:
+    parsed = urlparse(origin.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("allowed origins must include http(s) scheme and host")
+    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+        raise ValueError("allowed origins must not include path, query, or fragment")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("allowed origins must include a host")
+    netloc = hostname.lower()
+    if parsed.port is not None:
+        netloc = f"{netloc}:{parsed.port}"
+    return f"{parsed.scheme.lower()}://{netloc}"
+
+
+def normalize_allowed_origins(origins: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for origin in origins:
+        normalized_origin = normalize_allowed_origin(origin)
+        if normalized_origin not in seen:
+            normalized.append(normalized_origin)
+            seen.add(normalized_origin)
+    return normalized
 
 
 class APIStatus(BaseModel):
@@ -33,6 +60,12 @@ class StudyCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     objective: str | None = Field(default=None, max_length=1000)
     target_url: str | None = None
+    allowed_origins: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def validate_allowed_origins(cls, value: list[str]) -> list[str]:
+        return normalize_allowed_origins(value)
 
 
 class StudyResponse(BaseModel):
@@ -40,6 +73,7 @@ class StudyResponse(BaseModel):
     name: str
     objective: str | None = None
     target_url: str | None = None
+    allowed_origins: list[str] = Field(default_factory=list)
     status: Literal["placeholder", "active"] = "active"
     persistence: Literal["not_implemented", "sqlite"] = "sqlite"
     created_at: str = Field(default_factory=utcnow_iso)
@@ -199,8 +233,14 @@ class StudyConfigurationRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     objective: str | None = Field(default=None, max_length=1000)
     target_url: str | None = None
+    allowed_origins: list[str] = Field(default_factory=list, max_length=20)
     tasks: list[StudyTaskConfigRequest] = Field(min_length=1)
     aois: list[AoiCreateRequest] = Field(min_length=1)
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def validate_allowed_origins(cls, value: list[str]) -> list[str]:
+        return normalize_allowed_origins(value)
 
 
 class StudyConfigurationResponse(BaseModel):

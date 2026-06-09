@@ -89,6 +89,22 @@ def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _encode_allowed_origins(allowed_origins: list[str]) -> str:
+    return json.dumps(allowed_origins)
+
+
+def _decode_allowed_origins(value: str | None) -> list[str]:
+    if not value:
+        return []
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(decoded, list):
+        return []
+    return [origin for origin in decoded if isinstance(origin, str)]
+
+
 @dataclass(frozen=True)
 class StudyRecord:
     id: UUID
@@ -96,6 +112,7 @@ class StudyRecord:
     description: str | None
     target_url: str | None
     capture_token: str | None
+    allowed_origins: list[str]
     created_at: str
     updated_at: str | None
 
@@ -226,24 +243,29 @@ class GazeTrackRepository:
         title: str,
         description: str | None = None,
         target_url: str | None = None,
+        allowed_origins: list[str] | None = None,
         study_id: UUID | None = None,
     ) -> StudyRecord:
         now = utcnow_iso()
         record_id = study_id or uuid4()
         capture_token = secrets.token_urlsafe(24)
+        allowed_origins_json = _encode_allowed_origins(allowed_origins or [])
         with connect_database(self.database_url) as connection:
             connection.execute(
                 """
-                INSERT INTO studies (id, title, description, target_url, capture_token, updated_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO studies (
+                    id, title, description, target_url, capture_token, allowed_origins, updated_at, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
                     description = excluded.description,
                     target_url = excluded.target_url,
+                    allowed_origins = excluded.allowed_origins,
                     capture_token = COALESCE(studies.capture_token, excluded.capture_token),
                     updated_at = excluded.updated_at
                 """,
-                (str(record_id), title, description, target_url, capture_token, now, now),
+                (str(record_id), title, description, target_url, capture_token, allowed_origins_json, now, now),
             )
         return self.get_study(record_id) or StudyRecord(
             id=record_id,
@@ -251,6 +273,7 @@ class GazeTrackRepository:
             description=description,
             target_url=target_url,
             capture_token=capture_token,
+            allowed_origins=allowed_origins or [],
             created_at=now,
             updated_at=now,
         )
@@ -279,7 +302,7 @@ class GazeTrackRepository:
         with connect_database(self.database_url) as connection:
             row = connection.execute(
                 """
-                SELECT id, title, description, target_url, capture_token, created_at, updated_at
+                SELECT id, title, description, target_url, capture_token, allowed_origins, created_at, updated_at
                 FROM studies
                 WHERE id = ?
                 """,
@@ -293,6 +316,7 @@ class GazeTrackRepository:
             description=row["description"],
             target_url=row["target_url"],
             capture_token=row["capture_token"],
+            allowed_origins=_decode_allowed_origins(row["allowed_origins"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -301,7 +325,7 @@ class GazeTrackRepository:
         with connect_database(self.database_url) as connection:
             rows = connection.execute(
                 """
-                SELECT id, title, description, target_url, capture_token, created_at, updated_at
+                SELECT id, title, description, target_url, capture_token, allowed_origins, created_at, updated_at
                 FROM studies
                 ORDER BY created_at ASC
                 """
@@ -313,6 +337,7 @@ class GazeTrackRepository:
                 description=row["description"],
                 target_url=row["target_url"],
                 capture_token=row["capture_token"],
+                allowed_origins=_decode_allowed_origins(row["allowed_origins"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
@@ -325,22 +350,30 @@ class GazeTrackRepository:
         title: str,
         description: str | None,
         target_url: str | None,
+        allowed_origins: list[str] | None,
         tasks: list[dict[str, str | None]],
         aois: list[dict[str, str | float | None]],
     ) -> tuple[StudyRecord, list[TaskRecord], list[AoiRecord]]:
         existing = self.get_study(study_id)
         if existing is None:
-            self.create_study(title=title, description=description, target_url=target_url, study_id=study_id)
+            self.create_study(
+                title=title,
+                description=description,
+                target_url=target_url,
+                allowed_origins=allowed_origins or [],
+                study_id=study_id,
+            )
 
         now = utcnow_iso()
+        allowed_origins_json = _encode_allowed_origins(allowed_origins or [])
         with connect_database(self.database_url) as connection:
             connection.execute(
                 """
                 UPDATE studies
-                SET title = ?, description = ?, target_url = ?, updated_at = ?
+                SET title = ?, description = ?, target_url = ?, allowed_origins = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (title, description, target_url, now, str(study_id)),
+                (title, description, target_url, allowed_origins_json, now, str(study_id)),
             )
             connection.execute("DELETE FROM tasks WHERE study_id = ?", (str(study_id),))
             connection.execute("DELETE FROM aois WHERE study_id = ?", (str(study_id),))
@@ -378,6 +411,7 @@ class GazeTrackRepository:
             description=description,
             target_url=target_url,
             capture_token=None,
+            allowed_origins=allowed_origins or [],
             created_at=now,
             updated_at=now,
         )

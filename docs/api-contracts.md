@@ -6,7 +6,7 @@ These contracts describe the currently implemented backend demo API and SQLite-b
 
 - `GET /health` → `{ "status": "ok" }`
 - `GET /api/v1/meta` → project metadata + privacy posture + implemented capabilities
-- `POST /api/v1/studies` → accepts `name`, optional `objective`, optional `target_url`; returns generated `study_id`
+- `POST /api/v1/studies` → accepts `name`, optional `objective`, optional `target_url`, optional `allowed_origins`; returns generated `study_id`
 - `GET /api/v1/studies` → lists persisted local studies, including the synthetic demo study once initialized
 - `GET /api/v1/studies/{study_id}` → returns a persisted study envelope
 - `POST /api/v1/studies/{study_id}/tasks` → creates a task with `title`, `prompt`, optional `success_criteria`, optional `target_url`
@@ -27,7 +27,20 @@ Legacy dashboard/demo endpoints remain available for local development and synth
 
 ## Public capture API
 
-The public capture API is the boundary used by `gazetrack-capture.js`. These endpoints require the study capture token and return `403` for an invalid token. The token is not a user-auth substitute; until auth exists, token retrieval endpoints are local/demo-admin surfaces.
+The public capture API is the boundary used by `gazetrack-capture.js`. These endpoints require the study capture token and return `403` for an invalid token. When a study has `allowed_origins`, capture requests must also include a browser `Origin` header that exactly matches one configured origin. Empty allowlists preserve current local/demo behavior. The token and origin check are not user-auth substitutes; until auth exists, token retrieval endpoints are local/demo-admin surfaces.
+
+Study create/configuration payloads support `allowed_origins`:
+
+```json
+{
+  "name": "Checkout CTA study",
+  "objective": "Measure whether visitors notice checkout.",
+  "target_url": "https://example.test/pricing",
+  "allowed_origins": ["https://example.test"]
+}
+```
+
+Origins must include `http` or `https` scheme and host, with no path, query, or fragment. Values are normalized and stored as JSON text in SQLite. Global CORS still controls browser access to the backend; the per-study allowlist is an additional app-level validation step for the public capture namespace.
 
 Fetch capture config:
 

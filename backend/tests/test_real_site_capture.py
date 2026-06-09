@@ -7,13 +7,14 @@ from app.repository import GazeTrackRepository
 client = TestClient(app)
 
 
-def create_real_site_study() -> tuple[dict[str, object], str]:
+def create_real_site_study(allowed_origins: list[str] | None = None) -> tuple[dict[str, object], str]:
     response = client.post(
         "/api/v1/studies/configurations",
         json={
             "name": "Real checkout study",
             "objective": "Measure whether visitors notice the checkout CTA.",
             "target_url": "https://example.com/pricing",
+            "allowed_origins": allowed_origins or [],
             "tasks": [{"prompt": "Find checkout."}],
             "aois": [
                 {
@@ -44,6 +45,7 @@ def create_real_site_study() -> tuple[dict[str, object], str]:
     )
     assert response.status_code == 200
     study = response.json()["study"]
+    assert study["allowed_origins"] == (allowed_origins or [])
     config_response = client.get(f"/api/v1/studies/{study['study_id']}/capture-snippet-config")
     assert config_response.status_code == 200
     return study, config_response.json()["capture_token"]
@@ -237,6 +239,116 @@ def test_public_capture_namespace_happy_path() -> None:
     assert report["completed"] is True
     assert report["tracker_type"] == "real_site_capture"
     assert report["event_type_counts"]["click"] == 1
+
+
+def test_public_capture_namespace_allows_configured_origin() -> None:
+    study, capture_token = create_real_site_study(allowed_origins=["https://example.com"])
+    headers = {"Origin": "https://example.com"}
+
+    config_response = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": capture_token},
+        headers=headers,
+    )
+    assert config_response.status_code == 200
+
+    session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": capture_token},
+        headers=headers,
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["session_id"]
+
+    snapshot_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/aoi-snapshots",
+        json={"capture_token": capture_token, "snapshots": []},
+        headers=headers,
+    )
+    assert snapshot_response.status_code == 200
+
+    events_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/events",
+        json={
+            "capture_token": capture_token,
+            "events": [
+                {
+                    "event_type": "task_start",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+                }
+            ],
+        },
+        headers=headers,
+    )
+    assert events_response.status_code == 200
+
+    complete_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/complete",
+        json={"capture_token": capture_token},
+        headers=headers,
+    )
+    assert complete_response.status_code == 200
+
+
+def test_public_capture_namespace_rejects_disallowed_and_missing_origins() -> None:
+    study, capture_token = create_real_site_study(allowed_origins=["https://allowed.example"])
+
+    missing_origin_config = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": capture_token},
+    )
+    disallowed_config = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": capture_token},
+        headers={"Origin": "https://blocked.example"},
+    )
+    disallowed_session_start = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": capture_token},
+        headers={"Origin": "https://blocked.example"},
+    )
+
+    assert missing_origin_config.status_code == 403
+    assert disallowed_config.status_code == 403
+    assert disallowed_session_start.status_code == 403
+
+    session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": capture_token},
+        headers={"Origin": "https://allowed.example"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["session_id"]
+
+    snapshot_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/aoi-snapshots",
+        json={"capture_token": capture_token, "snapshots": []},
+        headers={"Origin": "https://blocked.example"},
+    )
+    events_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/events",
+        json={
+            "capture_token": capture_token,
+            "events": [
+                {
+                    "event_type": "task_start",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+                }
+            ],
+        },
+        headers={"Origin": "https://blocked.example"},
+    )
+    complete_response = client.post(
+        f"/api/v1/capture/sessions/{session_id}/complete",
+        json={"capture_token": capture_token},
+        headers={"Origin": "https://blocked.example"},
+    )
+
+    assert snapshot_response.status_code == 403
+    assert events_response.status_code == 403
+    assert complete_response.status_code == 403
 
 
 def test_public_capture_event_batch_retry_is_idempotent() -> None:
