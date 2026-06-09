@@ -205,6 +205,17 @@ class CaptureSnippetConfigResponse(CaptureConfigResponse):
     capture_token: str
 
 
+class InstallVerificationResponse(BaseModel):
+    study_id: UUID
+    expected_script_path: str
+    expected_script_url: str
+    capture_token_exists: bool
+    target_url: str | None = None
+    allowed_origins: list[str] = Field(default_factory=list)
+    aois: list[CaptureConfigAoiResponse]
+    recommended_snippet: str
+
+
 class CaptureSessionCreateRequest(BaseModel):
     capture_token: str = Field(min_length=1, max_length=200)
     page_url: str | None = None

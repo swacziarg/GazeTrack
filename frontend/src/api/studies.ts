@@ -3,6 +3,7 @@ export type BackendStudy = {
   name: string
   objective: string | null
   target_url: string | null
+  allowed_origins: string[]
   status: 'placeholder' | 'active'
   persistence: 'not_implemented' | 'sqlite'
   created_at: string
@@ -40,6 +41,7 @@ export type StudyConfigurationPayload = {
   name: string
   objective: string | null
   target_url: string | null
+  allowed_origins?: string[]
   tasks: Array<{
     title: string
     prompt: string
@@ -102,12 +104,32 @@ export type CaptureSnippetConfig = CaptureConfig & {
   capture_token: string
 }
 
+export type InstallVerification = {
+  study_id: string
+  expected_script_path: string
+  expected_script_url: string
+  capture_token_exists: boolean
+  target_url: string | null
+  allowed_origins: string[]
+  aois: CaptureConfigAoi[]
+  recommended_snippet: string
+}
+
 export type CaptureConfigResult = {
   ok: boolean
   backendAvailable: boolean
   apiBaseUrl: string
   statusCode?: number
   config: CaptureSnippetConfig | null
+  message: string
+}
+
+export type InstallVerificationResult = {
+  ok: boolean
+  backendAvailable: boolean
+  apiBaseUrl: string
+  statusCode?: number
+  verification: InstallVerification | null
   message: string
 }
 
@@ -296,6 +318,43 @@ export async function fetchCaptureConfig(studyId: string): Promise<CaptureConfig
       apiBaseUrl,
       config: null,
       message: 'Backend unavailable - capture snippet cannot be generated yet.',
+    }
+  }
+}
+
+export async function fetchInstallVerification(studyId: string): Promise<InstallVerificationResult> {
+  const apiBaseUrl = getApiBaseUrl()
+
+  try {
+    const result = await fetchJson<InstallVerification>(
+      `${apiBaseUrl}/api/v1/studies/${encodeURIComponent(studyId)}/install-verification`,
+    )
+    if (!result.ok) {
+      return {
+        ok: false,
+        backendAvailable: true,
+        apiBaseUrl,
+        statusCode: result.status,
+        verification: null,
+        message: `Backend responded with HTTP ${result.status}.`,
+      }
+    }
+
+    return {
+      ok: true,
+      backendAvailable: true,
+      apiBaseUrl,
+      statusCode: result.status,
+      verification: result.body,
+      message: 'Install verification loaded.',
+    }
+  } catch {
+    return {
+      ok: false,
+      backendAvailable: false,
+      apiBaseUrl,
+      verification: null,
+      message: 'Backend unavailable - install verification cannot be loaded yet.',
     }
   }
 }

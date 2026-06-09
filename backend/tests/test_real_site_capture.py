@@ -208,6 +208,32 @@ def test_capture_token_rotation_returns_404_for_missing_study() -> None:
     assert response.status_code == 404
 
 
+def test_install_verification_returns_versioned_snippet_and_readiness_payload() -> None:
+    study, _capture_token = create_real_site_study(allowed_origins=["https://example.com"])
+
+    response = client.get(f"/api/v1/studies/{study['study_id']}/install-verification")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["study_id"] == study["study_id"]
+    assert payload["target_url"] == "https://example.com/pricing"
+    assert payload["allowed_origins"] == ["https://example.com"]
+    assert payload["capture_token_exists"] is True
+    assert payload["expected_script_path"] == "/sdk/v0.2/gazetrack-capture.js"
+    assert payload["expected_script_url"].endswith("/sdk/v0.2/gazetrack-capture.js")
+    assert "/sdk/v0.2/gazetrack-capture.js" in payload["recommended_snippet"]
+    assert f'studyId: "{study["study_id"]}"' in payload["recommended_snippet"]
+    assert "captureToken" in payload["recommended_snippet"]
+    assert [aoi["role_key"] for aoi in payload["aois"]] == ["primary_cta", "footer"]
+    assert payload["aois"][0]["selector"] == "[data-gazetrack-aoi='primary_cta']"
+
+
+def test_install_verification_returns_404_for_missing_study() -> None:
+    response = client.get("/api/v1/studies/00000000-0000-4000-8000-999999999999/install-verification")
+
+    assert response.status_code == 404
+
+
 def test_public_capture_namespace_happy_path() -> None:
     study, capture_token = create_real_site_study()
 

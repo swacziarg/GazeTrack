@@ -22,6 +22,7 @@ These contracts describe the currently implemented backend demo API and SQLite-b
 - `POST /api/v1/capture/sessions/{session_id}/aoi-snapshots` → replaces session AOI snapshots for the captured page
 - `POST /api/v1/capture/sessions/{session_id}/events` → ingests token-authorized real-site capture telemetry
 - `POST /api/v1/capture/sessions/{session_id}/complete` → completes a token-authorized real-site capture session
+- `GET /api/v1/studies/{study_id}/install-verification` → local/demo-admin install readiness helper with the current versioned snippet, target URL, AOI selectors, and allowed origins
 - `POST /api/v1/studies/{study_id}/capture-token/rotate` → local/demo-admin route that replaces the study capture token and returns the current snippet config
 
 Legacy dashboard/demo endpoints remain available for local development and synthetic telemetry compatibility. New website embeds should use the `/api/v1/capture/...` namespace through the versioned SDK.
@@ -163,6 +164,40 @@ POST /api/v1/capture/sessions/{session_id}/complete
 ```
 
 Response shape is `SessionCompleteResponse` with `completed: true` and the accepted event count.
+
+### Install verification helper
+
+Local/demo-admin callers can fetch a study's website integration readiness payload:
+
+```http
+GET /api/v1/studies/{study_id}/install-verification
+```
+
+Response shape:
+
+```json
+{
+  "study_id": "00000000-0000-0000-0000-000000000000",
+  "expected_script_path": "/sdk/v0.2/gazetrack-capture.js",
+  "expected_script_url": "https://your-gazetrack-api.example/sdk/v0.2/gazetrack-capture.js",
+  "capture_token_exists": true,
+  "target_url": "https://example.test/pricing",
+  "allowed_origins": ["https://example.test"],
+  "aois": [
+    {
+      "aoi_id": "00000000-0000-0000-0000-000000000001",
+      "label": "Primary CTA",
+      "semantic_type": "CTA",
+      "role_key": "primary_cta",
+      "selector": "[data-gazetrack-aoi='primary_cta']",
+      "required": true
+    }
+  ],
+  "recommended_snippet": "<script>...</script>"
+}
+```
+
+The helper ensures a capture token exists and returns a copyable snippet using `/sdk/v0.2/gazetrack-capture.js`. It is not a remote scanner: it does not crawl, fetch, screenshot, or inspect the target website. Because dashboard authentication is not implemented yet, treat this route and the visible snippet/token panel as local/demo-admin only.
 
 ### Capture token rotation
 

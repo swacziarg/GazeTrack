@@ -5,9 +5,11 @@ import { fetchSessionReport, type BackendReportResult } from './api/reports'
 import {
   createStudySession,
   fetchCaptureConfig,
+  fetchInstallVerification,
   fetchStudySetup,
   saveStudyConfiguration,
   type CaptureConfigResult,
+  type InstallVerificationResult,
   type StudySetupResult,
 } from './api/studies'
 import { AoiBreakdown } from './components/AoiBreakdown'
@@ -24,6 +26,7 @@ import { SessionControls, type SessionPhase } from './components/SessionControls
 import { StudySetupWizard } from './components/StudySetupWizard'
 import { SyntheticHeatmapPreview } from './components/SyntheticHeatmapPreview'
 import { TrackerModePanel } from './components/TrackerModePanel'
+import { WebsiteIntegrationPanel } from './components/WebsiteIntegrationPanel'
 import { defaultStudyBuilderConfig, type StudyBuilderAoi, type StudyBuilderConfig } from './data/demoStudy'
 import { countCalibrationEvents, type MockStudyEvent, type SyntheticTelemetryMode } from './lib/mockEvents'
 import { generateDemoReport } from './lib/mockReport'
@@ -182,23 +185,6 @@ function getIngestStatusClass(ingestResult: EventIngestResult | null, isIngestin
   return ingestResult.ok ? 'ok' : 'error'
 }
 
-function buildCaptureSnippet(captureConfigResult: CaptureConfigResult | null) {
-  const config = captureConfigResult?.config
-  const apiBaseUrl = captureConfigResult?.apiBaseUrl ?? initialHealth.apiBaseUrl
-  if (!config) {
-    return null
-  }
-
-  return `<script>
-  window.GazeTrackConfig = {
-    apiBaseUrl: "${apiBaseUrl}",
-    studyId: "${config.study_id}",
-    captureToken: "${config.capture_token}"
-  }
-</script>
-<script src="${apiBaseUrl}/gazetrack-capture.js" async></script>`
-}
-
 function App() {
   const [activeSection, setActiveSection] = useState<ActiveSection>('setup')
   const [backendHealth, setBackendHealth] = useState<BackendHealth>(initialHealth)
@@ -214,6 +200,7 @@ function App() {
   const [studySetupResult, setStudySetupResult] = useState<StudySetupResult | null>(null)
   const [studySaveResult, setStudySaveResult] = useState<StudySetupResult | null>(null)
   const [captureConfigResult, setCaptureConfigResult] = useState<CaptureConfigResult | null>(null)
+  const [installVerificationResult, setInstallVerificationResult] = useState<InstallVerificationResult | null>(null)
   const [isFetchingStudySetup, setIsFetchingStudySetup] = useState(true)
   const [studyBuilderConfig, setStudyBuilderConfig] = useState<StudyBuilderConfig>(defaultStudyBuilderConfig)
   const [isSavingStudy, setIsSavingStudy] = useState(false)
@@ -264,7 +251,6 @@ function App() {
         : 0
   const isFullscreenRun =
     activeSection === 'run' && (sessionPhase === 'active' || (trackerId === 'webgazer' && sessionPhase === 'calibration'))
-  const captureSnippet = buildCaptureSnippet(captureConfigResult)
 
   useEffect(() => {
     let isMounted = true
@@ -276,9 +262,13 @@ function App() {
         setStudySetupResult(studySetup)
         if (studySetup.ok && studySetup.study) {
           setStudyBuilderConfig(backendSetupToBuilderConfig(studySetup.study, studySetup.tasks, studySetup.aois))
-          const captureConfig = await fetchCaptureConfig(studySetup.study.study_id)
+          const [captureConfig, installVerification] = await Promise.all([
+            fetchCaptureConfig(studySetup.study.study_id),
+            fetchInstallVerification(studySetup.study.study_id),
+          ])
           if (isMounted) {
             setCaptureConfigResult(captureConfig)
+            setInstallVerificationResult(installVerification)
           }
         }
         setIsCheckingHealth(false)
@@ -480,6 +470,7 @@ function App() {
           setStudySetupResult(result)
           setStudyBuilderConfig(backendSetupToBuilderConfig(result.study, result.tasks, result.aois))
           void fetchCaptureConfig(result.study.study_id).then(setCaptureConfigResult)
+          void fetchInstallVerification(result.study.study_id).then(setInstallVerificationResult)
         }
       })
       .finally(() => {
@@ -766,48 +757,18 @@ function App() {
             <DisclosureCard
               eyebrow="Real website"
               id="real-site-capture"
-              status={<span className={`status-pill ${captureConfigResult?.ok ? 'ok' : 'pending'}`}>Snippet</span>}
-              title="Install on a controlled page"
+              status={
+                <span className={`status-pill ${installVerificationResult?.ok || captureConfigResult?.ok ? 'ok' : 'pending'}`}>
+                  Integration
+                </span>
+              }
+              title="Website integration"
             >
-              <p className="privacy-note compact">
-                Add this snippet to a page you control. It resolves the five fixed AOIs from
-                <code>data-gazetrack-aoi</code> attributes or the saved CSS selectors, then stores telemetry JSON only.
-              </p>
-              {captureSnippet ? (
-                <pre className="snippet-block">
-                  <code>{captureSnippet}</code>
-                </pre>
-              ) : (
-                <p className="backend-unavailable compact">
-                  {captureConfigResult?.message ?? 'Save the study while the backend is online to generate a capture snippet.'}
-                </p>
-              )}
-              <div className="study-builder-grid">
-                <section>
-                  <h4>Allowed origin</h4>
-                  <p className="muted compact-text">
-                    Add the tested page origin to <code>GAZETRACK_CORS_ALLOWED_ORIGINS</code> before running outside localhost.
-                  </p>
-                </section>
-                <section>
-                  <h4>Fixed AOI attributes</h4>
-                  <ul className="setup-list">
-                    {(captureConfigResult?.config?.aois ?? studyBuilderConfig.aois).map((aoi) => {
-                      const roleKey = 'role_key' in aoi ? aoi.role_key : (aoi.roleKey ?? '')
-                      const selector = 'selector' in aoi ? aoi.selector : aoi.selector
-                      return (
-                        <li key={roleKey || aoi.label}>
-                          <strong>{aoi.label}</strong>
-                          <span>
-                            <code>data-gazetrack-aoi=&quot;{roleKey}&quot;</code>
-                            {selector ? ` or ${selector}` : ''}
-                          </span>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-              </div>
+              <WebsiteIntegrationPanel
+                captureConfigResult={captureConfigResult}
+                installVerificationResult={installVerificationResult}
+                fallbackAoIs={studyBuilderConfig.aois}
+              />
             </DisclosureCard>
 
             <DisclosureCard

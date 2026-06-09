@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createStudySession, fetchStudySetup, saveStudyConfiguration } from './studies'
+import { createStudySession, fetchInstallVerification, fetchStudySetup, saveStudyConfiguration } from './studies'
 
 const studyId = '00000000-0000-4000-8000-000000000001'
 
@@ -20,6 +20,7 @@ describe('fetchStudySetup', () => {
             name: 'Synthetic demo study',
             objective: 'Default local study',
             target_url: null,
+            allowed_origins: [],
             status: 'active',
             persistence: 'sqlite',
             created_at: '2026-01-01T00:00:00Z',
@@ -110,6 +111,7 @@ describe('fetchStudySetup', () => {
           name: 'Checkout study',
           objective: 'Measure checkout discovery',
           target_url: 'https://example.test/checkout',
+          allowed_origins: ['https://example.test'],
           status: 'active',
           persistence: 'sqlite',
           created_at: '2026-01-01T00:00:00Z',
@@ -168,5 +170,32 @@ describe('fetchStudySetup', () => {
       expect.objectContaining({ method: 'POST' }),
     )
     expect(result.sessionId).toBe('44444444-4444-4444-8444-444444444444')
+  })
+
+  it('loads install verification for the saved study', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        study_id: studyId,
+        expected_script_path: '/sdk/v0.2/gazetrack-capture.js',
+        expected_script_url: 'http://localhost:8000/sdk/v0.2/gazetrack-capture.js',
+        capture_token_exists: true,
+        target_url: 'https://example.test/checkout',
+        allowed_origins: ['https://example.test'],
+        recommended_snippet: '<script src="http://localhost:8000/sdk/v0.2/gazetrack-capture.js" async></script>',
+        aois: [],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchInstallVerification(studyId)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8000/api/v1/studies/${studyId}/install-verification`,
+      expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    )
+    expect(result.ok).toBe(true)
+    expect(result.verification?.expected_script_path).toBe('/sdk/v0.2/gazetrack-capture.js')
   })
 })

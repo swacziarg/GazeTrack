@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.models.api import (
     AoiCreateRequest,
@@ -9,6 +9,7 @@ from app.models.api import (
     CaptureConfigResponse,
     CaptureSessionCreateRequest,
     CaptureSnippetConfigResponse,
+    InstallVerificationResponse,
     SessionResponse,
     StudyConfigurationRequest,
     StudyConfigurationResponse,
@@ -20,6 +21,7 @@ from app.models.api import (
 from app.repository import AoiRecord, StudyRecord, TaskRecord, get_repository
 
 router = APIRouter(prefix="/studies", tags=["studies"])
+VERSIONED_CAPTURE_SDK_PATH = "/sdk/v0.2/gazetrack-capture.js"
 
 
 def _study_response(record: StudyRecord) -> StudyResponse:
@@ -254,6 +256,39 @@ def get_capture_snippet_config(study_id: UUID) -> CaptureSnippetConfigResponse:
     study, tasks, aois = _capture_config_inputs(study_id)
     config = _capture_config_response(study, tasks, aois)
     return CaptureSnippetConfigResponse(**config.model_dump(), capture_token=capture_token)
+
+
+def _recommended_capture_snippet(api_base_url: str, study_id: UUID, capture_token: str) -> str:
+    return f"""<script>
+  window.GazeTrackConfig = {{
+    apiBaseUrl: "{api_base_url}",
+    studyId: "{study_id}",
+    captureToken: "{capture_token}"
+  }}
+</script>
+<script src="{api_base_url}{VERSIONED_CAPTURE_SDK_PATH}" async></script>"""
+
+
+@router.get("/{study_id}/install-verification", response_model=InstallVerificationResponse)
+def get_install_verification(study_id: UUID, request: Request) -> InstallVerificationResponse:
+    repository = get_repository()
+    capture_token = repository.ensure_capture_token(study_id)
+    if capture_token is None:
+        raise HTTPException(status_code=404, detail="Study not found")
+
+    study, tasks, aois = _capture_config_inputs(study_id)
+    config = _capture_config_response(study, tasks, aois)
+    api_base_url = str(request.base_url).rstrip("/")
+    return InstallVerificationResponse(
+        study_id=study.id,
+        expected_script_path=VERSIONED_CAPTURE_SDK_PATH,
+        expected_script_url=f"{api_base_url}{VERSIONED_CAPTURE_SDK_PATH}",
+        capture_token_exists=bool(capture_token),
+        target_url=study.target_url,
+        allowed_origins=study.allowed_origins,
+        aois=config.aois,
+        recommended_snippet=_recommended_capture_snippet(api_base_url, study.id, capture_token),
+    )
 
 
 @router.post("/{study_id}/capture-token/rotate", response_model=CaptureSnippetConfigResponse)
