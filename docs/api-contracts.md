@@ -22,6 +22,7 @@ These contracts describe the currently implemented backend demo API and SQLite-b
 - `POST /api/v1/capture/sessions/{session_id}/aoi-snapshots` → replaces session AOI snapshots for the captured page
 - `POST /api/v1/capture/sessions/{session_id}/events` → ingests token-authorized real-site capture telemetry
 - `POST /api/v1/capture/sessions/{session_id}/complete` → completes a token-authorized real-site capture session
+- `POST /api/v1/studies/{study_id}/capture-token/rotate` → local/demo-admin route that replaces the study capture token and returns the current snippet config
 
 Legacy dashboard/demo endpoints remain available for local development and synthetic telemetry compatibility. New website embeds should use the `/api/v1/capture/...` namespace through the versioned SDK.
 
@@ -162,6 +163,18 @@ POST /api/v1/capture/sessions/{session_id}/complete
 ```
 
 Response shape is `SessionCompleteResponse` with `completed: true` and the accepted event count.
+
+### Capture token rotation
+
+Local/demo-admin callers can rotate a study capture token:
+
+```http
+POST /api/v1/studies/{study_id}/capture-token/rotate
+```
+
+The response shape is `CaptureSnippetConfigResponse`: the current study/task/AOI snippet config plus the newly generated `capture_token`. The previous token stops working immediately for public capture config, session creation, event ingest, AOI snapshots, and completion. `GET /api/v1/studies/{study_id}/capture-snippet-config` returns the current token after rotation.
+
+This is the current revoke posture for Release 003: rotate the token, update or redeploy the controlled-site snippet, and old embedded tokens are rejected. Authentication is not implemented yet, so token retrieval and rotation endpoints must be treated as local/demo-admin APIs, not public end-user APIs.
 
 ### SDK privacy options
 

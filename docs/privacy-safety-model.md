@@ -13,6 +13,7 @@ GazeTrack is designed around a narrow data boundary: collect task analytics tele
 - DOM text capture requires explicit SDK opt-in with `captureText: true` and `allowedTextSelectors`.
 - `redactSelectors`, inputs, textareas, and password fields never contribute stored DOM text, even when they also match an allowed selector.
 - Public capture endpoints require the study capture token and, when configured, an exact per-study `allowed_origins` match against the browser `Origin` header.
+- Study capture tokens can be rotated from the local/demo-admin API; rotation immediately invalidates the previous token for public capture requests.
 - Backend reports and schematic replay are generated from accepted telemetry and computed metrics only.
 
 ## Data that may be stored
@@ -33,6 +34,8 @@ Accepted telemetry can include:
 This is local SQLite demo storage by default.
 
 Study records may also store `allowed_origins` as a JSON allowlist of site origins approved for public capture. An empty allowlist keeps local/demo integration behavior permissive. A non-empty allowlist rejects public capture config/session/event requests from missing or non-matching origins with `403`. This is a defense-in-depth control alongside CORS and capture tokens, not authentication.
+
+Capture token rotation is the current revoke mechanism. Rotating a token replaces the stored study token, so controlled-site snippets using the old token are rejected until updated. Token retrieval and rotation are local/demo-admin surfaces until authentication and admin permissions are added.
 
 ## Data that must not be stored
 

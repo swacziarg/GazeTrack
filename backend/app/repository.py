@@ -618,6 +618,23 @@ class GazeTrackRepository:
             )
         return capture_token
 
+    def rotate_capture_token(self, study_id: UUID) -> str | None:
+        if self.get_study(study_id) is None:
+            return None
+
+        capture_token = secrets.token_urlsafe(24)
+        now = utcnow_iso()
+        with connect_database(self.database_url) as connection:
+            connection.execute(
+                """
+                UPDATE studies
+                SET capture_token = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (capture_token, now, str(study_id)),
+            )
+        return capture_token
+
     def replace_aoi_snapshots(
         self,
         session_id: UUID,

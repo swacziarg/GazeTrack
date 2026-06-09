@@ -88,6 +88,7 @@ Controlled websites can include the standalone vanilla script with one config ob
 New integrations should use the versioned `/sdk/v0.2/gazetrack-capture.js` SDK path. The legacy `/gazetrack-capture.js` path remains available for existing controlled-site embeds.
 The SDK submits website telemetry through the token-protected `/api/v1/capture/...` API namespace while legacy dashboard/demo endpoints remain available for local synthetic runs.
 Studies can set `allowed_origins` such as `["https://example.com"]` so public capture config/session/event requests are accepted only when the browser `Origin` exactly matches the study allowlist. Leave the allowlist empty for local/demo behavior. This app-level check complements global CORS and capture tokens; it is not a replacement for future dashboard/admin authentication.
+Use `POST /api/v1/studies/{study_id}/capture-token/rotate` to revoke a leaked or stale capture token and get a fresh snippet config. The old token stops working immediately. Because dashboard auth is not implemented yet, snippet-config and token-rotation routes are local/demo-admin APIs.
 Real-site layout snapshots default to structural metadata only. Arbitrary DOM text from headings, paragraphs, links, and buttons is not persisted unless `captureText: true` is set with explicit `allowedTextSelectors`; `redactSelectors` and form fields always suppress text. AOI labels may appear in reports because they are study-owner configuration.
 
 For WebGazer-enabled real-site capture, add:

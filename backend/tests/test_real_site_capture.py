@@ -125,6 +125,89 @@ def test_public_capture_namespace_rejects_invalid_tokens() -> None:
     assert complete_response.status_code == 403
 
 
+def test_capture_token_rotation_invalidates_old_token_and_returns_current_snippet_config() -> None:
+    study, old_token = create_real_site_study()
+    original_session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": old_token},
+    )
+    assert original_session_response.status_code == 200
+    original_session_id = original_session_response.json()["session_id"]
+
+    rotate_response = client.post(f"/api/v1/studies/{study['study_id']}/capture-token/rotate")
+
+    assert rotate_response.status_code == 200
+    rotated_config = rotate_response.json()
+    new_token = rotated_config["capture_token"]
+    assert new_token != old_token
+    assert rotated_config["study_id"] == study["study_id"]
+    assert rotated_config["target_url"] == study["target_url"]
+    assert [aoi["role_key"] for aoi in rotated_config["aois"]] == ["primary_cta", "footer"]
+
+    snippet_config_response = client.get(f"/api/v1/studies/{study['study_id']}/capture-snippet-config")
+    assert snippet_config_response.status_code == 200
+    assert snippet_config_response.json()["capture_token"] == new_token
+
+    old_config_response = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": old_token},
+    )
+    old_session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": old_token},
+    )
+    old_event_response = client.post(
+        f"/api/v1/capture/sessions/{original_session_id}/events",
+        json={
+            "capture_token": old_token,
+            "events": [
+                {
+                    "event_type": "task_start",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+                }
+            ],
+        },
+    )
+
+    assert old_config_response.status_code == 403
+    assert old_session_response.status_code == 403
+    assert old_event_response.status_code == 403
+
+    new_config_response = client.get(
+        "/api/v1/capture/config",
+        params={"study_id": study["study_id"], "capture_token": new_token},
+    )
+    new_session_response = client.post(
+        "/api/v1/capture/sessions",
+        json={"study_id": study["study_id"], "capture_token": new_token},
+    )
+    new_event_response = client.post(
+        f"/api/v1/capture/sessions/{original_session_id}/events",
+        json={
+            "capture_token": new_token,
+            "events": [
+                {
+                    "event_type": "task_start",
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "payload": {"source": "real_site_capture", "tracker_type": "real_site_capture"},
+                }
+            ],
+        },
+    )
+
+    assert new_config_response.status_code == 200
+    assert new_session_response.status_code == 200
+    assert new_event_response.status_code == 200
+    assert new_event_response.json()["accepted_count"] == 1
+
+
+def test_capture_token_rotation_returns_404_for_missing_study() -> None:
+    response = client.post("/api/v1/studies/00000000-0000-4000-8000-999999999999/capture-token/rotate")
+
+    assert response.status_code == 404
+
+
 def test_public_capture_namespace_happy_path() -> None:
     study, capture_token = create_real_site_study()
 

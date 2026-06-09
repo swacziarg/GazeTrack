@@ -256,6 +256,17 @@ def get_capture_snippet_config(study_id: UUID) -> CaptureSnippetConfigResponse:
     return CaptureSnippetConfigResponse(**config.model_dump(), capture_token=capture_token)
 
 
+@router.post("/{study_id}/capture-token/rotate", response_model=CaptureSnippetConfigResponse)
+def rotate_capture_token(study_id: UUID) -> CaptureSnippetConfigResponse:
+    repository = get_repository()
+    capture_token = repository.rotate_capture_token(study_id)
+    if capture_token is None:
+        raise HTTPException(status_code=404, detail="Study not found")
+    study, tasks, aois = _capture_config_inputs(study_id)
+    config = _capture_config_response(study, tasks, aois)
+    return CaptureSnippetConfigResponse(**config.model_dump(), capture_token=capture_token)
+
+
 @router.post("/{study_id}/capture-sessions", response_model=SessionResponse)
 def create_capture_session(study_id: UUID, payload: CaptureSessionCreateRequest) -> SessionResponse:
     repository = get_repository()
