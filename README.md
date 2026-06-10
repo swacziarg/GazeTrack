@@ -1,6 +1,6 @@
 # GazeTrack
 
-GazeTrack is a privacy-first, task-based UX analytics demo for website builders. It shows how a browser frontend, typed telemetry contracts, a FastAPI ingest layer, SQLite persistence, and backend-generated reports can work together to evaluate whether users notice and act on important page regions. The recommended demo uses deterministic synthetic telemetry; the optional browser gaze path is experimental, opt-in, approximate, and not medical-grade eye tracking.
+GazeTrack is a privacy-first, task-based UX analytics MVP for website builders. It shows how a browser frontend, typed telemetry contracts, a FastAPI ingest layer, SQLite persistence, a website capture SDK, and backend-generated reports can work together to evaluate whether users notice and act on important page regions. The synthetic path remains deterministic and camera-free; real-site capture is interaction-only by default; browser gaze is optional, experimental, approximate, and not medical-grade eye tracking.
 
 ## What is implemented now
 
@@ -10,14 +10,16 @@ GazeTrack is a privacy-first, task-based UX analytics demo for website builders.
 - Synthetic quality modes: `healthy`, `low_confidence`, `bad_calibration`, and `no_gaze`.
 - Optional `WebGazerTracker` experiment hidden behind `VITE_ENABLE_WEBGAZER=true`, consent, and browser support checks.
 - Standalone real-site capture embed with interaction-only mode by default and an opt-in WebGazer setup flow for controlled websites.
+- Versioned public SDK path, dedicated capture API namespace, capture tokens, per-study origin allowlists, idempotent event delivery, retry-aware flushing, and dashboard install helper for controlled-site integrations.
 - FastAPI + SQLite persistence for studies, tasks, AOIs, tester sessions, accepted telemetry events, and report payloads.
 - Privacy-safe ingest validation that rejects media-like payload keys before persistence.
 - Backend reports with executive summaries, quality interpretation, AOI attention ranking, first/most/weak attention callouts, recommended next actions, event counts, AOI metrics, CAF delay when available, and schematic replay data.
-- In-app Demo Guide for reviewers and placeholders/instructions for future screenshots or GIFs.
+- In-app Demo Guide for reviewers and integration notes for controlled-site setup.
 
 ## Current status
 
 - Synthetic mode: stable default demo path with deterministic, camera-free telemetry.
+- Website integration MVP: implemented for controlled websites through `/sdk/v0.2/gazetrack-capture.js` and `/api/v1/capture/...`, with interaction telemetry by default.
 - Experimental browser gaze: opt-in browser experiment behind `VITE_ENABLE_WEBGAZER=true`; approximate, browser-dependent, and not medical-grade.
 - Reports: quality-aware UX insight reports with AOI ranking, attention callouts, cautious interpretation, and next-action recommendations.
 - Privacy: no raw webcam video, frames, screenshots, image blobs, base64 media, or media-like payloads are stored.
@@ -91,6 +93,7 @@ Studies can set `allowed_origins` such as `["https://example.com"]` so public ca
 Use `POST /api/v1/studies/{study_id}/capture-token/rotate` to revoke a leaked or stale capture token and get a fresh snippet config. The old token stops working immediately. Because dashboard auth is not implemented yet, snippet-config and token-rotation routes are local/demo-admin APIs.
 The dashboard Website integration panel and `GET /api/v1/studies/{study_id}/install-verification` return the current versioned snippet, target URL, allowed origins, and AOI selectors/role keys for local/demo-admin install checks. This helper does not crawl, scan, screenshot, or fetch the target site.
 Real-site layout snapshots default to structural metadata only. Arbitrary DOM text from headings, paragraphs, links, and buttons is not persisted unless `captureText: true` is set with explicit `allowedTextSelectors`; `redactSelectors` and form fields always suppress text. AOI labels may appear in reports because they are study-owner configuration.
+Event delivery is retry-safe when the SDK supplies opaque `batch_id` and `client_event_id` values. The backend skips duplicate `(session_id, client_event_id)` rows and reports accepted, rejected, duplicate, and skipped counts. The SDK also flushes periodically, on visibility/page lifecycle changes, and before completing a capture session.
 
 For WebGazer-enabled real-site capture, add:
 
@@ -110,6 +113,14 @@ For WebGazer-enabled real-site capture, add:
 ```
 
 This mode is consent-gated. It loads WebGazer only after the tester starts setup, hides WebGazer preview/prediction UI, shows a local-only camera readiness preview, requires full-viewport calibration clicks, then starts task capture. It submits telemetry only: normalized gaze coordinates, confidence when available, calibration summaries, quality events, clicks, scrolls, and task events with `source`/`tracker_type` set to `real_site_capture`. WebGazer capture is approximate, browser-dependent, and not medical-grade.
+
+### Real-site troubleshooting
+
+- CORS/origin mismatch: include the target site in `GAZETRACK_CORS_ALLOWED_ORIGINS` and, when a study has `allowed_origins`, add the exact browser origin such as `https://example.com`. Paths, query strings, and mismatched ports do not match.
+- Invalid token: copy the current dashboard Website integration snippet or call `GET /api/v1/studies/{study_id}/capture-snippet-config`. If a token was leaked or stale, rotate it with `POST /api/v1/studies/{study_id}/capture-token/rotate` and redeploy the snippet.
+- AOI not detected: verify the page contains the configured selector or `data-gazetrack-aoi` role key, that the element is visible when the task starts, and that the study target route matches the tested page.
+- Iframe blocked in report view: some target sites set frame-blocking headers. The report view can still show schematic telemetry, AOI snapshots, and metrics without embedding the live site.
+- Backend unavailable: the SDK cannot create sessions or flush telemetry while FastAPI is unreachable. Restart the backend, verify `apiBaseUrl`, and keep the synthetic demo path for camera-free local validation.
 
 ## Privacy guarantees
 
@@ -169,13 +180,14 @@ cd frontend
 npx playwright install chromium
 ```
 
-Validation run for this checkout: frontend unit tests `56 passed`, frontend build passed, backend tests `44 passed`, and Playwright E2E `1 passed`. Re-run the commands above after future changes before relying on status.
+Release 003 validation is tracked in [docs/release-003-checklist.md](docs/release-003-checklist.md). Re-run the commands above in the current checkout before relying on status.
 
 ## Current limitations
 
 - Synthetic telemetry is deterministic demo data, not observed human gaze.
 - Browser gaze is an experimental spike and can be noisy across browsers, lighting, cameras, face position, and permissions.
-- AOIs are manual normalized rectangles; DOM-derived AOIs and screenshot-assisted authoring are not implemented.
+- Real-site capture is intended for controlled websites where the study owner can install the SDK and configure AOI selectors.
+- AOI authoring is still explicit/manual through study config and selectors; screenshot-assisted authoring is not implemented.
 - Session replay is a schematic normalized-coordinate visualization, not video replay or screenshot playback.
 - Fixations and quality scores are deterministic demo heuristics, not validated clinical or hardware-eye-tracking metrics.
 - No auth, teams, deployment, exports, share links, retention/deletion UI, or production analytics jobs yet.
@@ -188,6 +200,7 @@ Validation run for this checkout: frontend unit tests `56 passed`, frontend buil
 - Improve AOI authoring with DOM/page assistance while keeping media persistence out of ingest.
 - Validate browser gaze quality thresholds before promoting any real-gaze capability.
 - Add report export/share flows only after auth and least-privilege access controls exist.
+- Add authenticated dashboard/admin controls before treating snippet, install-verification, or token-rotation routes as production admin APIs.
 
 See [docs/mvp-roadmap.md](docs/mvp-roadmap.md) for more detail.
 
@@ -201,17 +214,6 @@ See [docs/mvp-roadmap.md](docs/mvp-roadmap.md) for more detail.
 6. Review the backend report: executive summary, quality interpretation, AOI ranking, first/most/weak attention callouts, recommendations, tracker mode, event counts, AOI metrics, CAF delay when available, and privacy summary.
 7. Show the schematic replay and clarify that it is generated from telemetry, not webcam video or screenshots.
 8. Optionally restart with `VITE_ENABLE_WEBGAZER=true` to show the consent-gated browser experiment and its limitations.
-
-## Demo Assets / Screenshots / GIFs
-
-Add screenshots or short GIFs later under a future `docs/assets/` folder, for example:
-
-- Study Builder screenshot: `docs/assets/study-builder.png`
-- Synthetic report screenshot: `docs/assets/synthetic-report.png`
-- Experimental gaze debug overlay screenshot/GIF: `docs/assets/browser-gaze-debug.gif`
-- Backend report/insights screenshot: `docs/assets/backend-report-insights.png`
-
-Do not add real tester webcam imagery, raw frames, screenshots containing private data, or base64 media payload examples.
 
 ## Project summary bullets
 

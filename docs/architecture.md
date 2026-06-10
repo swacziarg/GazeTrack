@@ -1,27 +1,28 @@
 # Architecture Overview: GazeTrack
 
 ## System overview
-GazeTrack is currently a full-stack synthetic telemetry demo where the browser emits synthetic gaze-like + interaction telemetry, backend APIs ingest and validate privacy-safe events, and report helpers/services compute quality-aware demo metrics for reporting. Future browser gaze work is isolated behind an experimental feature flag.
+GazeTrack is currently a full-stack task analytics MVP where the browser can emit deterministic synthetic telemetry or controlled-site interaction telemetry, backend APIs ingest and validate privacy-safe events, and report helpers/services compute quality-aware metrics for reporting. Browser gaze work remains optional and experimental behind explicit configuration.
 
 ## Frontend/backend/database boundaries
-- **Frontend (React/TS):** Study setup UI, calibration UI, telemetry capture, report rendering.
-- **Backend (FastAPI):** Study/task/AOI/session/event endpoints and report orchestration. Authentication is not implemented in the current demo.
+- **Frontend (React/TS):** Study setup UI, calibration UI, telemetry capture, website integration helper, and report rendering.
+- **Backend (FastAPI):** Study/task/AOI/session/event endpoints, public capture namespace, install verification helper, and report orchestration. Authentication is not implemented in Release 003.
 - **Database:** SQLite for current local development; schema is shaped for a later PostgreSQL/Supabase migration with core entities, task/AOI setup tables, append-only event tables, and persisted report payloads.
 
 ## Event ingestion flow
-1. Frontend opens/creates tester session.
-2. Client buffers gaze and interaction events with timestamps/confidence.
-3. Batched events sent to ingestion endpoint.
-4. Backend validates schema/session linkage and writes accepted privacy-safe events to SQLite.
-5. Report generation reads persisted events plus study tasks/AOIs and writes a report payload row.
+1. Frontend or SDK opens/creates a tester session.
+2. Client buffers synthetic, interaction, and optional experimental gaze-shaped events with timestamps/confidence where available.
+3. Batched events are sent to the legacy demo ingest endpoint or the token-protected `/api/v1/capture/...` namespace.
+4. Backend validates schema/session linkage, capture token, optional origin allowlist, task context, and privacy constraints before writing accepted events to SQLite.
+5. Report generation reads persisted events plus study tasks/AOIs/AOI snapshots and writes a report payload row.
 
 ## Study setup flow
 1. A study contains task prompts and AOI rectangles.
 2. Tasks capture `title`, `prompt`, optional `success_criteria`, and optional `target_url`.
 3. AOIs capture `label`, optional `page_url`, normalized `x`, `y`, `width`, `height`, and `coordinate_space`.
 4. The default synthetic demo study is seeded with one task and five placeholder AOIs when no setup exists.
+5. Controlled-site studies can use AOI selectors and role keys to snapshot configured elements from the live page.
 
-AOI coordinates are normalized 0-1 rectangles. They are currently demo placeholders; screenshot uploads and DOM-based AOI detection are not part of this milestone.
+AOI coordinates are normalized 0-1 rectangles. Controlled-site capture can resolve configured selectors and `data-gazetrack-aoi` role keys into AOI snapshots. Screenshot uploads, screenshot-assisted authoring, and automatic page scanning are not part of this milestone.
 
 ## Gaze tracking flow
 1. Frontend tracker providers implement a shared boundary for calibration, session start/stop, and telemetry events.
@@ -46,7 +47,7 @@ AOI coordinates are normalized 0-1 rectangles. They are currently demo placehold
 6. Build schematic replay data from accepted telemetry, computed fixations, and normalized AOI boxes.
 7. Materialize report payload for dashboard rendering.
 
-Current local reports compute deterministic event counts, gaze presence, low-confidence gaze rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze sample counts, AOI click counts, approximate raw-sample AOI dwell, fixation-derived AOI dwell, report-level fixation summary, replay summary/events/fixations/AOI overlay, privacy summary, and a heuristic quality summary from stored telemetry.
+Current local reports compute deterministic event counts, gaze presence, low-confidence gaze rate, click/scroll/calibration/task counts, task/AOI counts, AOI gaze sample counts, AOI click counts, approximate raw-sample AOI dwell, fixation-derived AOI dwell, report-level fixation summary, replay summary/events/fixations/AOI overlay, captured page layout context when available, privacy summary, and a heuristic quality summary from stored telemetry.
 
 The fixation detector is `simple_dispersion_v1`: accepted gaze samples with normalized coordinates are sorted by timestamp, clustered when consecutive samples are close in space and time, and promoted to a fixation only after minimum sample-count and duration thresholds. This is a deterministic demo pipeline for future browser gaze input, not medical-grade eye tracking or a claim of perfect gaze accuracy.
 
@@ -61,7 +62,8 @@ Session replay v1 is a privacy-safe schematic overlay. The backend emits ordered
 - Persist telemetry only (coordinates, confidence, events, quality metadata).
 - Generate replay from persisted telemetry and computed fixations only.
 - Reject raw webcam/video/image/frame/base64/blob payloads before persistence.
-- Keep browser gaze tracking feature-flagged and consent-gated; synthetic telemetry remains the default.
+- Keep browser gaze tracking feature-flagged and consent-gated; website integration is interaction-only by default.
+- Keep arbitrary DOM text out of layout snapshots unless explicitly enabled with allowed selectors; redaction selectors and form fields always suppress text.
 - Avoid sensitive fields unless necessary for study operation.
 - Plan for retention/deletion controls and auditability.
 

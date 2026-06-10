@@ -1,12 +1,12 @@
 # Analytics Metrics Definitions
 
-These definitions distinguish current `v0.1-demo` report fields from future production metrics. Current inputs are synthetic-compatible telemetry and optional experimental browser-gaze-shaped events, not validated production webcam tracking.
+These definitions distinguish current Release 003 report fields from future production metrics. Current inputs are synthetic-compatible telemetry, controlled-site interaction telemetry, AOI snapshots, and optional experimental browser-gaze-shaped events, not validated production webcam tracking.
 
 ## Dwell time by AOI
 **Plain English:** Total time a tester spent looking at each AOI.
 **Compute:** Map gaze samples and fixation centroids to normalized AOI rectangles. Current reports keep `approximate_dwell_ms` from bounded raw gaze-sample gaps and add `fixation_dwell_ms` from detected fixation durations.
 
-`fixation_dwell_ms` is usually more meaningful than raw sample dwell because it ignores isolated samples and requires a small cluster over time. It is still approximate in the current demo because the input is synthetic-compatible browser telemetry, not calibrated production gaze tracking.
+`fixation_dwell_ms` is usually more meaningful than raw sample dwell because it ignores isolated samples and requires a small cluster over time. It is still approximate because the input is synthetic-compatible or experimental browser telemetry, not calibrated production gaze tracking.
 
 ## Time to first fixation (TTFF)
 **Plain English:** How long it took from task start until the tester first clearly looked at a target AOI.
@@ -36,7 +36,7 @@ This is demo-grade HCI telemetry, not medical-grade fixation detection.
 
 ## Attention entropy
 **Plain English:** How concentrated vs. scattered attention was across AOIs.
-**Current status:** Future metric. Not returned by the `v0.1-demo` backend report.
+**Current status:** Future metric. Not returned by the Release 003 backend report.
 **Compute:** Build AOI dwell-time distribution `p_i`; entropy `H = -sum(p_i * ln(p_i))`.
 
 ## Session quality score

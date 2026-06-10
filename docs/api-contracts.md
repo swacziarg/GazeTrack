@@ -1,6 +1,6 @@
 # API Contracts
 
-These contracts describe the currently implemented backend demo API and SQLite-backed local telemetry flow.
+These contracts describe the currently implemented backend API, SQLite-backed local telemetry flow, and Release 003 Website Integration MVP.
 
 ## Routes
 
@@ -29,7 +29,9 @@ Legacy dashboard/demo endpoints remain available for local development and synth
 
 ## Public capture API
 
-The public capture API is the boundary used by `gazetrack-capture.js`. These endpoints require the study capture token and return `403` for an invalid token. When a study has `allowed_origins`, capture requests must also include a browser `Origin` header that exactly matches one configured origin. Empty allowlists preserve current local/demo behavior. The token and origin check are not user-auth substitutes; until auth exists, token retrieval endpoints are local/demo-admin surfaces.
+The public capture API is the boundary used by `gazetrack-capture.js`. New integrations should load the SDK from `/sdk/v0.2/gazetrack-capture.js`; `/gazetrack-capture.js` remains available for existing controlled-site embeds. The SDK uses interaction-only capture by default: page view, task, click, scroll, route-change, AOI snapshot, and layout metadata events. WebGazer is optional and experimental through explicit SDK configuration.
+
+These endpoints require the study capture token and return `403` for an invalid token. When a study has `allowed_origins`, capture requests must also include a browser `Origin` header that exactly matches one configured origin. Empty allowlists preserve current local/demo behavior. The token and origin check are not user-auth substitutes; until auth exists, token retrieval endpoints are local/demo-admin surfaces.
 
 Study create/configuration payloads support `allowed_origins`:
 
@@ -151,6 +153,8 @@ POST /api/v1/capture/sessions/{session_id}/events
 
 Response shape is `EventIngestResponse` with `accepted_count`, `rejected_count`, `duplicate_count`, `skipped_count`, `stored_count_for_session`, and `rejected_reasons`. `accepted_count` means validation-accepted events in the request, including duplicate retry events. `duplicate_count`/`skipped_count` identify accepted events that were not persisted again because the session already stored the same `client_event_id`. Media-like payload keys are rejected and not persisted.
 
+The SDK keeps queued events until normal async flushes are acknowledged by the backend. It flushes periodically during active tasks, on visibility/page lifecycle changes with `sendBeacon` or `fetch(..., { keepalive: true })` when possible, and before completing the session. Because lifecycle transports do not always provide a usable acknowledgement, duplicate retries are expected and handled through `client_event_id`.
+
 Complete a capture session:
 
 ```http
@@ -234,6 +238,14 @@ window.GazeTrackConfig = {
 - AOI labels may appear in layout snapshots and reports because they are configured by the study owner, not read from arbitrary page copy.
 - These options do not allow raw webcam video, frames, screenshots, image blobs, base64 media, face embeddings, or face landmarks.
 
+### Capture troubleshooting
+
+- CORS/origin mismatch: browser CORS and study `allowed_origins` are separate controls. `GAZETRACK_CORS_ALLOWED_ORIGINS` must allow the website origin at the server layer, and non-empty study allowlists require an exact `Origin` match including scheme and port.
+- Invalid token: fetch the current local/demo-admin snippet config or rotate the token. Old embedded tokens stop working immediately after rotation.
+- AOI not detected: check the configured selector or `data-gazetrack-aoi` role key, ensure the element is visible in the tested route, and verify the target page is not rendering a different variant.
+- Iframe blocked in report view: frame-blocking target sites may prevent embedded report previews. Metrics, AOI snapshots, and schematic replay still come from stored telemetry.
+- Backend unavailable: capture sessions and flushes require FastAPI. Confirm `apiBaseUrl`, backend health, CORS settings, and network reachability before retesting.
+
 ## Task contract
 
 Task create payload:
@@ -272,7 +284,7 @@ AOIs are normalized 0-1 rectangles. `x` and `y` are top-left coordinates, and `w
 - `y >= aoi.y`
 - `y <= aoi.y + aoi.height`
 
-Current AOIs are manual/demo placeholders only. Screenshot uploads and DOM-derived AOI detection are not implemented.
+AOIs are explicit study configuration. Real-site capture can resolve configured selectors and role keys into AOI snapshots, but screenshot uploads and screenshot-assisted authoring are not implemented.
 
 ## Demo report fields
 
@@ -448,4 +460,4 @@ Event payloads containing keys that look like raw media are rejected (case-insen
 
 Accepted telemetry is stored in local SQLite by default. Rejected media-like payloads are not persisted. The current schema uses UUID/string IDs, timestamp columns, append-only telemetry rows, and JSON payloads serialized as text to keep a straightforward future migration path to PostgreSQL/Supabase.
 
-No auth, production-grade webcam tracking, bundled WebGazer dependency, screenshot uploads, production analytics jobs, production replay engine, medical-grade fixation detection, or raw media storage is implemented in this phase.
+No auth, production-grade webcam tracking, bundled WebGazer dependency, screenshot uploads, production analytics jobs, production replay engine, medical-grade fixation detection, or raw media storage is implemented in this phase. The Release 003 website integration is credible for controlled-site interaction telemetry, not a generic session recorder or medical/biometric system.

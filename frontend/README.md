@@ -1,6 +1,6 @@
 # GazeTrack Frontend
 
-React + TypeScript + Vite frontend for the GazeTrack `v0.1-demo` synthetic telemetry dashboard.
+React + TypeScript + Vite frontend for the GazeTrack dashboard, synthetic telemetry demo, reports, and Release 003 Website Integration MVP.
 
 ## Install
 
@@ -26,7 +26,7 @@ npm run build
 npm run test
 ```
 
-Tests currently cover the synthetic tracker, feature-flagged tracker selection, WebGazer adapter normalization, event contract adapter, backend ingest client, demo report utilities, backend report rendering, and synthetic visualization helpers.
+Tests currently cover the synthetic tracker, feature-flagged tracker selection, WebGazer adapter normalization, event contract adapter, backend ingest client, study/install API helpers, demo report utilities, backend report rendering, website integration panel, and synthetic visualization helpers.
 
 ## E2E
 
@@ -121,6 +121,10 @@ Interaction-only mode is the default:
 
 New integrations should use the versioned `/sdk/v0.2/gazetrack-capture.js` SDK path. The legacy `/gazetrack-capture.js` path remains available for existing controlled-site embeds.
 
+The SDK talks to the token-protected `/api/v1/capture/...` namespace. Public capture requests also honor per-study `allowed_origins` when configured, using exact browser `Origin` matching. Event flushes include opaque `batch_id` and `client_event_id` values so retrying a failed or uncertain delivery does not double-store events.
+
+Layout snapshots are structural by default. Arbitrary DOM text from headings, paragraphs, links, and buttons is not captured unless `captureText: true` is combined with explicit `allowedTextSelectors`; `redactSelectors`, inputs, textareas, and password fields always suppress text. CSS metadata is enabled by default and can be disabled with `captureCssMetadata: false`.
+
 WebGazer-enabled mode is explicit:
 
 ```html
@@ -158,8 +162,8 @@ After completing the mock session, the local report renders synthetic visual pre
 
 These visuals are generated from mock telemetry positions and demo AOI boxes only. They are not webcam tracking, WebGazer output, raw media processing, or production heatmap analytics.
 
-The backend session replay uses persisted telemetry, computed fixations, AOI boxes, and safe DOM layout metadata only.
-Real-site reports reconstruct page context from document dimensions, safe text snippets, visual style metadata, and
+The backend session replay uses persisted telemetry, computed fixations, AOI boxes, and privacy-safe DOM layout metadata only.
+Real-site reports reconstruct page context from document dimensions, configured AOI labels, optional selector-allowed text, visual style metadata, and
 semantic element rectangles, not screenshots. Replay renders a bounded viewport and auto-scrolls through the reconstructed
 page as playback reaches events captured below the fold. It does not request, store, or render webcam video, page
 screenshots, images, blobs, or base64 media. The scrubber filters
@@ -181,7 +185,7 @@ If the backend is offline, the local demo report still renders and the backend p
 - Default camera/webcam tracking
 - Authentication
 - Production-grade analytics, heatmaps, or report generation
-- CAF delay
-- DOM-derived AOI detection
+- Authenticated snippet/token administration
+- Screenshot-assisted AOI authoring
 - Export/share flows
 - Production gaze replay tracking, video replay, screenshot replay, or chart visualizations

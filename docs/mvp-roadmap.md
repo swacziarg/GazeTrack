@@ -1,27 +1,27 @@
 # MVP Roadmap
 
-This document describes the current documented implementation state and possible future directions. It is not a release-readiness statement or a prioritized execution plan.
+This document describes the current Release 003 implementation state and likely next milestones. It is not a release-readiness statement; re-run validation in the current checkout before publishing.
 
-## Current documented state
+## Current Release 003 State
 
-The current repository contains a local full-stack synthetic demo path:
+The repository contains a local full-stack UX telemetry MVP:
 
-- React/Vite/TypeScript dashboard with a synthetic study/session/report flow
-- Default synthetic tracker with multiple quality modes
-- Feature-flagged `WebGazerTracker` spike behind `VITE_ENABLE_WEBGAZER`, consent, and guarded `window.webgazer` access
-- FastAPI + SQLite persistence for studies, tasks, AOIs, sessions, accepted telemetry events, and persisted reports
-- Privacy validation that rejects media-like payload keys before persistence
-- Backend report helpers for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, CAF-style click-after-fixation delay, quality-aware AOI insights, and replay payloads
-- Frontend local report, backend ingest/report panels, synthetic visuals, and schematic normalized-coordinate replay
+- React/Vite/TypeScript dashboard with study setup, synthetic session flow, report display, and Website integration helper.
+- Default synthetic tracker with deterministic calibration, gaze-like samples, clicks, scrolls, and task events.
+- Controlled-site capture SDK served from `/sdk/v0.2/gazetrack-capture.js`, with legacy `/gazetrack-capture.js` compatibility.
+- Dedicated `/api/v1/capture/...` namespace for public website capture config, session creation, AOI snapshots, event ingest, and completion.
+- Capture tokens, token rotation, and per-study `allowed_origins` checks for public capture requests.
+- Retry-safe event delivery with `batch_id`, `client_event_id`, duplicate skipping, periodic flush, lifecycle flush, and final flush before completion.
+- Privacy-safe real-site layout capture with arbitrary DOM text off by default, optional selector-allowed text, redaction selectors, and CSS metadata controls.
+- Optional WebGazer experiment behind explicit configuration and consent. It remains approximate, browser-dependent, and not medical-grade.
+- FastAPI + SQLite persistence for studies, tasks, AOIs, sessions, accepted telemetry events, AOI snapshots, and persisted reports.
+- Backend report helpers for event counts, AOI hit metrics, bounded raw dwell, `simple_dispersion_v1` demo fixations, TTFF from task start, CAF-style click-after-fixation delay, quality-aware AOI insights, and schematic replay payloads.
 
-The repository currently has a `v0.1-demo` Git tag, verified with `git tag --list` on 2026-06-07. Confirm tag state in the current checkout before publishing or relying on release notes.
+## Validation Evidence
 
-## Validation evidence
-
-Validation evidence is local and time-scoped. Re-run the relevant commands in the current environment before relying on test status:
+Validation evidence is local and time-scoped. Re-run the relevant commands before relying on status:
 
 ```bash
-git tag --list "v0.1-demo"
 git status --short
 cd backend && PYTHONPATH=. pytest
 cd ../frontend && npm test
@@ -29,24 +29,23 @@ npm run build
 npm run e2e
 ```
 
-See [v0.1-demo Validation Notes](v0.1-demo-release-checklist.md) for recorded local validation details.
+Release 003 validation is tracked in [release-003-checklist.md](release-003-checklist.md). Historical `v0.1-demo` notes remain in [v0.1-demo-release-checklist.md](v0.1-demo-release-checklist.md).
 
-## Known non-goals and not currently claimed
+## Known Non-Goals
 
-- Production webcam tracking
-- Medical-grade eye tracking
-- Real heatmaps
-- Screenshot or video replay
-- DOM-derived AOI detection
-- Authentication, deployment, export, or sharing features
-- Multi-session analytics
+- Medical-grade eye tracking, biometric identity, or perfect gaze accuracy claims.
+- Raw webcam video, frames, screenshots, images, blobs, base64 media, face embeddings, or face landmarks.
+- Generic session recording or Hotjar-style passive replay.
+- Authenticated dashboard/admin access control.
+- Remote crawling, scanner-style install verification, or target-site screenshot capture.
+- Production analytics jobs, background workers, exports, share links, retention UI, or team permissions.
 
-## Possible future directions
+## Release 004 Candidates
 
-- Configurable study setup beyond the seeded demo study
-- Stronger privacy regression tests, including broader recursive media-key rejection cases
-- Database reset/seed documentation
-- Multi-session reporting and comparison views
-- Metrics evolution for task completion time, entropy, dispersion, and heatmap generation after backend support exists
-- Browser gaze research mode with documented consent, privacy, accuracy, and browser-compatibility evidence
-- Production hardening candidates such as auth, retention/deletion workflows, deployment, export, and sharing after those areas enter implemented scope
+- Authenticated local/admin boundaries for snippet config, install verification, and token rotation.
+- Retention/deletion workflows and clearer tester consent records before any production data collection.
+- Multi-session study summaries, segment comparisons, and stronger task-success metrics.
+- More explicit AOI authoring assistance that uses DOM/selector data without storing screenshots or page media.
+- Broader privacy regression tests for layout snapshots, lifecycle flush payloads, and token/origin enforcement.
+- Export/share flows only after least-privilege access controls exist.
+- Browser gaze quality validation before promoting any real-gaze capability beyond experimental status.

@@ -5,6 +5,7 @@ GazeTrack is designed around a narrow data boundary: collect task analytics tele
 ## Current guarantees
 
 - Synthetic mode is the default and does not request camera permission.
+- Real-site website integration is interaction-only by default. It captures task, click, scroll, route, AOI snapshot, and structural layout telemetry without loading webcam gaze code.
 - Experimental browser gaze mode is hidden unless `VITE_ENABLE_WEBGAZER=true`.
 - Browser gaze mode requires explicit in-app consent before initialization.
 - Raw webcam video is not sent to FastAPI and is not persisted.
@@ -35,7 +36,9 @@ This is local SQLite demo storage by default.
 
 Study records may also store `allowed_origins` as a JSON allowlist of site origins approved for public capture. An empty allowlist keeps local/demo integration behavior permissive. A non-empty allowlist rejects public capture config/session/event requests from missing or non-matching origins with `403`. This is a defense-in-depth control alongside CORS and capture tokens, not authentication.
 
-Capture token rotation is the current revoke mechanism. Rotating a token replaces the stored study token, so controlled-site snippets using the old token are rejected until updated. Token retrieval and rotation are local/demo-admin surfaces until authentication and admin permissions are added.
+Capture token rotation is the current revoke mechanism. Rotating a token replaces the stored study token, so controlled-site snippets using the old token are rejected until updated. Token retrieval, install verification, and rotation are local/demo-admin surfaces until authentication and admin permissions are added.
+
+The SDK uses opaque `batch_id` and `client_event_id` delivery identifiers for retry-safe event flushing. These IDs are scoped to delivery semantics and must not be derived from page text, user identity, browser fingerprinting, or raw payload hashes.
 
 ## Data that must not be stored
 
@@ -51,7 +54,7 @@ The current implementation must not persist:
 - Text from inputs, textareas, password fields, or elements matching configured redaction selectors.
 - Biometric identity templates.
 
-Backend tests cover rejection of media-like event payload keys. Any future tracker or report feature should preserve that boundary.
+Backend tests cover rejection of media-like event payload keys. Any future tracker or report feature should preserve that boundary. Capture lifecycle features such as `sendBeacon`, `keepalive`, and retry/backoff must use the same JSON telemetry envelope and must not bypass media-key validation.
 
 ## Safety and positioning rules
 

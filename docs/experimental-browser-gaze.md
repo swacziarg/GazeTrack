@@ -1,6 +1,6 @@
 # Experimental Browser Gaze Limitations
 
-The browser gaze path exists to show a future integration boundary, not to prove production-grade eye tracking.
+The browser gaze path exists to show an experimental browser-native gaze boundary, not to prove production-grade eye tracking.
 
 ## How to enable it
 

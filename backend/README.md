@@ -1,6 +1,6 @@
 # Backend
 
-Minimal FastAPI API for GazeTrack. This backend exposes stable demo endpoints plus SQLite-backed local persistence for synthetic study, session, telemetry, and report flows.
+FastAPI API for GazeTrack. This backend exposes stable demo endpoints, the Release 003 public capture namespace, and SQLite-backed local persistence for synthetic and controlled-site telemetry/report flows.
 
 ## Install
 
@@ -60,8 +60,10 @@ PYTHONPATH=. pytest tests/test_session_report_schema_contract.py
 - `POST /api/v1/capture/sessions/{session_id}/aoi-snapshots`
 - `POST /api/v1/capture/sessions/{session_id}/events`
 - `POST /api/v1/capture/sessions/{session_id}/complete`
+- `GET /api/v1/studies/{study_id}/install-verification`
+- `POST /api/v1/studies/{study_id}/capture-token/rotate`
 
-The `/api/v1/capture/...` namespace is the public website capture boundary used by the versioned SDK. It requires a study capture token and preserves the older dashboard/demo endpoints for local synthetic flows.
+The `/api/v1/capture/...` namespace is the public website capture boundary used by the versioned SDK at `/sdk/v0.2/gazetrack-capture.js`. It requires a study capture token and, when configured, an exact per-study `allowed_origins` match against the browser `Origin` header. The older dashboard/demo endpoints remain available for local synthetic flows and compatibility.
 
 ## SQLite demo persistence
 
@@ -76,7 +78,7 @@ The local schema includes:
 - `telemetry_events`
 - `reports`
 
-The schema keeps UUID/string IDs, timestamp fields, append-only telemetry events, sanitized JSON payloads stored as text, and queryable canonical telemetry columns (`event_schema_version`, `telemetry_source`, normalized point, confidence, payload byte size, AOI hit count, and `ingested_at`) so the shape can migrate to PostgreSQL/Supabase later.
+The schema keeps UUID/string IDs, timestamp fields, append-only telemetry events, sanitized JSON payloads stored as text, delivery metadata (`batch_id`, `client_event_id`), and queryable canonical telemetry columns (`event_schema_version`, `telemetry_source`, normalized point, confidence, payload byte size, AOI hit count, and `ingested_at`) so the shape can migrate to PostgreSQL/Supabase later. When `client_event_id` is present, duplicate retries for the same session are skipped rather than stored again.
 
 `GET /api/v1/studies` ensures the default synthetic demo study exists. The default study also receives one demo task and five placeholder AOIs when no tasks/AOIs exist.
 
@@ -107,7 +109,7 @@ Report replay fields are generated from already persisted telemetry and computed
 - `replay_events` is an ordered privacy-safe timeline with event type, timestamp, relative time, optional normalized point, confidence, AOI hits, label/message, page, source, and viewport scroll metadata when captured.
 - `replay_fixations` contains replay-friendly fixation centroids with start/end relative time, duration, sample count, optional confidence, and AOI hits.
 - `replay_aoi_overlay` contains normalized AOI boxes for schematic rendering.
-- `page_layouts` contains safe DOM layout metadata for real-site reports: page URL/path, viewport/document dimensions, scroll offsets, AOI rectangles, safe text snippets, basic visual style metadata, and semantic element boxes.
+- `page_layouts` contains privacy-safe DOM layout metadata for real-site reports: page URL/path, viewport/document dimensions, scroll offsets, AOI rectangles, configured AOI labels, structural semantic element boxes, and optional selector-allowed text only when explicitly enabled by the SDK config. Arbitrary DOM text is off by default.
 
 Replay is not video replay. It does not persist or return raw payloads wholesale, webcam frames, images, screenshots, blobs, base64 media, face embeddings, or face landmarks from webcam processing.
 
@@ -117,7 +119,7 @@ Replay is not video replay. It does not persist or return raw payloads wholesale
 - No Supabase wiring yet.
 - No bundled or production WebGazer integration.
 - No production-grade webcam tracking implementation.
-- No screenshot uploads or DOM-derived AOI detection.
+- No screenshot uploads or screenshot-assisted AOI authoring.
 - No production analytics jobs, background workers, or medical-grade fixation detection.
 - No production video/session replay engine.
 - No raw webcam video/image/frame/base64/blob storage.

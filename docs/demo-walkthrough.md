@@ -1,6 +1,6 @@
 # Demo Walkthrough
 
-Use this walkthrough when showing GazeTrack to a recruiter, interviewer, or engineering reviewer. The default path is synthetic because it is deterministic, privacy-safe, and does not depend on camera permission.
+Use this walkthrough when showing GazeTrack to a recruiter, interviewer, or engineering reviewer. The default demo path is synthetic because it is deterministic, privacy-safe, and does not depend on camera permission. Release 003 also includes a controlled-site Website Integration MVP for interaction-only capture.
 
 ## 1. Start the local stack
 
@@ -28,7 +28,7 @@ Open `http://localhost:5173`.
 
 Start with this positioning:
 
-> GazeTrack is a privacy-first task analytics demo. The implemented demo uses synthetic gaze-like telemetry by default, persists only telemetry, and generates backend reports from SQLite. It is not medical-grade eye tracking and does not store webcam video.
+> GazeTrack is a privacy-first task analytics MVP. The default demo uses synthetic gaze-like telemetry, and controlled websites can use the SDK for interaction-only capture. It persists telemetry, not raw media, and generates backend reports from SQLite. It is not medical-grade eye tracking and does not store webcam video.
 
 Call out the in-app Demo Guide before starting the session.
 
@@ -72,20 +72,29 @@ In the local report and backend report, point out:
 
 ## 6. Optional browser gaze experiment
 
-Only show this if you explicitly want to discuss future browser-native gaze work:
+Only show this if you explicitly want to discuss experimental browser-native gaze work:
 
 ```bash
 cd frontend
 VITE_ENABLE_WEBGAZER=true npm run dev
 ```
 
-Then choose `Browser gaze experiment`, read the consent notice, grant consent, allow camera permission, and run calibration. Explain that this path is approximate, browser-dependent, quality-gated, opt-in, and not part of the default synthetic demo.
+Then choose `Browser gaze experiment`, read the consent notice, grant consent, allow camera permission, and run calibration. Explain that this path is approximate, browser-dependent, quality-gated, opt-in, and not part of the default synthetic demo or interaction-only website capture default.
 
 If the tracker fails or quality is weak, use the fallback button. That is expected behavior for an experimental path.
 
-## Screenshot / GIF slots
+## Optional website integration discussion
 
-Future demo media can be added under `docs/assets/`:
+Show this only when the audience wants the Release 003 integration boundary:
+
+1. Open the dashboard Website integration panel.
+2. Point out the versioned `/sdk/v0.2/gazetrack-capture.js` snippet, capture token, target URL, allowed origins, and AOI selector/role-key checklist.
+3. Explain that install verification is a local/demo-admin readiness helper, not a remote crawler or scanner.
+4. Explain that the SDK defaults to interaction-only telemetry, keeps arbitrary DOM text off by default, retries event delivery with opaque delivery IDs, and does not send screenshots or webcam frames.
+
+## Demo media slots
+
+Demo media can be added under `docs/assets/`:
 
 - `demo-guide.png`: first viewport with Demo Guide and privacy copy.
 - `study-builder.png`: configured study/tasks/AOIs.
