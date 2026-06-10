@@ -39,7 +39,7 @@ Release 003 makes controlled-site website integration credible, repeatable, priv
 
 ## Validation Commands
 
-Ticket 10 should run the full validation suite in a clean checkout:
+Ticket 10 ran the full validation suite on June 9, 2026 from a clean worktree:
 
 ```bash
 cd backend && PYTHONPATH=. pytest
@@ -54,6 +54,17 @@ Ticket 9 docs validation:
 git diff --check
 rg -n "future|v0.1-demo|safe text snippets|CAF delay|production-grade|medical-grade|screenshot|raw video|future work|not implemented" README.md docs backend/README.md frontend/README.md
 ```
+
+## Ticket 10 Validation Results
+
+- [x] Baseline check: `git status --short` returned clean; recent commits matched Release 003 tickets.
+- [x] Backend: `cd backend && PYTHONPATH=. pytest` passed, 76 tests.
+- [x] Frontend unit tests: `cd frontend && npm test` passed, 23 files and 93 tests.
+- [x] Frontend build: `cd frontend && npm run build` passed.
+- [x] Frontend E2E: `cd frontend && npm run e2e` passed, 8 Playwright tests.
+- [x] Diff hygiene: `git diff --check` passed.
+- [x] Console/log hygiene: SDK contains only two non-secret warning messages, and no console output logs capture tokens, snippets, event payloads, batch IDs, or client event IDs.
+- [x] Secret/local-only wording scan: findings were expected API field names, local development examples, cautionary privacy wording, and third-party MediaPipe bundled comments. No Release 003 cleanup was required.
 
 ## Known Limitations
 
